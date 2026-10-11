@@ -617,7 +617,7 @@
     }
 
     const normalizedPlanName = typeof planName === "string"
-      ? planName.toLowerCase()
+      ? planName.trim().toLowerCase()
       : ""
 
     const hasPlanUsage = !!usage.planUsage
@@ -629,9 +629,16 @@
       typeof usage.planUsage.totalPercentUsed === "number" &&
       Number.isFinite(usage.planUsage.totalPercentUsed)
 
+    const poolUsage = usage.planUsage || {}
+    const spent = readNumber(poolUsage.totalSpend) ??
+      ((readNumber(poolUsage.limit) ?? 0) - (readNumber(poolUsage.remaining) ?? readNumber(poolUsage.limit) ?? 0))
+    const hasModelPools = [poolUsage.autoPercentUsed, poolUsage.apiPercentUsed].every(
+      (value) => typeof value === "number" && Number.isFinite(value) && value >= 0
+    ) && (poolUsage.autoPercentUsed > 0 || poolUsage.apiPercentUsed > 0 || spent === 0)
+
     // Enterprise and some Team request-based accounts can return no planUsage
     // or a planUsage object without limit from the Connect API.
-    const needsRequestBasedFallback = usage.enabled !== false && (!hasPlanUsage || planUsageLimitMissing) && (
+    const needsRequestBasedFallback = usage.enabled !== false && (!hasPlanUsage || (planUsageLimitMissing && !hasModelPools)) && (
       normalizedPlanName === "enterprise" ||
       normalizedPlanName === "team"
     )
@@ -645,7 +652,7 @@
     }
 
     const needsFallbackWithoutPlanInfo = usage.enabled !== false &&
-      (!hasPlanUsage || planUsageLimitMissing) &&
+      (!hasPlanUsage || (planUsageLimitMissing && !hasModelPools)) &&
       !hasTotalUsagePercent &&
       !normalizedPlanName &&
       planInfoUnavailable
@@ -654,7 +661,7 @@
       return buildUnknownRequestBasedResult(ctx, accessToken, planName)
     }
 
-    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent) {
+    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent && !hasModelPools) {
       ctx.host.log.warn("planUsage.limit missing, attempting REST usage API fallback")
       try {
         return buildUnknownRequestBasedResult(ctx, accessToken, planName)
@@ -712,7 +719,7 @@
     }
 
     // Total usage (always present) - fallback primary metric
-    if (!hasPlanUsageLimit && !hasTotalUsagePercent) {
+    if (!hasPlanUsageLimit && !hasTotalUsagePercent && !hasModelPools) {
       throw "Total usage limit missing from API response."
     }
     const planUsed = hasPlanUsageLimit
@@ -738,11 +745,19 @@
     const su = usage.spendLimitUsage
     const isTeamAccount = (
       normalizedPlanName === "team" ||
-      (su && su.limitType === "team") ||
+      (su && typeof su.limitType === "string" && su.limitType.toLowerCase() === "team") ||
       (su && typeof su.pooledLimit === "number" && su.pooledLimit > 0)
     )
 
-    if (isTeamAccount) {
+    if (isTeamAccount && hasModelPools) {
+      if (hasTotalUsagePercent) {
+        lines.push(ctx.line.progress({
+          label: "Total usage", used: pu.totalPercentUsed, limit: 100,
+          format: { kind: "percent" }, resetsAt: ctx.util.toIso(usage.billingCycleEnd),
+          periodDurationMs: billingPeriodMs,
+        }))
+      }
+    } else if (isTeamAccount) {
       if (!hasPlanUsageLimit) {
         ctx.host.log.warn("team-inferred account missing planUsage.limit, attempting REST usage API fallback")
         return buildUnknownRequestBasedResult(ctx, accessToken, planName)

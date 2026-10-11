@@ -49,18 +49,25 @@
     return typeof type === "string" ? type.trim() : "";
   }
 
-  function buildLine(ctx, raw, window) {
+  function buildLine(ctx, raw, window, capturedAt) {
     const percent = raw && typeof raw === "object" ? readNumber(raw.percent) : null;
     if (percent === null) {
       ctx.host.log.error("usage response missing percent for " + window.key);
       throw PARSE_FAILED;
+    }
+    let resetsAt = typeof raw.resetsAt === "string" ? ctx.util.toIso(raw.resetsAt) : null;
+    // An untouched rolling window reports now + 5h. A real sub-1% session rounds to 0,
+    // but keeps its earlier reset. Compare at capture time, preferably on the server clock.
+    if (window.key === "rolling" && percent <= 0 && resetsAt &&
+        Math.abs(Date.parse(resetsAt) - capturedAt - window.periodMs) <= 2000) {
+      resetsAt = null;
     }
     return ctx.line.progress({
       label: window.label,
       used: Math.max(0, Math.min(100, percent)),
       limit: 100,
       format: { kind: "percent" },
-      resetsAt: typeof raw.resetsAt === "string" ? ctx.util.toIso(raw.resetsAt) : null,
+      resetsAt,
       periodDurationMs: window.periodMs,
     });
   }
@@ -106,9 +113,13 @@
       throw PARSE_FAILED;
     }
 
+    const headers = result.resp.headers || {};
+    const dateHeader = Object.keys(headers).find((key) => key.toLowerCase() === "date");
+    const serverTime = dateHeader ? Date.parse(headers[dateHeader]) : NaN;
+    const capturedAt = Number.isFinite(serverTime) ? serverTime : Date.now();
     return {
       plan: "Go",
-      lines: WINDOWS.map((window) => buildLine(ctx, usage[window.key], window)),
+      lines: WINDOWS.map((window) => buildLine(ctx, usage[window.key], window, capturedAt)),
     };
   }
 

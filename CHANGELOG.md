@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+- Provider fixes adapted from upstream OpenUsage 0.7.14: Codex scans the selected login folder, keeps slow history scans in the background, and uses Pro 100 / Pro 200 / Pro 500 plan names
+- Codex history waits at most 150 ms per refresh; completed scans are retained for the next refresh and scoped by home, account and date range. WSL history stays disabled
+- Cursor prefers structured team usage pools over legacy dollar allowances; legacy accounts keep their dollar meter
+- OpenCode Go keeps reset countdowns for active sessions rounded below 1%, and drops untouched rolling-window placeholder resets
+
+
 ## v0.7.3
 
 Logins inside WSL get their own cards, Antigravity and Copilot work from their CLI logins, and the Codex logo follows the theme.

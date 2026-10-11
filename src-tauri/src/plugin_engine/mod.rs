@@ -1,5 +1,6 @@
 pub mod host_api;
 mod http_gate;
+mod retained_scan;
 pub mod manifest;
 pub mod runtime;
 mod sqlite;

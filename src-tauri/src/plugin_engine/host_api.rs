@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 /// Create a `Command` that won't flash a console window on Windows.
@@ -1818,7 +1818,7 @@ const CCUSAGE_POLL_INTERVAL_MS: u64 = 100;
 /// "probe timed out".
 const CCUSAGE_PROBE_RESERVE: Duration = Duration::from_secs(5);
 
-#[derive(Default, serde::Deserialize)]
+#[derive(Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CcusageQueryOpts {
     provider: Option<String>,
@@ -1826,6 +1826,7 @@ struct CcusageQueryOpts {
     until: Option<String>,
     home_path: Option<String>,
     claude_path: Option<String>,
+    account_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -2672,6 +2673,45 @@ where
     serde_json::json!({ "status": "runner_failed" }).to_string()
 }
 
+type CodexScan = Arc<Mutex<super::retained_scan::RetainedScan>>;
+static CODEX_HISTORY_SCANS: OnceLock<Mutex<HashMap<String, CodexScan>>> = OnceLock::new();
+
+fn retained_codex_history(opts: CcusageQueryOpts, pid: String, deadline: ProbeDeadline) -> String {
+    let Some(wait) = deadline.clamp_duration_reserving(
+        Duration::from_millis(150), CCUSAGE_PROBE_RESERVE,
+    ) else {
+        return serde_json::json!({ "status": "runner_failed" }).to_string();
+    };
+    // One worker per home. Account identity and date bounds prevent a new login or midnight
+    // rollover from receiving a completed scan from the preceding scope.
+    let home = ccusage_home_override(&opts, CcusageProvider::Codex)
+        .map(expand_path).unwrap_or_default();
+    let scope = serde_json::to_string(&opts).expect("serialize ccusage scope");
+    let scans = CODEX_HISTORY_SCANS.get_or_init(|| Mutex::new(HashMap::new()));
+    let scan = scans.lock().unwrap_or_else(|err| err.into_inner())
+        .entry(home).or_default().clone();
+    let result = scan.lock().unwrap_or_else(|err| err.into_inner())
+        .value(scope, wait, move || {
+            let Some(_guard) = CcusageQueryGuard::acquire(
+                CcusageProvider::Codex, ccusage_home_override(&opts, CcusageProvider::Codex),
+            ) else {
+                return serde_json::json!({ "status": "runner_failed" }).to_string();
+            };
+            let scan_deadline = ProbeDeadline::at(
+                Instant::now() + Duration::from_secs(CCUSAGE_TIMEOUT_SECS + 5),
+            );
+            run_ccusage_query_with_runners(
+                collect_ccusage_runners(), &opts, CcusageProvider::Codex, &pid,
+                |kind, program, opts, provider, plugin_id| {
+                    run_ccusage_with_runner_deadline(
+                        kind, program, opts, provider, plugin_id, scan_deadline,
+                    )
+                },
+            )
+        });
+    result.unwrap_or_else(|| serde_json::json!({ "status": "pending" }).to_string())
+}
+
 fn inject_ccusage<'js>(
     ctx: &Ctx<'js>,
     host: &Object<'js>,
@@ -2698,6 +2738,9 @@ fn inject_ccusage<'js>(
                     }
                 };
                 let provider = resolve_ccusage_provider(&opts, &pid);
+                if provider == CcusageProvider::Codex {
+                    return Ok(retained_codex_history(opts, pid.clone(), deadline));
+                }
                 let Some(_active_query) =
                     CcusageQueryGuard::acquire(provider, ccusage_home_override(&opts, provider))
                 else {
@@ -4100,6 +4143,17 @@ mod tests {
     }
 
     #[test]
+    fn redact_body_covers_ported_provider_fields() {
+        let body = r#"{"accountId":"work-account-identity","tokens":{"access_token":"access-secret-value","refresh_token":"refresh-secret-value","id_token":"identity-secret-value"},"planUsage":{"autoPercentUsed":2.6,"apiPercentUsed":11.65,"totalPercentUsed":4.088},"usage":{"rolling":{"percent":0,"resetsAt":"2026-10-07T12:30:00Z"}}}"#;
+        let redacted = redact_body(body);
+        for secret in ["work-account-identity", "access-secret-value", "refresh-secret-value", "identity-secret-value"] {
+            assert!(!redacted.contains(secret));
+        }
+        assert!(redacted.contains(r#""autoPercentUsed":2.6"#));
+        assert!(redacted.contains(r#""resetsAt":"2026-10-07T12:30:00Z"#));
+    }
+
+    #[test]
     fn redact_url_preserves_antigravity_quota_endpoints() {
         // [antigravity] new Cloud Code quota endpoints and local LS RPC carry no
         // query params; redact_url must leave them untouched.
@@ -4156,6 +4210,7 @@ mod tests {
             until: Some("20260131".to_string()),
             home_path: None,
             claude_path: None,
+            account_id: None,
         };
         let expected_ccusage_package = ccusage_package_spec();
         assert_eq!(expected_ccusage_package, "ccusage@20.0.14");
@@ -4305,6 +4360,7 @@ mod tests {
             until: Some("20260131".to_string()),
             home_path: None,
             claude_path: None,
+            account_id: None,
         };
         let expected_ccusage_package = ccusage_package_spec();
         let expected_npm_exec_package = format!("--package={expected_ccusage_package}");
@@ -4399,6 +4455,7 @@ mod tests {
             until: Some("20260131".to_string()),
             home_path: None,
             claude_path: None,
+            account_id: None,
         };
 
         let claude = ccusage_runner_args(
@@ -4709,6 +4766,7 @@ mod tests {
             until: None,
             home_path: None,
             claude_path: None,
+            account_id: None,
         };
         assert_eq!(
             resolve_ccusage_provider(&opts_explicit, "claude"),
@@ -4738,6 +4796,7 @@ mod tests {
             until: None,
             home_path: Some("/tmp/shared-home".to_string()),
             claude_path: Some("/tmp/claude-home".to_string()),
+            account_id: None,
         };
         assert_eq!(
             ccusage_home_override(&with_home, CcusageProvider::Claude),
@@ -4754,6 +4813,7 @@ mod tests {
             until: None,
             home_path: None,
             claude_path: Some("/tmp/legacy-claude-path".to_string()),
+            account_id: None,
         };
         assert_eq!(
             ccusage_home_override(&claude_compat, CcusageProvider::Claude),
@@ -4918,6 +4978,7 @@ esac
             until: None,
             home_path: None,
             claude_path: None,
+            account_id: None,
         };
         let result = run_ccusage_with_runner(
             CcusageRunnerKind::Bunx,

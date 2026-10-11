@@ -227,3 +227,7 @@ WorkosCursorSessionToken=<userId>%3A%3A<access_token>
 ```
 
 `userId` is derived from JWT `sub` (e.g. `google-oauth2|user_abc` -> `user_abc`).
+
+Modern team seats use structured Auto/API pool percentages, and the reported total percentage when
+present. The old dollar allowance does not replace those pools or synthesize a missing total.
+Zero-valued placeholders beside positive spend, and malformed/incomplete pools, retain legacy handling.

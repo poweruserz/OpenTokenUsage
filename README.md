@@ -52,9 +52,9 @@ Settings → **Tray icon** picks what sits next to the clock. Settings → **Tas
 - [**Amp**](docs/providers/amp.md) / free tier, bonus, credits
 - [**Antigravity**](docs/providers/antigravity.md) / Gemini and Claude models, session and weekly
 - [**Claude**](docs/providers/claude.md) / session, weekly, Fable, extra usage, rate limit resets, local token usage (ccusage)
-- [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits
+- [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits, local spend per account
 - [**Copilot**](docs/providers/copilot.md) / credits, extra usage, chat, completions
-- [**Cursor**](docs/providers/cursor.md) / credits, total usage, requests, auto usage, API usage, Grok Bot, on-demand, bonus spend, CLI auth
+- [**Cursor**](docs/providers/cursor.md) / credits, total usage, structured team pools, requests, auto usage, API usage, Grok Bot, on-demand, bonus spend, CLI auth
 - [**Factory / Droid**](docs/providers/factory.md) / standard, premium tokens
 - [**Grok**](docs/providers/grok.md) / weekly limit, credits used, pay-as-you-go cap
 - [**JetBrains AI Assistant**](docs/providers/jetbrains-ai-assistant.md) / quota, remaining

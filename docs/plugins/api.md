@@ -529,12 +529,14 @@ host.ccusage.query(opts: {
   provider?: "claude" | "codex", // Optional; defaults to plugin id, then "claude"
   since?: string,                // Start date (YYYYMMDD or YYYY-MM-DD)
   until?: string,                // End date (YYYYMMDD or YYYY-MM-DD)
+  accountId?: string, // Codex retained-history scope; not sent to the CLI
   homePath?: string,             // Provider home override (CLAUDE_CONFIG_DIR or CODEX_HOME)
   claudePath?: string,           // Legacy Claude-only override (deprecated; use homePath)
 }):
   | { status: "ok", data: { daily: DailyUsage[] } }
   | { status: "no_runner" }
   | { status: "runner_failed" }
+  | { status: "pending" } // Codex only: quota can render before local history finishes
 ```
 
 Queries local token usage via provider-focused ccusage commands:
@@ -596,3 +598,9 @@ if (result.status === "ok") {
 ## See Also
 
 - [Plugin Schema](./schema.md) - Plugin structure, manifest format, and output schema
+
+Codex history queries return `pending` while their background scan is running and no retained result
+is available. They wait at most 150 ms; later queries retrieve the completed result. The worker has
+its own bounded execution budget and is shared by home folder. The optional `accountId` and date
+bounds invalidate retained results when the login or query range changes. Plugins should leave live
+quota visible and omit unknown spend while pending. WSL account copies still return `no_runner`.

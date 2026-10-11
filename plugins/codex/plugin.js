@@ -347,8 +347,9 @@
   function formatCodexPlan(ctx, planType) {
     const rawPlan = typeof planType === "string" ? planType.trim() : ""
     if (!rawPlan) return null
-    if (rawPlan.toLowerCase() === "prolite") return "Pro 5x"
-    if (rawPlan.toLowerCase() === "pro") return "Pro 20x"
+    if (rawPlan.toLowerCase() === "prolite") return "Pro 100"
+    if (rawPlan.toLowerCase() === "pro") return "Pro 200"
+    if (rawPlan.toLowerCase() === "promax") return "Pro 500"
     if (rawPlan.toLowerCase() === "self_serve_business_prolite") return "Business Premium"
     return ctx.fmt.planLabel(rawPlan) || null
   }
@@ -408,7 +409,7 @@
     }
   }
 
-  function queryTokenUsage(ctx) {
+  function queryTokenUsage(ctx, authState) {
     if (!ctx.host.ccusage || typeof ctx.host.ccusage.query !== "function") {
       return { status: "no_runner", data: null }
     }
@@ -421,10 +422,13 @@
     const d = since.getDate()
     const sinceStr = "" + y + (m < 10 ? "0" : "") + m + (d < 10 ? "0" : "") + d
     const queryOpts = { provider: "codex", since: sinceStr }
-    const codexHome = readCodexHome(ctx)
-    if (codexHome) {
-      queryOpts.homePath = codexHome
-    }
+    const codexHome = authState.authPath
+      ? authState.authPath.replace(/[\\/]auth\.json$/, "")
+      : readCodexHome(ctx)
+    if (codexHome) queryOpts.homePath = codexHome
+    // Separate retained history when the login in a home changes.
+    const accountId = authState.auth.tokens && authState.auth.tokens.account_id
+    queryOpts.accountId = accountId || ctx.host.crypto.sha256Hex(authState.auth.tokens.access_token)
 
     const result = ctx.host.ccusage.query(queryOpts)
     if (!result || typeof result !== "object" || typeof result.status !== "string") {
@@ -848,7 +852,7 @@
         }
       }
 
-      const tokenUsageResult = queryTokenUsage(ctx)
+      const tokenUsageResult = queryTokenUsage(ctx, authState)
       if (tokenUsageResult.status === "ok") {
         const tokenUsage = tokenUsageResult.data
         const now = new Date()
