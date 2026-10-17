@@ -43,6 +43,8 @@ The app checks for new releases in-app and updates itself.
 
 Settings → **Tray icon** picks what sits next to the clock. Settings → **Taskbar strip** puts logos with session and weekly numbers into the taskbar: choose up to 6 providers and their order, the font and size, and a color scale that warms up as you use more.
 
+Choose **Left** to place the strip at the taskbar's left edge, or **Right** to keep it beside the notification area. **Offset (px)** adds spacing inward from that edge (0–4096, scaled with the display). The default stays Right with an 8 px offset. Placement is saved and applies to every selected taskbar. Large offsets are clamped to keep the strip on the taskbar and outside the tray; if the strip is too wide to fit, it hides. It does not reserve space for Start, Widgets or app buttons, so adjust the offset to avoid them.
+
 ## At Home on Windows 11
 
 ![The panel in the pure black dark theme and in the light theme](docs/images/themes.webp)

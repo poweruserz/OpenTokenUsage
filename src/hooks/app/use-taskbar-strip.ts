@@ -108,7 +108,11 @@ export function useTaskbarStrip(args: {
             )
       render()
         .then((images) =>
-          invoke("set_taskbar_strip", { images, monitors: stripMonitorsArg(style.monitors) }).then(
+          invoke("set_taskbar_strip", {
+            images,
+            monitors: stripMonitorsArg(style.monitors),
+            placement: { side: style.position, offset: style.offset },
+          }).then(
             () => (showingRef.current = images !== null)
           )
         )

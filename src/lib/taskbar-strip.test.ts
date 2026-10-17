@@ -146,6 +146,17 @@ describe("makeTaskbarStripSvg", () => {
 })
 
 describe("normalizeTaskbarStripStyle", () => {
+  it("preserves old placement and validates saved positions and offsets", () => {
+    expect(normalizeTaskbarStripStyle({}).position).toBe("right")
+    expect(normalizeTaskbarStripStyle({}).offset).toBe(8)
+    expect(normalizeTaskbarStripStyle({ position: "left", offset: 120 })).toMatchObject({ position: "left", offset: 120 })
+    expect(normalizeTaskbarStripStyle({ position: "center", offset: -1 })).toMatchObject({ position: "right", offset: 8 })
+    for (const offset of [NaN, Infinity, 1.5, 4097, "20", null]) {
+      expect(normalizeTaskbarStripStyle({ offset }).offset).toBe(8)
+    }
+    for (const offset of [0, 4096]) expect(normalizeTaskbarStripStyle({ offset }).offset).toBe(offset)
+  })
+
   it("keeps valid fields and replaces broken ones", () => {
     const stored = {
       font: "comic-sans",

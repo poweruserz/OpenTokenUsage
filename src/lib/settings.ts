@@ -510,6 +510,9 @@ const MAX_STRIP_MONITORS = 16;
 
 /** Look of the taskbar strip; everything the user can restyle. */
 export type TaskbarStripStyle = {
+  /** Left taskbar edge or right notification-area edge; offset uses logical pixels. */
+  position: "left" | "right";
+  offset: number;
   /** Providers shown, in strip order (own order, independent of the nav); null = first enabled ones. */
   providers: string[] | null;
   font: TaskbarStripFont;
@@ -530,6 +533,8 @@ export type TaskbarStripStyle = {
 };
 
 export const DEFAULT_TASKBAR_STRIP_STYLE: TaskbarStripStyle = {
+  position: "right",
+  offset: 8,
   providers: null,
   font: "segoe-variable",
   fontSize: 12,
@@ -580,6 +585,11 @@ export function normalizeTaskbarStripStyle(value: unknown): TaskbarStripStyle {
     : null;
   return {
     providers,
+    position: raw.position === "left" ? "left" : d.position,
+    offset:
+      typeof raw.offset === "number" && Number.isInteger(raw.offset) && raw.offset >= 0 && raw.offset <= 4096
+        ? raw.offset
+        : d.offset,
     font: TASKBAR_STRIP_FONTS.some((font) => font.id === raw.font) ? (raw.font as TaskbarStripFont) : d.font,
     fontSize: typeof raw.fontSize === "number" && raw.fontSize >= 10 && raw.fontSize <= 15 ? raw.fontSize : d.fontSize,
     bold: typeof raw.bold === "boolean" ? raw.bold : d.bold,
