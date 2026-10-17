@@ -68,6 +68,9 @@ describe("useSettingsSystemActions", () => {
     expect(setAutoUpdateInterval).toHaveBeenCalledWith(15)
     expect(setAutoUpdateNextAt).toHaveBeenCalledWith(910_000)
     expect(saveAutoUpdateIntervalMock).toHaveBeenCalledWith(15)
+    act(() => result.current.handleAutoUpdateIntervalChange("smart"))
+    expect(setAutoUpdateNextAt).toHaveBeenLastCalledWith(70_000)
+    expect(saveAutoUpdateIntervalMock).toHaveBeenLastCalledWith("smart")
     nowSpy.mockRestore()
   })
 

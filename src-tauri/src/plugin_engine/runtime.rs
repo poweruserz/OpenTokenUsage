@@ -74,11 +74,21 @@ pub struct PluginOutput {
 }
 
 pub fn run_probe(plugin: &LoadedPlugin, app_data_dir: &PathBuf, app_version: &str) -> PluginOutput {
+    run_probe_with_cache(plugin, app_data_dir, app_version, false)
+}
+
+pub fn run_probe_with_cache(
+    plugin: &LoadedPlugin,
+    app_data_dir: &PathBuf,
+    app_version: &str,
+    cache_local_usage: bool,
+) -> PluginOutput {
     run_probe_with_timeout(
         plugin,
         app_data_dir,
         app_version,
         Duration::from_secs(PROBE_TIMEOUT_SECS),
+        cache_local_usage,
     )
 }
 
@@ -112,6 +122,7 @@ pub fn run_account_key(
             app_version,
             host_api::ProbeDeadline::at(deadline_at),
             plugin.account.as_ref(),
+            false,
         )
         .ok()?;
         host_api::inject_utils(&ctx).ok()?;
@@ -138,6 +149,7 @@ fn run_probe_with_timeout(
     app_data_dir: &PathBuf,
     app_version: &str,
     timeout: Duration,
+    cache_local_usage: bool,
 ) -> PluginOutput {
     let fallback = error_output(plugin, "runtime error".to_string());
     let timeout_message = probe_timeout_message(timeout);
@@ -171,6 +183,7 @@ fn run_probe_with_timeout(
             app_version,
             deadline,
             plugin.account.as_ref(),
+            cache_local_usage,
         )
         .is_err()
         {
@@ -869,6 +882,7 @@ mod tests {
             &temp_app_dir("timeout"),
             "0.0.0",
             Duration::from_millis(5),
+            false,
         );
 
         assert_eq!(error_text(output), "probe timed out after 5ms");

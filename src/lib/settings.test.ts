@@ -180,6 +180,13 @@ describe("settings", () => {
     await expect(loadAutoUpdateInterval()).resolves.toBe(5)
   })
 
+  it("persists Smart refresh without changing fixed interval support", async () => {
+    await saveAutoUpdateInterval("smart")
+    await expect(loadAutoUpdateInterval()).resolves.toBe("smart")
+    storeState.set("autoUpdateInterval", "broken")
+    await expect(loadAutoUpdateInterval()).resolves.toBe(DEFAULT_AUTO_UPDATE_INTERVAL)
+  })
+
   it("loads default theme mode when missing", async () => {
     await expect(loadThemeMode()).resolves.toBe(DEFAULT_THEME_MODE)
   })

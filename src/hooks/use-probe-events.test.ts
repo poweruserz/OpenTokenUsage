@@ -71,6 +71,15 @@ describe("useProbeEvents", () => {
     }
   })
 
+  it("opts Smart polls into the local-history cache without changing manual probes", async () => {
+    invokeMock.mockResolvedValue({ batchId: "test", pluginIds: ["claude"] })
+    const { result } = renderHook(() => useProbeEvents({ onResult: vi.fn(), onBatchComplete: vi.fn() }))
+    await act(() => result.current.startBatch(["claude"], true))
+    expect(invokeMock).toHaveBeenLastCalledWith("start_probe_batch", expect.objectContaining({ cacheLocalUsage: true }))
+    await act(() => result.current.startBatch(["claude"]))
+    expect(invokeMock.mock.lastCall?.[1]).not.toHaveProperty("cacheLocalUsage")
+  })
+
   it("uses crypto randomUUID when available", async () => {
     const originalCrypto = globalThis.crypto
     // @ts-expect-error test randomUUID path

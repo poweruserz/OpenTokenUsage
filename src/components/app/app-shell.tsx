@@ -168,6 +168,7 @@ export function AppShell({
               />
             </div>
             <PanelFooter
+              refreshing={displayPlugins.some((plugin) => plugin.loading)}
               version={appVersion}
               autoUpdateNextAt={autoUpdateNextAt}
               updateStatus={updateStatus}
