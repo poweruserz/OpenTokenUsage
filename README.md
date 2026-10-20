@@ -47,6 +47,14 @@ Settings → **Tray icon** picks what sits next to the clock. Settings → **Tas
 
 ![The panel in the pure black dark theme and in the light theme](docs/images/themes.webp)
 
+## Smart refresh
+
+Settings → **Auto refresh → Smart** adjusts each account independently. After a quota change, it checks every minute for 5 minutes. Unchanged results then increase the wait to 2, 5, 10 and finally 15 minutes. Any further quota change restarts the one-minute checks. Existing fixed intervals and the default 15-minute setting stay available.
+
+Checks are scheduled after results arrive, so a slow account does not overlap itself or block another account. Failures use a separate 2/5/10/15-minute backoff, and the existing HTTP rate-limit gate still enforces server retry delays. Opening the panel refreshes data at least a minute old, without bypassing error backoff. At the 15-minute cadence, usage elsewhere can take up to 15 minutes to be detected.
+
+Smart polls reuse successful local token-history scans for up to 15 minutes; manual refreshes and fixed intervals still scan fresh history. Quota checks remain live. Only raw progress values and limits determine activity, so countdown text and history charts cannot keep an idle account polling rapidly. No file watchers or burn-rate prediction are involved.
+
 ## Supported Providers
 
 - [**Amp**](docs/providers/amp.md) / free tier, bonus, credits

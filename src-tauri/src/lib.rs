@@ -188,6 +188,7 @@ async fn start_probe_batch(
     state: tauri::State<'_, Mutex<AppState>>,
     batch_id: Option<String>,
     plugin_ids: Option<Vec<String>>,
+    cache_local_usage: Option<bool>,
 ) -> Result<ProbeBatchStarted, String> {
     let batch_id = batch_id
         .and_then(|id| {
@@ -325,7 +326,12 @@ async fn start_probe_batch(
                     wsl::stale_output(&plugin, local_http_api::cached_snapshot(&plugin_id))
                 } else {
                     catch_probe_panic(&plugin, || {
-                        plugin_engine::runtime::run_probe(&plugin, &data_dir, &version)
+                        plugin_engine::runtime::run_probe_with_cache(
+                            &plugin,
+                            &data_dir,
+                            &version,
+                            cache_local_usage.unwrap_or(false),
+                        )
                     })
                 };
                 // The account may have been removed while this probe was queued: drop its result

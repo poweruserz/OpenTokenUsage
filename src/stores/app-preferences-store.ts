@@ -14,7 +14,7 @@ import {
   DEFAULT_TRAY_PERCENT_COLOR,
   DEFAULT_TRAY_PROVIDER,
   type AlertSettings,
-  type AutoUpdateIntervalMinutes,
+  type AutoUpdateInterval,
   type DisplayMode,
   type GlobalShortcut,
   type MenubarIconStyle,
@@ -28,7 +28,7 @@ import {
 } from "@/lib/settings"
 
 type AppPreferencesStore = {
-  autoUpdateInterval: AutoUpdateIntervalMinutes
+  autoUpdateInterval: AutoUpdateInterval
   themeMode: ThemeMode
   displayMode: DisplayMode
   resetTimerDisplayMode: ResetTimerDisplayMode
@@ -47,7 +47,7 @@ type AppPreferencesStore = {
   trayLogoColors: boolean
   taskbarStrip: boolean
   taskbarStripStyle: TaskbarStripStyle
-  setAutoUpdateInterval: (value: AutoUpdateIntervalMinutes) => void
+  setAutoUpdateInterval: (value: AutoUpdateInterval) => void
   setThemeMode: (value: ThemeMode) => void
   setDisplayMode: (value: DisplayMode) => void
   setResetTimerDisplayMode: (value: ResetTimerDisplayMode) => void

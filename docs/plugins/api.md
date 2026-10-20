@@ -551,6 +551,7 @@ Returns a status envelope:
 ### Behavior
 
 - **Runtime runners**: Executes pinned `ccusage@20.0.14` via fallback chain `bunx -> pnpm dlx -> yarn dlx -> npm exec -> npx`
+- **Smart refresh**: Automatic Smart polls may reuse a successful result for up to 15 minutes, keyed by account and query options. Manual refreshes and fixed-interval polls bypass and update this cache. Failed queries are not cached. Provider quota requests remain live.
 - **Provider-aware**: Resolves provider from `opts.provider` or plugin id (`claude`/`codex`)
 - **Focused commands**: Uses `ccusage claude daily` or `ccusage codex daily`; it intentionally does not use `ccusage daily` because that aggregates all detected agents
 - **Legacy fallback**: If `ccusage@20.0.14` cannot run through the package manager release-age policy, retries with release-age-safe `ccusage@18.0.11` for Claude or `@ccusage/codex@18.0.11` for Codex

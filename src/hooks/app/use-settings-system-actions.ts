@@ -5,14 +5,14 @@ import {
   saveAutoUpdateInterval,
   saveGlobalShortcut,
   saveStartOnLogin,
-  type AutoUpdateIntervalMinutes,
+  type AutoUpdateInterval,
   type GlobalShortcut,
   type PluginSettings,
 } from "@/lib/settings"
 
 type UseSettingsSystemActionsArgs = {
   pluginSettings: PluginSettings | null
-  setAutoUpdateInterval: (value: AutoUpdateIntervalMinutes) => void
+  setAutoUpdateInterval: (value: AutoUpdateInterval) => void
   setAutoUpdateNextAt: (value: number | null) => void
   setGlobalShortcut: (value: GlobalShortcut) => void
   setStartOnLogin: (value: boolean) => void
@@ -27,13 +27,13 @@ export function useSettingsSystemActions({
   setStartOnLogin,
   applyStartOnLogin,
 }: UseSettingsSystemActionsArgs) {
-  const handleAutoUpdateIntervalChange = useCallback((value: AutoUpdateIntervalMinutes) => {
+  const handleAutoUpdateIntervalChange = useCallback((value: AutoUpdateInterval) => {
     setAutoUpdateInterval(value)
 
     if (pluginSettings) {
       const enabledIds = getEnabledPluginIds(pluginSettings)
       if (enabledIds.length > 0) {
-        setAutoUpdateNextAt(Date.now() + value * 60_000)
+        setAutoUpdateNextAt(Date.now() + (value === "smart" ? 1 : value) * 60_000)
       } else {
         setAutoUpdateNextAt(null)
       }

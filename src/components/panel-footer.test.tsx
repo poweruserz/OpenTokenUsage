@@ -14,6 +14,14 @@ const noop = () => {}
 const footerProps = { showAbout: false, onShowAbout: noop, onCloseAbout: noop, onUpdateCheck: noop }
 
 describe("PanelFooter", () => {
+  it("shows Refreshing instead of Paused while waiting for checks to complete", () => {
+    render(
+      <PanelFooter version="0.0.0" autoUpdateNextAt={null} refreshing updateStatus={idle} onUpdateInstall={noop} {...footerProps} />
+    )
+    expect(screen.getByText("Refreshing…")).toBeInTheDocument()
+    expect(screen.queryByText("Paused")).not.toBeInTheDocument()
+  })
+
   it("shortens the countdown to just the time while an update is shown, keeping the full text in the tooltip", () => {
     render(
       <PanelFooter
