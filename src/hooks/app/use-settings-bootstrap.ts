@@ -113,15 +113,14 @@ export function useSettingsBootstrap({
 }: UseSettingsBootstrapArgs) {
   const applyStartOnLogin = useCallback(async (value: boolean) => {
     if (!isTauri()) return
-    const currentlyEnabled = await isAutostartEnabled()
-    if (currentlyEnabled === value) return
-
+    // Always rewrite when on: isEnabled() only checks the Run entry exists, and the exe moves when
+    // an old per-machine MSI install becomes a per-user NSIS install.
     if (value) {
       await enableAutostart()
       return
     }
 
-    await disableAutostart()
+    if (await isAutostartEnabled()) await disableAutostart()
   }, [])
 
   useEffect(() => {

@@ -195,6 +195,27 @@ describe("useSettingsBootstrap", () => {
     expect(enableAutostartMock).not.toHaveBeenCalled()
   })
 
+  it("rewrites autostart even when already enabled (the exe moved from MSI to per-user install)", async () => {
+    const args = createArgs()
+    const { result } = renderHook(() => useSettingsBootstrap(args))
+
+    await result.current.applyStartOnLogin(true)
+
+    expect(enableAutostartMock).toHaveBeenCalledTimes(1)
+    expect(disableAutostartMock).not.toHaveBeenCalled()
+  })
+
+  it("leaves autostart alone when off and already disabled", async () => {
+    isAutostartEnabledMock.mockResolvedValue(false)
+    const args = createArgs()
+    const { result } = renderHook(() => useSettingsBootstrap(args))
+
+    await result.current.applyStartOnLogin(false)
+
+    expect(disableAutostartMock).not.toHaveBeenCalled()
+    expect(enableAutostartMock).not.toHaveBeenCalled()
+  })
+
   it("falls back to default reset timer mode when loading fails", async () => {
     const resetModeError = new Error("reset timer mode unavailable")
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
