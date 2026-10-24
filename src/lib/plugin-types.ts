@@ -1,7 +1,4 @@
-export type ProgressFormat =
-  | { kind: "percent" }
-  | { kind: "dollars" }
-  | { kind: "count"; suffix: string }
+export type ProgressFormat = { kind: "percent" } | { kind: "dollars" } | { kind: "count"; suffix: string }
 
 export type BarChartPoint = {
   label: string
@@ -9,8 +6,10 @@ export type BarChartPoint = {
   valueLabel?: string
 }
 
+export type ResetCredit = { count: number; expiresAt?: string }
+
 export type MetricLine =
-  | { type: "text"; label: string; value: string; color?: string; subtitle?: string }
+  | { type: "text"; label: string; value: string; color?: string; subtitle?: string; resetCredits?: ResetCredit[] }
   | {
       type: "progress"
       label: string

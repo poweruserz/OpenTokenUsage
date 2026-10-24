@@ -131,3 +131,13 @@ Response returns new `access_token`, and optionally new `refresh_token` and `id_
 ## WSL
 
 A login inside a running WSL distro shows as its own `Codex · WSL` card when it's a different account than the ones already shown. A stopped distro is never started; its card keeps its last data.
+
+## Banked reset expiry
+
+The reset row shows the available count and each expiry in local time, with a live days/hours countdown. Expired entries are removed locally between probes. The usage-page button opens the provider dashboard; this app never redeems a reset.
+
+Usage notifications also remind you during the final seven days and final 24 hours. The app must be running, notifications enabled, and the provider data current. Reminders are persisted so restarting does not repeat them. A missing expiry is shown as unavailable and never guessed.
+
+When the usage summary reports resets, `GET /backend-api/wham/rate-limit-reset-credits` reads `credits[].status` and `expires_at` using the same account credentials. Only available entries are shown. If this request fails, the summary count remains visible with expiry unavailable.
+
+Implementation reference: [T3 Code Codex usage mapping](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/codexUsageLimits.ts). This app uses its existing read-only HTTP integration rather than starting a Codex app-server.

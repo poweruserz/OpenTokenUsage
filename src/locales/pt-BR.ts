@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const ptBR: Messages = {
+  "banked.available": "{count} disponíveis",
+  "banked.expiresIn": "{count} redefinições expiram em {time}",
+  "banked.unknownExpiry": "{count} redefinições: validade desconhecida",
+  "banked.openUsage": "Abrir a página de uso para usar uma redefinição",
+  "banked.linkFailed": "Não foi possível abrir a página de uso. Tente novamente.",
+  "banked.alertTitle": "{provider}: as redefinições expiram em breve",
+  "banked.alertBody": "{count} redefinições expiram em {time}. Abra a página de uso do provedor para usá-las.",
   "app.minimize": "Minimizar para a área de notificação",
   "app.pin": "Manter na frente",
   "app.unpin": "Parar de manter na frente",
@@ -144,7 +151,7 @@ export const ptBR: Messages = {
   "settings.startOnLogin.desc": "Abrir o OpenTokenUsage ao entrar no Windows",
   "settings.startOnLogin.label": "Iniciar ao entrar",
   "settings.alerts.title": "Notificações",
-  "settings.alerts.desc": "Nos níveis de uso que você escolher, quando o limite vai acabar antes de redefinir e quando ele é redefinido",
+  "settings.alerts.desc": "Limites de uso, ritmo, redefinições de limites e redefinições guardadas que expiram em sete dias ou 24 horas",
   "settings.alerts.label": "Notificações de uso",
   "settings.panel.title": "Painel",
   "settings.panel.desc": "Onde o painel abre. O alfinete na barra de título o mantém acima das outras janelas.",

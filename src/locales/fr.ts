@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const fr: Messages = {
+  "banked.available": "{count} disponibles",
+  "banked.expiresIn": "{count} réinitialisation(s) expirent dans {time}",
+  "banked.unknownExpiry": "{count} réinitialisation(s) : expiration inconnue",
+  "banked.openUsage": "Ouvrir la page d’utilisation pour utiliser une réinitialisation",
+  "banked.linkFailed": "Impossible d’ouvrir la page d’utilisation. Réessayez.",
+  "banked.alertTitle": "{provider} : les réinitialisations expirent bientôt",
+  "banked.alertBody": "{count} réinitialisation(s) expirent dans {time}. Ouvrez la page d’utilisation du fournisseur pour les utiliser.",
   "app.minimize": "Réduire dans la zone de notification",
   "app.pin": "Garder au premier plan",
   "app.unpin": "Ne plus garder au premier plan",
@@ -144,7 +151,7 @@ export const fr: Messages = {
   "settings.startOnLogin.desc": "Ouvrir OpenTokenUsage lorsque vous vous connectez à Windows",
   "settings.startOnLogin.label": "Lancer à la connexion",
   "settings.alerts.title": "Notifications",
-  "settings.alerts.desc": "Aux niveaux d'utilisation choisis, si la limite sera atteinte avant la réinitialisation, et à chaque réinitialisation",
+  "settings.alerts.desc": "Seuils d’utilisation, rythme, réinitialisations des limites et réinitialisations en réserve expirant sous sept jours ou 24 heures",
   "settings.alerts.label": "Notifications d'utilisation",
   "settings.panel.title": "Panneau",
   "settings.panel.desc": "Où le panneau s'ouvre. L'épingle de la barre de titre le garde au-dessus des autres fenêtres.",

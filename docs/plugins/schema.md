@@ -162,7 +162,7 @@ globalThis.__openusage_plugin = {
 
 ```typescript
 type MetricLine =
-  | { type: "text"; label: string; value: string; color?: string; subtitle?: string }
+  | { type: "text"; label: string; value: string; color?: string; subtitle?: string; resetCredits?: { count: number; expiresAt?: string }[] }
   | {
       type: "progress";
       label: string;

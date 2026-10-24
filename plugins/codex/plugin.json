@@ -18,7 +18,7 @@
     { "type": "progress", "label": "Spark", "scope": "detail" },
     { "type": "progress", "label": "Spark Weekly", "scope": "detail" },
     { "type": "progress", "label": "Reviews", "scope": "detail" },
-    { "type": "text", "label": "Rate Limit Resets", "scope": "detail" },
+    { "type": "text", "label": "Rate Limit Resets", "scope": "overview" },
     { "type": "text", "label": "Credits", "scope": "detail" },
     { "type": "text", "label": "Today", "scope": "detail" },
     { "type": "text", "label": "Yesterday", "scope": "detail" },

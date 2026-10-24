@@ -2096,7 +2096,7 @@ describe("claude plugin", () => {
     const manifest = JSON.parse(readFileSync("plugins/claude/plugin.json", "utf8"))
     expect(manifest.lines).toContainEqual({ type: "badge", label: "Status", scope: "overview" })
     expect(manifest.lines).toContainEqual({ type: "progress", label: "Fable", scope: "overview" })
-    expect(manifest.lines).toContainEqual({ type: "text", label: "Rate Limit Resets", scope: "detail" })
+    expect(manifest.lines).toContainEqual({ type: "text", label: "Rate Limit Resets", scope: "overview" })
     const labels = manifest.lines.map((line) => line.label)
     expect(labels.indexOf("Fable")).toBe(labels.indexOf("Weekly") + 1)
   })
@@ -2201,7 +2201,18 @@ describe("claude plugin", () => {
           ],
         },
       })
-      expect(line).toEqual({ type: "text", label: "Rate Limit Resets", value: "4 available" })
+      expect(line).toMatchObject({ type: "text", label: "Rate Limit Resets", value: "4 available" })
+      expect(line.resetCredits).toHaveLength(3)
+      expect(line.resetCredits[0]).toEqual({ count: 1, expiresAt: "2099-10-22T16:00:00.000Z" })
+    })
+
+    it("excludes paused and explicitly unusable grants", async () => {
+      const { line } = await probeWith({ cedar_ember: { eligible: true, grants: [
+        { resets_left: 2, paused: true }, { resets_left: 1, usable_now: false },
+        { resets_left: 1, usable_now: true, ends_at: "2099-01-01T00:00:00Z" },
+      ] } })
+      expect(line.value).toBe("1 available")
+      expect(line.resetCredits).toEqual([{ count: 1, expiresAt: "2099-01-01T00:00:00.000Z" }])
     })
 
     it("reads 0 available for an ineligible account", async () => {

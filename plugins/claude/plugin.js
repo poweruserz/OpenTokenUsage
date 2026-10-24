@@ -881,17 +881,19 @@
   function pushResetGrantsLine(lines, ctx, block) {
     if (!block || typeof block !== "object") return
     let count = 0
+    const inventory = []
     if (block.eligible === true && Array.isArray(block.grants)) {
       const nowMs = Date.now()
       for (const grant of block.grants) {
         const left = grant ? parseNumber(grant.resets_left) : null
-        if (left === null || left < 1) continue
+        if (left === null || left < 1 || grant.paused === true || grant.usable_now === false) continue
         const endsAtMs = ctx.util.parseDateMs(ctx.util.toIso(grant.ends_at))
         if (endsAtMs !== null && endsAtMs <= nowMs) continue
         count += Math.floor(left)
+        inventory.push({ count: Math.floor(left), expiresAt: ctx.util.toIso(grant.ends_at) || undefined })
       }
     }
-    lines.push(ctx.line.text({ label: "Rate Limit Resets", value: count + " available" }))
+    lines.push(ctx.line.text({ label: "Rate Limit Resets", value: count + " available", resetCredits: inventory }))
   }
 
   // A model-scoped weekly limit from the `limits` array — `kind: "weekly_scoped"` with

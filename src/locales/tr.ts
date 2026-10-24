@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const tr: Messages = {
+  "banked.available": "{count} kullanılabilir",
+  "banked.expiresIn": "{count} sıfırlamanın süresi {time} sonra dolacak",
+  "banked.unknownExpiry": "{count} sıfırlama: son kullanma tarihi bilinmiyor",
+  "banked.openUsage": "Sıfırlama kullanmak için kullanım sayfasını aç",
+  "banked.linkFailed": "Kullanım sayfası açılamadı. Tekrar deneyin.",
+  "banked.alertTitle": "{provider}: sıfırlamaların süresi yakında doluyor",
+  "banked.alertBody": "{count} sıfırlamanın süresi {time} sonra dolacak. Kullanmak için sağlayıcının kullanım sayfasını açın.",
   "app.minimize": "Bildirim alanına küçült",
   "app.pin": "Üstte tut",
   "app.unpin": "Üstte tutmayı bırak",
@@ -144,7 +151,7 @@ export const tr: Messages = {
   "settings.startOnLogin.desc": "Windows'ta oturum açıldığında OpenTokenUsage başlasın",
   "settings.startOnLogin.label": "Oturum açıldığında başlat",
   "settings.alerts.title": "Bildirimler",
-  "settings.alerts.desc": "Seçtiğiniz kullanım seviyelerinde, sıfırlanmadan önce dolacaksa ve limit sıfırlandığında",
+  "settings.alerts.desc": "Kullanım eşikleri, tüketim hızı, limit sıfırlamaları ve yedi gün veya 24 saat içinde süresi dolacak birikmiş sıfırlamalar",
   "settings.alerts.label": "Kullanım bildirimleri",
   "settings.panel.title": "Panel",
   "settings.panel.desc": "Panelin açıldığı yer. Başlık çubuğundaki raptiye paneli diğer pencerelerin üstünde tutar.",

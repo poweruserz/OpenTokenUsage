@@ -1,6 +1,13 @@
 // Source of truth for UI strings. Every other locale must define exactly these keys (TypeScript
 // enforces it). Keep {placeholders} identical across locales; a test checks that.
 export const en = {
+  "banked.available": "{count} available",
+  "banked.expiresIn": "{count} reset(s) expire in {time}",
+  "banked.unknownExpiry": "{count} reset(s): expiry unavailable",
+  "banked.openUsage": "Open usage to use a reset",
+  "banked.linkFailed": "Could not open the usage page. Try again.",
+  "banked.alertTitle": "{provider}: resets expire soon",
+  "banked.alertBody": "{count} reset(s) expire in {time}. Open the provider’s usage page to use them.",
   "app.minimize": "Minimize to tray",
   "app.pin": "Keep on top",
   "app.unpin": "Stop keeping on top",
@@ -144,7 +151,7 @@ export const en = {
   "settings.startOnLogin.desc": "Open OpenTokenUsage when you sign in to Windows",
   "settings.startOnLogin.label": "Start on login",
   "settings.alerts.title": "Notifications",
-  "settings.alerts.desc": "At the usage levels you pick, when you'll run out before a reset, and when a limit resets",
+  "settings.alerts.desc": "Usage thresholds, pace, limit resets, and banked resets expiring within seven days or 24 hours",
   "settings.alerts.label": "Usage notifications",
   "settings.panel.title": "Panel",
   "settings.panel.desc": "Where the panel opens. The pin in its title bar keeps it above other windows.",

@@ -1,3 +1,4 @@
+import { ResetCredits } from "@/components/reset-credits"
 import { Fragment, useMemo } from "react"
 import { AlertCircle, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -139,7 +140,7 @@ export function ProviderCard({
     : lines.filter(line => overviewLabels.has(line.label))
 
   const hasResetCountdown = filteredLines.some(
-    (line) => line.type === "progress" && Boolean(line.resetsAt)
+    (line) => (line.type === "progress" && Boolean(line.resetsAt)) || (line.type === "text" && Boolean(line.resetCredits?.length))
   )
 
   // "has ever loaded" — true if either we have a prior success timestamp,
@@ -317,6 +318,7 @@ export function ProviderCard({
                 <div key={gi} className="space-y-1">
                   {group.lines.map((line, li) => (
                     <MetricLineRenderer
+                      usageUrl={links.find((link) => link.label === "Usage dashboard")?.url}
                       key={`${line.label}-${gi}-${li}`}
                       line={line}
                       displayMode={displayMode}
@@ -332,6 +334,7 @@ export function ProviderCard({
                 <Fragment key={gi}>
                   {group.lines.map((line, li) => (
                     <MetricLineRenderer
+                      usageUrl={links.find((link) => link.label === "Usage dashboard")?.url}
                       key={`${line.label}-${gi}-${li}`}
                       line={line}
                       displayMode={displayMode}
@@ -356,6 +359,7 @@ export function ProviderCard({
 
 function MetricLineRenderer({
   line,
+  usageUrl,
   displayMode,
   resetTimerDisplayMode,
   timeFormatMode,
@@ -364,6 +368,7 @@ function MetricLineRenderer({
   refreshing,
 }: {
   line: MetricLine
+  usageUrl?: string
   displayMode: DisplayMode
   resetTimerDisplayMode: ResetTimerDisplayMode
   timeFormatMode: TimeFormatMode
@@ -371,6 +376,9 @@ function MetricLineRenderer({
   now: number
   refreshing?: boolean
 }) {
+  if (line.type === "text" && line.resetCredits) {
+    return <ResetCredits credits={line.resetCredits} now={now} usageUrl={usageUrl} />
+  }
   if (line.type === "text") {
     return (
       <div>
