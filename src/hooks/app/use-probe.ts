@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { useProbeEvents } from "@/hooks/use-probe-events"
 import {
-  type AutoUpdateIntervalMinutes,
+  type AutoUpdateInterval,
   type PluginSettings,
 } from "@/lib/settings"
 import { useProbeAutoUpdate } from "@/hooks/app/use-probe-auto-update"
@@ -10,7 +10,7 @@ import { useProbeState } from "@/hooks/app/use-probe-state"
 
 type UseProbeArgs = {
   pluginSettings: PluginSettings | null
-  autoUpdateInterval: AutoUpdateIntervalMinutes
+  autoUpdateInterval: AutoUpdateInterval
   onProbeResult?: () => void
 }
 
@@ -47,6 +47,7 @@ export function useProbe({
   } = useProbeAutoUpdate({
     pluginSettings,
     autoUpdateInterval,
+    pluginStates,
     setLoadingForPlugins,
     setErrorForPlugins,
     isPluginLoading,

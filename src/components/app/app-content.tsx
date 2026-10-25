@@ -9,7 +9,7 @@ import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { useAppUiStore } from "@/stores/app-ui-store"
 import type { AccountsChange } from "@/lib/accounts"
 import type {
-  AutoUpdateIntervalMinutes,
+  AutoUpdateInterval,
   DisplayMode,
   GlobalShortcut,
   MenubarIconStyle,
@@ -29,7 +29,7 @@ export type AppContentActionProps = {
   onReorder: (orderedIds: string[]) => void
   onToggle: (id: string) => void
   onAccountsChanged: (change: AccountsChange) => void
-  onAutoUpdateIntervalChange: (value: AutoUpdateIntervalMinutes) => void
+  onAutoUpdateIntervalChange: (value: AutoUpdateInterval) => void
   onThemeModeChange: (mode: ThemeMode) => void
   onDisplayModeChange: (mode: DisplayMode) => void
   onResetTimerDisplayModeChange: (mode: ResetTimerDisplayMode) => void

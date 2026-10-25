@@ -45,7 +45,7 @@ import {
   USAGE_ALERT_LEVELS,
   type AlertSettings,
   type AlertSound,
-  type AutoUpdateIntervalMinutes,
+  type AutoUpdateInterval,
   type DisplayMode,
   type GlobalShortcut,
   type MenubarIconStyle,
@@ -470,8 +470,8 @@ interface SettingsPageProps {
   onReorder: (orderedIds: string[]) => void;
   onToggle: (id: string) => void;
   onAccountsChanged: (change: AccountsChange) => void;
-  autoUpdateInterval: AutoUpdateIntervalMinutes;
-  onAutoUpdateIntervalChange: (value: AutoUpdateIntervalMinutes) => void;
+  autoUpdateInterval: AutoUpdateInterval;
+  onAutoUpdateIntervalChange: (value: AutoUpdateInterval) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (value: ThemeMode) => void;
   displayMode: DisplayMode;
@@ -586,6 +586,9 @@ export function SettingsPage({
           value={autoUpdateInterval}
           onChange={onAutoUpdateIntervalChange}
         />
+        {autoUpdateInterval === "smart" && (
+          <p className="mt-2 text-xs text-muted-foreground">{t("settings.autoRefresh.smartHint")}</p>
+        )}
       </SettingsSection>
 
       <SettingsSection title={t("settings.usageMode.title")} description={t("settings.usageMode.desc")}>

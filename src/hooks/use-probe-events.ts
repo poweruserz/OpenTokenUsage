@@ -92,7 +92,7 @@ export function useProbeEvents({ onResult, onBatchComplete }: UseProbeEventsOpti
     }
   }, [onBatchComplete, onResult])
 
-  const startBatch = useCallback(async (pluginIds?: string[]) => {
+  const startBatch = useCallback(async (pluginIds?: string[], cacheLocalUsage?: boolean) => {
     // Wait for listeners to be ready before starting the batch
     if (listenersReadyRef.current) {
       await listenersReadyRef.current
@@ -110,8 +110,9 @@ export function useProbeEvents({ onResult, onBatchComplete }: UseProbeEventsOpti
     const args = pluginIds
       ? { batchId, pluginIds }
       : { batchId }
+    const probeArgs = cacheLocalUsage ? { ...args, cacheLocalUsage: true } : args
     try {
-      const result = await invoke<ProbeBatchStarted>("start_probe_batch", args)
+      const result = await invoke<ProbeBatchStarted>("start_probe_batch", probeArgs)
       return result.pluginIds
     } catch (error) {
       activeBatchIds.current.delete(batchId)

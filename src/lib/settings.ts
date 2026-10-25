@@ -12,7 +12,7 @@ export type PluginSettings = {
   disabled: string[];
 };
 
-export type AutoUpdateIntervalMinutes = 5 | 15 | 30 | 60;
+export type AutoUpdateInterval = 5 | 15 | 30 | 60 | "smart";
 
 /** "dark" is pure black (the former OLED theme). */
 export type ThemeMode = "dark" | "light";
@@ -64,7 +64,7 @@ const GLOBAL_SHORTCUT_KEY = "globalShortcut";
 const START_ON_LOGIN_KEY = "startOnLogin";
 const LANGUAGE_KEY = "language";
 
-export const DEFAULT_AUTO_UPDATE_INTERVAL: AutoUpdateIntervalMinutes = 15;
+export const DEFAULT_AUTO_UPDATE_INTERVAL: AutoUpdateInterval = 15;
 export const DEFAULT_THEME_MODE: ThemeMode = "dark";
 export const DEFAULT_DISPLAY_MODE: DisplayMode = "left";
 export const DEFAULT_RESET_TIMER_DISPLAY_MODE: ResetTimerDisplayMode = "relative";
@@ -76,7 +76,7 @@ export const DEFAULT_TRAY_PERCENT_COLOR: TrayPercentColor = "#ffffff";
 export const DEFAULT_GLOBAL_SHORTCUT: GlobalShortcut = null;
 export const DEFAULT_START_ON_LOGIN = true;
 
-const AUTO_UPDATE_INTERVALS: AutoUpdateIntervalMinutes[] = [5, 15, 30, 60];
+const AUTO_UPDATE_INTERVALS: AutoUpdateInterval[] = [5, 15, 30, 60, "smart"];
 const THEME_MODES: ThemeMode[] = ["dark", "light"];
 const DISPLAY_MODES: DisplayMode[] = ["used", "left"];
 const RESET_TIMER_DISPLAY_MODES: ResetTimerDisplayMode[] = ["relative", "absolute"];
@@ -103,11 +103,13 @@ export function isPerProviderTrayStyle(style: MenubarIconStyle): boolean {
   return style === "numbers" || style === "logos";
 }
 
-export const AUTO_UPDATE_OPTIONS: SettingOption<AutoUpdateIntervalMinutes>[] =
+export const AUTO_UPDATE_OPTIONS: SettingOption<AutoUpdateInterval>[] =
   AUTO_UPDATE_INTERVALS.map((value) =>
-    value === 60
-      ? { value, labelKey: "settings.autoRefresh.hour" }
-      : { value, labelKey: "settings.autoRefresh.minutes", labelVars: { n: value } }
+    value === "smart"
+      ? { value, labelKey: "settings.autoRefresh.smart" }
+      : value === 60
+        ? { value, labelKey: "settings.autoRefresh.hour" }
+        : { value, labelKey: "settings.autoRefresh.minutes", labelVars: { n: value } }
   );
 
 export const THEME_OPTIONS: SettingOption<ThemeMode>[] = THEME_MODES.map((value) => ({
@@ -181,21 +183,21 @@ export function migrateWindsurfToDevin(settings: PluginSettings): PluginSettings
   };
 }
 
-function isAutoUpdateInterval(value: unknown): value is AutoUpdateIntervalMinutes {
+function isAutoUpdateInterval(value: unknown): value is AutoUpdateInterval {
   return (
-    typeof value === "number" &&
-    AUTO_UPDATE_INTERVALS.includes(value as AutoUpdateIntervalMinutes)
+    (typeof value === "number" || value === "smart") &&
+    AUTO_UPDATE_INTERVALS.includes(value as AutoUpdateInterval)
   );
 }
 
-export async function loadAutoUpdateInterval(): Promise<AutoUpdateIntervalMinutes> {
+export async function loadAutoUpdateInterval(): Promise<AutoUpdateInterval> {
   const stored = await store.get<unknown>(AUTO_UPDATE_SETTINGS_KEY);
   if (isAutoUpdateInterval(stored)) return stored;
   return DEFAULT_AUTO_UPDATE_INTERVAL;
 }
 
 export async function saveAutoUpdateInterval(
-  interval: AutoUpdateIntervalMinutes
+  interval: AutoUpdateInterval
 ): Promise<void> {
   await store.set(AUTO_UPDATE_SETTINGS_KEY, interval);
   await store.save();

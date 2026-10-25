@@ -19,6 +19,7 @@ const UPDATE_SHOWN = new Set<UpdateStatus["status"]>(["downloading", "ready", "i
 interface PanelFooterProps {
   version: string;
   autoUpdateNextAt: number | null;
+  refreshing?: boolean;
   updateStatus: UpdateStatus;
   onUpdateInstall: () => void;
   onUpdateCheck: () => void;
@@ -99,6 +100,7 @@ function VersionDisplay({
 export function PanelFooter({
   version,
   autoUpdateNextAt,
+  refreshing = false,
   updateStatus,
   onUpdateInstall,
   onUpdateCheck,
@@ -117,7 +119,7 @@ export function PanelFooter({
   const updateShown = UPDATE_SHOWN.has(updateStatus.status);
   const { countdownLabel, countdownFull } = useMemo(() => {
     if (!autoUpdateNextAt) {
-      const paused = t("footer.paused");
+      const paused = t(refreshing ? "footer.refreshing" : "footer.paused");
       return { countdownLabel: paused, countdownFull: paused };
     }
     const remainingMs = Math.max(0, autoUpdateNextAt - now);
@@ -127,7 +129,7 @@ export function PanelFooter({
       : t("duration.s", { s: totalSeconds });
     const full = t("footer.nextUpdate", { time });
     return { countdownLabel: updateShown ? time : full, countdownFull: full };
-  }, [autoUpdateNextAt, now, updateShown]);
+  }, [autoUpdateNextAt, now, updateShown, refreshing]);
 
   return (
     <>

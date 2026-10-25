@@ -1,22 +1,26 @@
 import { useCallback, useEffect, useState } from "react"
+import type { PluginState } from "@/hooks/app/types"
+import { useSmartRefresh } from "@/hooks/app/use-smart-refresh"
 import {
   getEnabledPluginIds,
-  type AutoUpdateIntervalMinutes,
+  type AutoUpdateInterval,
   type PluginSettings,
 } from "@/lib/settings"
 
 type UseProbeAutoUpdateArgs = {
   pluginSettings: PluginSettings | null
-  autoUpdateInterval: AutoUpdateIntervalMinutes
+  autoUpdateInterval: AutoUpdateInterval
+  pluginStates?: Record<string, PluginState>
   setLoadingForPlugins: (ids: string[]) => void
   setErrorForPlugins: (ids: string[], error: string) => void
   isPluginLoading: (id: string) => boolean
-  startBatch: (pluginIds?: string[]) => Promise<string[] | undefined>
+  startBatch: (pluginIds?: string[], cacheLocalUsage?: boolean) => Promise<string[] | undefined>
 }
 
 export function useProbeAutoUpdate({
   pluginSettings,
   autoUpdateInterval,
+  pluginStates,
   setLoadingForPlugins,
   setErrorForPlugins,
   isPluginLoading,
@@ -24,9 +28,17 @@ export function useProbeAutoUpdate({
 }: UseProbeAutoUpdateArgs) {
   const [autoUpdateNextAt, setAutoUpdateNextAt] = useState<number | null>(null)
   const [autoUpdateResetToken, setAutoUpdateResetToken] = useState(0)
+  const smartNextAt = useSmartRefresh({
+    enabled: autoUpdateInterval === "smart",
+    pluginSettings,
+    pluginStates,
+    setLoadingForPlugins,
+    setErrorForPlugins,
+    startBatch,
+  })
 
   useEffect(() => {
-    if (!pluginSettings) {
+    if (!pluginSettings || autoUpdateInterval === "smart") {
       setAutoUpdateNextAt(null)
       return
     }
@@ -68,6 +80,8 @@ export function useProbeAutoUpdate({
   ])
 
   const resetAutoUpdateSchedule = useCallback(() => {
+    // Smart schedules advance per account when its result arrives, including manual refreshes.
+    if (autoUpdateInterval === "smart") return
     if (!pluginSettings) return
     const enabledIds = getEnabledPluginIds(pluginSettings)
     /* v8 ignore start */
@@ -82,7 +96,7 @@ export function useProbeAutoUpdate({
   }, [autoUpdateInterval, pluginSettings])
 
   return {
-    autoUpdateNextAt,
+    autoUpdateNextAt: autoUpdateInterval === "smart" ? smartNextAt : autoUpdateNextAt,
     setAutoUpdateNextAt,
     resetAutoUpdateSchedule,
   }

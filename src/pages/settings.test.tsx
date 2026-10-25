@@ -303,4 +303,13 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByText("Start on login"))
     expect(onStartOnLoginChange).toHaveBeenCalledWith(true)
   })
+
+  it("offers Smart refresh and explains its per-account schedule", async () => {
+    const onAutoUpdateIntervalChange = vi.fn()
+    render(<SettingsPage {...defaultProps} autoUpdateInterval="smart" onAutoUpdateIntervalChange={onAutoUpdateIntervalChange} />)
+    expect(screen.getByRole("radio", { name: "Smart" })).toHaveAttribute("aria-checked", "true")
+    expect(screen.getByText(/Checks every 2 minutes after usage changes/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("radio", { name: "15 min" }))
+    expect(onAutoUpdateIntervalChange).toHaveBeenCalledWith(15)
+  })
 })

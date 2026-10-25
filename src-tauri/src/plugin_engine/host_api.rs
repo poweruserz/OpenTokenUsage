@@ -605,6 +605,7 @@ pub(crate) fn inject_host_api<'js>(
         app_version,
         ProbeDeadline::none(),
         None,
+        false,
     )
 }
 
@@ -615,6 +616,7 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     app_version: &str,
     deadline: ProbeDeadline,
     account: Option<&crate::plugin_engine::manifest::AccountBinding>,
+    cache_local_usage: bool,
 ) -> rquickjs::Result<()> {
     let globals = ctx.globals();
     let probe_ctx = Object::new(ctx.clone())?;
@@ -660,7 +662,9 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     // An account copy reads the same kind of local logs as its base plugin (from its own home). A
     // WSL copy reads none: its logs live in WSL, far too slow to scan over \\wsl.localhost.
     let ccusage_id = account.map_or(plugin_id, |account| account.base_id.as_str());
-    inject_ccusage(ctx, &host, ccusage_id, deadline, home.is_none())?;
+    inject_ccusage(
+        ctx, &host, ccusage_id, deadline, home.is_none(), plugin_id, cache_local_usage,
+    )?;
 
     probe_ctx.set("host", host)?;
     globals.set("__openusage_ctx", probe_ctx)?;
@@ -2690,9 +2694,12 @@ fn inject_ccusage<'js>(
     plugin_id: &str,
     deadline: ProbeDeadline,
     enabled: bool,
+    cache_id: &str,
+    reuse: bool,
 ) -> rquickjs::Result<()> {
     let ccusage_obj = Object::new(ctx.clone())?;
     let pid = plugin_id.to_string();
+    let cache_id = cache_id.to_string();
 
     ccusage_obj.set(
         "_queryRaw",
@@ -2709,25 +2716,27 @@ fn inject_ccusage<'js>(
                         CcusageQueryOpts::default()
                     }
                 };
-                let provider = resolve_ccusage_provider(&opts, &pid);
-                let Some(_active_query) =
-                    CcusageQueryGuard::acquire(provider, ccusage_home_override(&opts, provider))
-                else {
-                    log::warn!("[plugin:{}] ccusage query already running", pid);
-                    return Ok(serde_json::json!({ "status": "runner_failed" }).to_string());
-                };
-                let runners = collect_ccusage_runners();
-                Ok(run_ccusage_query_with_runners(
-                    runners,
-                    &opts,
-                    provider,
-                    &pid,
-                    |kind, program, opts, provider, plugin_id| {
-                        run_ccusage_with_runner_deadline(
-                            kind, program, opts, provider, plugin_id, deadline,
-                        )
-                    },
-                ))
+                Ok(super::ccusage_cache::query(&cache_id, &opts_json, reuse, || {
+                    let provider = resolve_ccusage_provider(&opts, &pid);
+                    let Some(_active_query) =
+                        CcusageQueryGuard::acquire(provider, ccusage_home_override(&opts, provider))
+                    else {
+                        log::warn!("[plugin:{}] ccusage query already running", pid);
+                        return serde_json::json!({ "status": "runner_failed" }).to_string();
+                    };
+                    let runners = collect_ccusage_runners();
+                    run_ccusage_query_with_runners(
+                        runners,
+                        &opts,
+                        provider,
+                        &pid,
+                        |kind, program, opts, provider, plugin_id| {
+                            run_ccusage_with_runner_deadline(
+                                kind, program, opts, provider, plugin_id, deadline,
+                            )
+                        },
+                    )
+                }))
             },
         )?,
     )?;
@@ -3583,6 +3592,7 @@ mod tests {
                 "0.0.0",
                 ProbeDeadline::none(),
                 Some(&account),
+                false,
             )
             .expect("inject host api");
             let home: Option<String> = ctx
@@ -5398,6 +5408,7 @@ wait
                 "0.0.0",
                 ProbeDeadline::none(),
                 Some(&account),
+                false,
             )
             .expect("inject host api");
             patch_ccusage_wrapper(&ctx).expect("ccusage wrapper");
@@ -5409,6 +5420,33 @@ wait
                 .eval(r#"__openusage_ctx.host.ccusage.query({}).status"#)
                 .expect("ccusage");
             assert_eq!(status, "no_runner");
+        });
+    }
+
+    #[test]
+    fn smart_probe_reads_cached_history_without_starting_a_runner() {
+        let account = "smart-cache-host-test";
+        super::super::ccusage_cache::query(account, "{}", false, || {
+            r#"{"status":"ok","data":{"daily":[]}}"#.to_string()
+        });
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            inject_host_api_with_deadline(
+                &ctx,
+                account,
+                &std::env::temp_dir(),
+                "0.0.0",
+                ProbeDeadline::none(),
+                None,
+                true,
+            )
+            .expect("inject host api");
+            patch_ccusage_wrapper(&ctx).expect("ccusage wrapper");
+            let status: String = ctx
+                .eval(r#"__openusage_ctx.host.ccusage.query({}).status"#)
+                .expect("cached ccusage");
+            assert_eq!(status, "ok");
         });
     }
 }

@@ -43,7 +43,7 @@ import {
   normalizePluginSettings,
   savePluginSettings,
   type AlertSettings,
-  type AutoUpdateIntervalMinutes,
+  type AutoUpdateInterval,
   type DisplayMode,
   type GlobalShortcut,
   type MenubarIconStyle,
@@ -61,7 +61,7 @@ import { useLocaleStore } from "@/lib/i18n"
 type UseSettingsBootstrapArgs = {
   setPluginSettings: (value: PluginSettings | null) => void
   setPluginsMeta: (value: PluginMeta[]) => void
-  setAutoUpdateInterval: (value: AutoUpdateIntervalMinutes) => void
+  setAutoUpdateInterval: (value: AutoUpdateInterval) => void
   setThemeMode: (value: ThemeMode) => void
   setDisplayMode: (value: DisplayMode) => void
   setResetTimerDisplayMode: (value: ResetTimerDisplayMode) => void
