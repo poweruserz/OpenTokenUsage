@@ -36,11 +36,15 @@ export function useSmartRefresh({
     const now = Date.now()
     for (const id of ids) {
       const state = pluginStates[id]
-      let entry: Entry = entries.current.get(id) ?? newSmartSchedule(now)
+      const existing = entries.current.get(id)
+      let entry: Entry = existing ?? newSmartSchedule(now)
       if (state && state !== entry.observed) {
+        // A result already there when Smart starts keeps its age, so old data is refreshed soon
+        // (and on panel open) instead of counting as just checked.
+        const completedAt = existing ? now : Math.min(now, state.lastUpdatedAt ?? now)
         entry = state.loading
           ? { ...entry, nextAt: null }
-          : completeSmartCheck(entry, state.data, !!state.error, now)
+          : completeSmartCheck(entry, state.data, !!state.error, completedAt)
       }
       entries.current.set(id, { ...entry, observed: state })
     }

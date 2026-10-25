@@ -114,3 +114,12 @@ it("starts the due checks when the wall clock trails the timer that woke them", 
   await app.tick(2)
   expect(app.startBatch).toHaveBeenCalledWith(["claude", "codex-work"], true)
 })
+
+// Switching to Smart must not count a result from ten minutes ago as just checked.
+it("keeps the age of results that were already there when Smart starts", async () => {
+  const old = { ...state("claude"), lastUpdatedAt: Date.now() - 10 * MINUTE }
+  const app = setup({ claude: old, "codex-work": state("codex-work") })
+  await app.tick(0)
+  expect(app.startBatch).toHaveBeenCalledTimes(1)
+  expect(app.startBatch).toHaveBeenCalledWith(["claude"], true)
+})
