@@ -3122,7 +3122,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "opentokenusage"
-version = "0.7.7"
+version = "0.7.8"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
