@@ -49,9 +49,11 @@ export function useSmartRefresh({
     setNextAt(next)
     if (next == null) return
     const timer = window.setTimeout(() => {
+      // Due by the time this timer was set for, not by Date.now(): the timer runs on a monotonic
+      // clock, and a wall clock trailing it by a few ms would leave nothing due and no new timer.
       const due = ids.filter((id) => {
         const entry = entries.current.get(id)
-        return entry?.nextAt != null && entry.nextAt <= Date.now() && !pluginStates[id]?.loading
+        return entry?.nextAt != null && entry.nextAt <= next && !pluginStates[id]?.loading
       })
       if (!due.length) return
       for (const id of due) entries.current.get(id)!.nextAt = null

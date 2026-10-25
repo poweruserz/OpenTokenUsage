@@ -104,3 +104,13 @@ it("refreshes stale data on panel focus without bypassing error backoff", async 
   await app.tick(0)
   expect(app.startBatch).not.toHaveBeenCalled()
 })
+
+// setTimeout runs on a monotonic clock, Date.now() on the wall clock: after an NTP slew, a clock
+// set back, or Chromium's periodic resync, the timer can fire a few ms "early" by Date.now().
+it("starts the due checks when the wall clock trails the timer that woke them", async () => {
+  const app = setup()
+  const timerNow = Date.now
+  vi.spyOn(Date, "now").mockImplementation(() => timerNow.call(Date) - 50)
+  await app.tick(2)
+  expect(app.startBatch).toHaveBeenCalledWith(["claude", "codex-work"], true)
+})
