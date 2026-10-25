@@ -246,6 +246,8 @@ export const es419: Messages = {
 
   "label.Session": "Sesión",
   "label.Weekly": "Semanal",
+  "label.Claude Weekly": "Claude semanal",
+  "label.Argon Weekly": "Argon semanal",
   "label.Monthly": "Mensual",
   "label.Today": "Hoy",
   "label.Yesterday": "Ayer",

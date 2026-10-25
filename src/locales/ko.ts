@@ -246,6 +246,8 @@ export const ko: Messages = {
 
   "label.Session": "세션",
   "label.Weekly": "주간",
+  "label.Claude Weekly": "Claude 주간",
+  "label.Argon Weekly": "Argon 주간",
   "label.Monthly": "월간",
   "label.Today": "오늘",
   "label.Yesterday": "어제",

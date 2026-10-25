@@ -246,6 +246,8 @@ export const en = {
 
   "label.Session": "Session",
   "label.Weekly": "Weekly",
+  "label.Claude Weekly": "Claude Weekly",
+  "label.Argon Weekly": "Argon Weekly",
   "label.Monthly": "Monthly",
   "label.Today": "Today",
   "label.Yesterday": "Yesterday",
