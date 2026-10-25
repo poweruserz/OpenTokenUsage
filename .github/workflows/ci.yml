@@ -25,3 +25,31 @@ jobs:
 
       - name: Run tests
         run: bun run test
+
+  # The native host (plugin engine, redaction, taskbar strip, accounts) is Windows-only Rust that
+  # the job above never compiles. The runner image ships rustup, so no toolchain action is needed.
+  windows-rust:
+    name: Windows Rust tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - run: bun install --frozen-lockfile
+
+      # tauri::generate_context! embeds dist/ and the bundled plugins, so both must exist.
+      - name: Bundle plugins and build the frontend
+        run: bun run bundle:plugins && bun run build
+
+      - name: Test the native host
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
