@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.7.8
+
+Updates no longer ask for administrator rights, Antigravity's meters and plan badge are back, and Smart refresh and banked-reset reminders arrive. Thanks to @ElliotDrel for three of these.
+
+**Installed 0.7.7 or older (MSI or WinGet)?** This update moves the app to a per-user install. Windows asks once to remove the old version and once for administrator rights; your settings stay. Later updates need neither.
+
+### New Features
+- Smart refresh: an optional Auto refresh choice that checks each account every 2 minutes while its usage changes and slows down to 15 minutes when it doesn't (#5 by @ElliotDrel)
+- Codex and Claude: the reset row lists when each banked reset expires, with a live countdown, and usage notifications remind you 7 days and 24 hours before one expires (#19 by @ElliotDrel)
+- Antigravity: Argon Weekly, the separate weekly quota some accounts have (#22)
+
+### Bug Fixes
+- Installs and updates are per user (`%LOCALAPPDATA%\OpenTokenUsage`), so updates no longer ask for administrator rights. WinGet installs the same per-user setup (#18 by @ElliotDrel)
+- Antigravity: the tray could show "--" when Google's quota summary left out the Gemini group; Session then comes from the per-model quotas. Both Cloud Code hosts are asked, and the plan badge shows without the Antigravity app running (#20, #22)
+- Codex: Pro plans show their current names (Pro 100, Pro 200, Pro 500), and local spend comes from the folder of the login in use (#25)
+- Cursor: team seats use their Auto and API pools (#25)
+- OpenCode Go: an active session at 0% keeps its reset time (#25)
+
 ## v0.7.7
 
 GitHub Copilot usage now also works for GitHub Enterprise Cloud accounts. Thanks to @OzmaXochi.
