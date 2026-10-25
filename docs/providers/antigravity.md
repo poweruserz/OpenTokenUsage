@@ -212,6 +212,16 @@ Same client_id/secret is there in the Antigravity app bundle, used for the Googl
 
 When the language server is not running, the plugin falls back to Google's Cloud Code API using a Google OAuth access token from the unified-state protobuf, a cached refreshed token, or the `agy` keychain account.
 
+### retrieveUserQuotaSummary (first)
+
+The pooled meters: `gemini-5h` (Session), `gemini-weekly` (Weekly), `3p-5h` (Claude) and `3p-weekly` (Claude Weekly), matched by exact `bucketId`. The plugin asks production first and daily only when production's answer lacks one of the four, then merges the bodies by bucket id, the first usable bucket winning: either host can omit a whole pool (upstream #1407).
+
+Eligible accounts also get a `Gemini 4 Argon` group with one `window: "weekly"` bucket of its own id: it becomes **Argon Weekly**, between Weekly and Claude. A disabled bucket, a `disabled` flag that isn't a boolean, or anything but exactly one weekly bucket drops that line (upstream #1395). Argon models never join the Gemini pool in the per-model fallbacks below.
+
+When the merged summary reports other pools but no Gemini bucket at all (seen 2026-10-25 on both hosts), Session comes from `fetchAvailableModels`' Gemini models instead (the LS path uses `GetUserStatus`). Image models are left out: they have a quota of their own. Gemini's weekly window then has no data.
+
+The plan badge comes from `loadCodeAssist` (`User-Agent: antigravity`, body `{}`): `paidTier.name`, else a known `paidTier.id` (`g1-pro-tier`, `g1-ultra-tier`, `g1-ultra-lite-tier`), else `currentTier.name`.
+
 ### fetchAvailableModels
 
 ```
@@ -224,8 +234,6 @@ User-Agent: antigravity
 Base URLs tried in order (production first: daily can answer 200 without the Gemini group):
 1. `https://cloudcode-pa.googleapis.com`
 2. `https://daily-cloudcode-pa.googleapis.com`
-
-When `retrieveUserQuotaSummary` reports other pools but no Gemini bucket (seen 2026-10-25 on both hosts), Session comes from this endpoint's Gemini models instead (the LS path uses `GetUserStatus`). Image models are left out: they have a quota of their own. Gemini's weekly window then has no data.
 
 ### agy keychain fallback
 
@@ -265,7 +273,7 @@ The Cloud Code model set is a superset of the LS model set. The LS returns only 
 1. Probe the Antigravity app/IDE language server.
 2. Probe the `agy` local language server.
 3. Read SQLite token candidates from both Antigravity state DB paths.
-4. Try unexpired SQLite/cached access tokens with `fetchAvailableModels`.
+4. Try unexpired SQLite/cached access tokens with `retrieveUserQuotaSummary` (then `fetchAvailableModels` for builds without it), and read the plan from `loadCodeAssist`.
 5. Refresh SQLite refresh tokens only after auth failure or when no access token exists.
 6. Read `agy` keychain token from service `gemini`, account `antigravity`, then call `loadCodeAssist` and `retrieveUserQuota`.
 7. If all strategies fail: error "Start Antigravity or run `agy` and try again."

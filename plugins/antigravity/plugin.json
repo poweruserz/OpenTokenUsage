@@ -9,6 +9,7 @@
   "lines": [
     { "type": "progress", "label": "Session", "scope": "overview", "primaryOrder": 1 },
     { "type": "progress", "label": "Weekly", "scope": "overview", "period": "weekly" },
+    { "type": "progress", "label": "Argon Weekly", "scope": "overview", "period": "weekly" },
     { "type": "progress", "label": "Claude", "scope": "detail" },
     { "type": "progress", "label": "Claude Weekly", "scope": "detail", "period": "weekly" }
   ]

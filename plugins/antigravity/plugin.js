@@ -438,6 +438,18 @@
     return normalizedLabel.toLowerCase().indexOf("gemini") !== -1 ? SESSION_LABEL : CLAUDE_LABEL
   }
 
+  // Gemini 4 Argon has a weekly quota of its own (upstream #1395); the per-model quotas carry no
+  // window, so it never joins the Gemini pool. M421 and the names were seen in GetUserStatus.
+  function isArgonModel(label, modelId) {
+    if (modelId === "MODEL_PLACEHOLDER_M421") return true
+    var values = [label, modelId || ""]
+    for (var i = 0; i < values.length; i++) {
+      var normalized = String(values[i]).toLowerCase().replace(/ /g, "-")
+      if (normalized === "gemini-4-argon" || normalized.indexOf("gemini-4-argon-") === 0) return true
+    }
+    return false
+  }
+
   function modelSortKey(label) {
     // The Gemini pool ("Session") before Claude, matching the plugin.json declaration order.
     return label === SESSION_LABEL ? "0_" + label : "1_" + label
@@ -477,6 +489,11 @@
       if (frac === null) {
         // Never fabricate a 100%-used meter from missing quota info — drop the model.
         ctx.host.log.warn("model '" + label + "' has no usable remainingFraction; dropping it")
+        continue
+      }
+      var mid = c.modelId || (c.modelOrAlias && c.modelOrAlias.model)
+      if (isArgonModel(label, mid)) {
+        ctx.host.log.warn("skipping legacy Argon quota: its pool and period are unavailable")
         continue
       }
       var rtime = (qi && qi.resetTime) || undefined
@@ -521,40 +538,124 @@
     { bucketId: "3p-weekly", label: CLAUDE_WEEKLY_LABEL, periodMs: WEEKLY_PERIOD_MS },
   ]
 
-  // RetrieveUserQuotaSummary → up to four pool meters, ordered Session, Weekly, Claude,
-  // Claude Weekly. Accepts both the LS envelope ({"response":{"groups":…}}) and the bare
-  // Cloud Code payload ({"groups":…}). Returns null when the body has no groups anywhere
-  // (not a summary — the caller may fall back to the legacy endpoints). A non-null result,
-  // even an empty one, is authoritative and must never fall through to the legacy chain.
-  // A bucket with a missing/unusable remainingFraction drops its line instead of
-  // fabricating 0% or 100%.
-  function parseQuotaSummary(ctx, data) {
-    if (!data || typeof data !== "object") return null
-    var groups = null
-    if (data.response && Array.isArray(data.response.groups)) {
-      groups = data.response.groups
-    } else if (Array.isArray(data.groups)) {
-      groups = data.groups
+  // Eligible accounts get a separate Gemini 4 Argon group with its own weekly window (upstream
+  // #1395). Its buckets never feed the shared pools, even under a shared bucket id.
+  var ARGON_GROUP = "Gemini 4 Argon"
+  var ARGON_WEEKLY_LABEL = "Argon Weekly"
+
+  function isSharedBucketId(id) {
+    for (var k = 0; k < SUMMARY_BUCKETS.length; k++) {
+      if (SUMMARY_BUCKETS[k].bucketId === id) return true
     }
-    if (!groups) return null
+    return false
+  }
+
+  // Both envelopes: the LS wraps the payload ({"response":{"groups":…}}), Cloud Code doesn't.
+  function summaryGroups(data) {
+    if (!data || typeof data !== "object") return null
+    if (data.response && Array.isArray(data.response.groups)) return data.response.groups
+    if (Array.isArray(data.groups)) return data.groups
+    return null
+  }
+
+  // The buckets of the shared pools: every group but Argon's.
+  function sharedBuckets(groups) {
+    var buckets = []
+    for (var i = 0; i < groups.length; i++) {
+      var group = groups[i]
+      if (!group || group.displayName === ARGON_GROUP || !Array.isArray(group.buckets)) continue
+      for (var j = 0; j < group.buckets.length; j++) {
+        if (group.buckets[j] && typeof group.buckets[j] === "object") buckets.push(group.buckets[j])
+      }
+    }
+    return buckets
+  }
+
+  function usableFraction(bucket) {
+    return typeof bucket.remainingFraction === "number" && Number.isFinite(bucket.remainingFraction)
+  }
+
+  // Whether one body already has a usable value for all four shared pools: under the first-wins
+  // merge no other host's answer could change those meters.
+  function isCompleteSummary(data) {
+    var groups = summaryGroups(data)
+    if (!groups) return false
+    var usable = {}
+    var buckets = sharedBuckets(groups)
+    for (var i = 0; i < buckets.length; i++) {
+      if (usableFraction(buckets[i])) usable[buckets[i].bucketId] = true
+    }
+    for (var k = 0; k < SUMMARY_BUCKETS.length; k++) {
+      if (!usable[SUMMARY_BUCKETS[k].bucketId]) return false
+    }
+    return true
+  }
+
+  // Argon's line needs exactly one weekly bucket with its own id; a disabled flag that isn't a
+  // boolean can't establish access, so the line is dropped.
+  function argonWeeklyLine(ctx, groups) {
+    var buckets = []
+    var found = false
+    for (var i = 0; i < groups.length; i++) {
+      var group = groups[i]
+      if (!group || group.displayName !== ARGON_GROUP) continue
+      found = true
+      if (Array.isArray(group.buckets)) buckets = buckets.concat(group.buckets)
+    }
+    if (!found) return null
+    var weekly = []
+    for (var j = 0; j < buckets.length; j++) {
+      var bucket = buckets[j]
+      if (!bucket || typeof bucket !== "object") continue
+      if (bucket.window !== "weekly") {
+        ctx.host.log.warn("Argon quota has unsupported window '" + String(bucket.window) + "'; skipping its bucket")
+        continue
+      }
+      weekly.push(bucket)
+    }
+    var only = weekly.length === 1 ? weekly[0] : null
+    if (!only || typeof only.bucketId !== "string" || !only.bucketId || isSharedBucketId(only.bucketId)) {
+      ctx.host.log.warn("Argon quota group has no unambiguous separate weekly bucket; dropping its line")
+      return null
+    }
+    if (only.disabled !== undefined && only.disabled !== null && typeof only.disabled !== "boolean") {
+      ctx.host.log.warn("Argon weekly quota has an unusable disabled flag; dropping its line")
+      return null
+    }
+    if (only.disabled === true) return null
+    if (!usableFraction(only)) {
+      ctx.host.log.warn("Argon weekly quota has no usable remainingFraction; dropping its line")
+      return null
+    }
+    return modelLine(ctx, ARGON_WEEKLY_LABEL, only.remainingFraction, only.resetTime, WEEKLY_PERIOD_MS)
+  }
+
+  // RetrieveUserQuotaSummary bodies (one per Cloud Code host, or the LS's one) → up to five meters,
+  // ordered Session, Weekly, Argon Weekly, Claude, Claude Weekly. Buckets merge by id, the first
+  // usable one winning: one host can omit a whole pool (upstream #1407). Returns null when no body
+  // is a summary (the caller may fall back to the legacy endpoints). A non-null result, even an
+  // empty one, is authoritative. A bucket with a missing/unusable remainingFraction drops its line
+  // instead of fabricating 0% or 100%.
+  function parseQuotaSummaries(ctx, bodies) {
+    var groupLists = []
+    for (var b = 0; b < bodies.length; b++) {
+      var groups = summaryGroups(bodies[b])
+      if (groups) groupLists.push(groups)
+    }
+    if (groupLists.length === 0) return null
 
     var pooled = {}
-    for (var i = 0; i < groups.length; i++) {
-      var buckets = (groups[i] && Array.isArray(groups[i].buckets)) ? groups[i].buckets : []
+    for (var g = 0; g < groupLists.length; g++) {
+      var buckets = sharedBuckets(groupLists[g])
       for (var j = 0; j < buckets.length; j++) {
         var bucket = buckets[j]
-        if (!bucket || typeof bucket !== "object") continue
         var id = bucket.bucketId
-        var known = false
-        for (var k = 0; k < SUMMARY_BUCKETS.length; k++) {
-          if (SUMMARY_BUCKETS[k].bucketId === id) { known = true; break }
-        }
-        if (!known) {
+        if (!isSharedBucketId(id)) {
           ctx.host.log.warn("quota summary: skipping unrecognized bucket id '" + String(id) + "'")
           continue
         }
         if (pooled[id]) continue // duplicate bucket id — first one wins
-        if (typeof bucket.remainingFraction !== "number" || !Number.isFinite(bucket.remainingFraction)) {
+        if (!usableFraction(bucket)) {
           ctx.host.log.warn("quota summary: bucket '" + id + "' has no usable remainingFraction; dropping its line")
           continue
         }
@@ -569,19 +670,34 @@
       if (!entry) continue
       lines.push(modelLine(ctx, spec.label, entry.fraction, entry.resetTime, spec.periodMs))
     }
+
+    // Argon is judged per body: two hosts' Argon groups together would read as an ambiguous bucket.
+    for (var a = 0; a < groupLists.length; a++) {
+      var argon = argonWeeklyLine(ctx, groupLists[a])
+      if (!argon) continue
+      var at = lines.length
+      for (var n = 0; n < lines.length; n++) {
+        if (lines[n].label === CLAUDE_LABEL || lines[n].label === CLAUDE_WEEKLY_LABEL) { at = n; break }
+      }
+      lines.splice(at, 0, argon)
+      break
+    }
     return lines
+  }
+
+  function parseQuotaSummary(ctx, data) {
+    return parseQuotaSummaries(ctx, [data])
   }
 
   // Seen 2026-10-25: both Cloud Code hosts answered with only the Claude group while the per-model
   // quotas still carried every Gemini model. A summary that reports other pools but no Gemini bucket
   // at all gets its Session (Gemini 5h) from those quotas; Gemini's weekly window stays unknown.
-  function summaryLacksGemini(data, lines) {
+  function summaryLacksGemini(bodies, lines) {
     if (lines.length === 0) return false
-    var groups = (data.response && data.response.groups) || data.groups || []
-    for (var i = 0; i < groups.length; i++) {
-      var buckets = (groups[i] && Array.isArray(groups[i].buckets)) ? groups[i].buckets : []
+    for (var b = 0; b < bodies.length; b++) {
+      var buckets = sharedBuckets(summaryGroups(bodies[b]) || [])
       for (var j = 0; j < buckets.length; j++) {
-        var id = buckets[j] && buckets[j].bucketId
+        var id = buckets[j].bucketId
         if (id === "gemini-5h" || id === "gemini-weekly") return false
       }
     }
@@ -598,8 +714,8 @@
     return lines
   }
 
-  function withCloudGemini(ctx, token, summary, lines) {
-    if (!summaryLacksGemini(summary, lines)) return lines
+  function withCloudGemini(ctx, token, summaries, lines) {
+    if (!summaryLacksGemini(summaries, lines)) return lines
     ctx.host.log.warn("quota summary has no Gemini group; Session comes from fetchAvailableModels")
     var models = requestCloudCodeJson(ctx, FETCH_MODELS_PATH, token, "antigravity", {})
     return models && !models._authFailed ? withLegacyGemini(ctx, lines, parseCloudCodeModels(models)) : lines
@@ -614,39 +730,68 @@
 
   // --- Cloud Code API ---
 
-  function requestCloudCodeJson(ctx, path, token, userAgent, body) {
-    for (var i = 0; i < CLOUD_CODE_URLS.length; i++) {
-      try {
-        var resp = ctx.host.http.request({
-          method: "POST",
-          url: CLOUD_CODE_URLS[i] + path,
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-            "User-Agent": userAgent || "antigravity",
-          },
-          bodyText: JSON.stringify(body || {}),
-          timeoutMs: 15000,
-        })
-        if (!resp || typeof resp.status !== "number" || !Number.isFinite(resp.status)) {
-          ctx.host.log.warn("Cloud Code returned invalid response shape (" + CLOUD_CODE_URLS[i] + ")")
-          continue
-        }
-        if (ctx.util.isAuthStatus(resp.status)) return { _authFailed: true }
-        if (resp.status >= 200 && resp.status < 300) {
-          var json = ctx.util.tryParseJson(resp.bodyText)
-          if (!json || typeof json !== "object") {
-            ctx.host.log.warn("Cloud Code returned invalid JSON (" + CLOUD_CODE_URLS[i] + ")")
-            continue
-          }
-          return json
-        }
-      } catch (e) {
-        ctx.host.log.warn("Cloud Code request failed (" + CLOUD_CODE_URLS[i] + "): " + String(e))
+  // One Cloud Code host: the JSON body, { _authFailed: true }, or null (unavailable).
+  function requestCloudCodeHost(ctx, base, path, token, userAgent, body) {
+    try {
+      var resp = ctx.host.http.request({
+        method: "POST",
+        url: base + path,
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+          "User-Agent": userAgent || "antigravity",
+        },
+        bodyText: JSON.stringify(body || {}),
+        timeoutMs: 15000,
+      })
+      if (!resp || typeof resp.status !== "number" || !Number.isFinite(resp.status)) {
+        ctx.host.log.warn("Cloud Code returned invalid response shape (" + base + ")")
+        return null
       }
+      if (ctx.util.isAuthStatus(resp.status)) return { _authFailed: true }
+      if (resp.status >= 200 && resp.status < 300) {
+        var json = ctx.util.tryParseJson(resp.bodyText)
+        if (!json || typeof json !== "object") {
+          ctx.host.log.warn("Cloud Code returned invalid JSON (" + base + ")")
+          return null
+        }
+        return json
+      }
+    } catch (e) {
+      ctx.host.log.warn("Cloud Code request failed (" + base + "): " + String(e))
     }
     return null
+  }
+
+  // The first host that answers (or rejects the token) wins.
+  function requestCloudCodeJson(ctx, path, token, userAgent, body) {
+    for (var i = 0; i < CLOUD_CODE_URLS.length; i++) {
+      var json = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[i], path, token, userAgent, body)
+      if (json) return json
+    }
+    return null
+  }
+
+  // The quota summary from production, then daily unless production's answer is already complete
+  // (upstream #1407: one host can omit a whole pool). The 2xx bodies in host order,
+  // { _authFailed: true }, or null.
+  function requestQuotaSummaries(ctx, token) {
+    var bodies = []
+    for (var i = 0; i < CLOUD_CODE_URLS.length; i++) {
+      var json = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[i], QUOTA_SUMMARY_PATH, token, "antigravity", {})
+      if (json && json._authFailed) return bodies.length ? bodies : json
+      if (!json) continue
+      bodies.push(json)
+      if (isCompleteSummary(json)) break
+    }
+    return bodies.length ? bodies : null
+  }
+
+  // The plan never gates the meters: a failed loadCodeAssist just leaves it blank.
+  function loadCloudPlan(ctx, token) {
+    var data = requestCloudCodeJson(ctx, LOAD_CODE_ASSIST_PATH, token, "antigravity", {})
+    return data && !data._authFailed ? readAgyPlan(data) : null
   }
 
   // Cloud Code probe for one DB/cached/refreshed token: the quota summary first (the only
@@ -654,11 +799,13 @@
   // then the legacy fetchAvailableModels chain for builds without the RPC.
   // Returns { plan, lines }, { _authFailed: true }, or null (unavailable).
   function probeCloudCodeToken(ctx, token) {
-    var summary = requestCloudCodeJson(ctx, QUOTA_SUMMARY_PATH, token, "antigravity", {})
-    if (summary && summary._authFailed) return summary
-    if (summary) {
-      var summaryLines = parseQuotaSummary(ctx, summary)
-      if (summaryLines) return { plan: null, lines: withCloudGemini(ctx, token, summary, summaryLines) }
+    var summaries = requestQuotaSummaries(ctx, token)
+    if (summaries && summaries._authFailed) return summaries
+    if (summaries) {
+      var summaryLines = parseQuotaSummaries(ctx, summaries)
+      if (summaryLines) {
+        return { plan: loadCloudPlan(ctx, token), lines: withCloudGemini(ctx, token, summaries, summaryLines) }
+      }
       // 2xx but not a summary payload — the parser said so; fall to the legacy chain.
     }
 
@@ -666,7 +813,7 @@
     if (!data || data._authFailed) return data
     var lines = buildModelLines(ctx, parseCloudCodeModels(data))
     if (lines.length === 0) return null
-    return { plan: null, lines: lines }
+    return { plan: loadCloudPlan(ctx, token), lines: lines }
   }
 
   function parseCloudCodeModels(data) {
@@ -689,16 +836,27 @@
       // remainingFraction instead of fabricating a value here.
       configs.push({
         label: displayName,
+        modelId: modelId,
         quotaInfo: m.quotaInfo,
       })
     }
     return configs
   }
 
+  // Google One tiers by paidTier.id, for a paid tier that comes without a name.
+  var PAID_TIER_PLANS = {
+    "g1-pro-tier": "Google AI Pro",
+    "g1-ultra-tier": "Google AI Ultra",
+    "g1-ultra-lite-tier": "Google AI Ultra Lite",
+  }
+
   function readAgyPlan(loadData) {
     var paidTier = loadData && loadData.paidTier
     if (paidTier && typeof paidTier.name === "string" && paidTier.name.trim()) {
       return paidTier.name.trim()
+    }
+    if (paidTier && typeof paidTier.id === "string" && Object.prototype.hasOwnProperty.call(PAID_TIER_PLANS, paidTier.id)) {
+      return PAID_TIER_PLANS[paidTier.id]
     }
     var currentTier = loadData && loadData.currentTier
     if (currentTier && typeof currentTier.name === "string" && currentTier.name.trim()) {
@@ -729,14 +887,12 @@
     // Authoritative first: the quota summary. The plan lookup never gates it — a failed
     // loadCodeAssist just leaves the plan blank. User-Agent "agy" gets 403 SUBSCRIPTION_REQUIRED
     // on every quota endpoint (and no paidTier) even for paid accounts; "antigravity" works.
-    var summary = requestCloudCodeJson(ctx, QUOTA_SUMMARY_PATH, token, "antigravity", {})
-    if (summary && summary._authFailed) return summary
-    if (summary) {
-      var summaryLines = parseQuotaSummary(ctx, summary)
+    var summaries = requestQuotaSummaries(ctx, token)
+    if (summaries && summaries._authFailed) return summaries
+    if (summaries) {
+      var summaryLines = parseQuotaSummaries(ctx, summaries)
       if (summaryLines) {
-        var planData = requestCloudCodeJson(ctx, LOAD_CODE_ASSIST_PATH, token, "antigravity", {})
-        var plan = (planData && !planData._authFailed) ? readAgyPlan(planData) : null
-        return { plan: plan, lines: withCloudGemini(ctx, token, summary, summaryLines) }
+        return { plan: loadCloudPlan(ctx, token), lines: withCloudGemini(ctx, token, summaries, summaryLines) }
       }
     }
 
@@ -812,7 +968,7 @@
         } catch (e) {
           ctx.host.log.warn("GetUserStatus threw: " + String(e))
         }
-        if (summaryLacksGemini(summaryData, summaryLines)) {
+        if (summaryLacksGemini([summaryData], summaryLines)) {
           ctx.host.log.warn("quota summary has no Gemini group; Session comes from GetUserStatus")
           var statusConfigs = statusData && statusData.userStatus &&
             (statusData.userStatus.cascadeModelConfigData || {}).clientModelConfigs

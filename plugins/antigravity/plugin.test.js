@@ -2157,4 +2157,153 @@ describe("antigravity plugin", () => {
     expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude", "Claude Weekly"])
     expect(result.lines.map((l) => l.used)).toEqual([20, 60, 0])
   })
+
+  // --- Ported from upstream OpenUsage #1407 (merge hosts, plan from loadCodeAssist) and #1395 (Argon) ---
+
+  function setupDbToken(ctx) {
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.test-token", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+  }
+
+  function summaryCalls(ctx) {
+    return ctx.host.http.request.mock.calls
+      .map((c) => String(c[0].url))
+      .filter((u) => u.includes("retrieveUserQuotaSummary"))
+  }
+
+  it("merges the summary from both Cloud Code hosts when production lacks a pool", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) {
+        const payload = url.includes("daily-cloudcode") ? makeQuotaSummaryPayload() : claudeOnlySummary()
+        return { status: 200, bodyText: JSON.stringify(payload) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Claude", "Claude Weekly"])
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+    expect(summaryCalls(ctx)).toHaveLength(2)
+    const calls = ctx.host.http.request.mock.calls.map((c) => String(c[0].url))
+    expect(calls.filter((u) => u.includes("fetchAvailableModels")).length).toBe(0)
+  })
+
+  it("asks only production when its summary already has all four pools", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    plugin.probe(ctx)
+
+    expect(summaryCalls(ctx)).toEqual(["https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"])
+  })
+
+  function withArgon(payload, buckets) {
+    payload.groups.push({ displayName: "Gemini 4 Argon", buckets })
+    return payload
+  }
+
+  function probeSummary(ctx, payload) {
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(payload) }
+      return { status: 500, bodyText: "" }
+    })
+  }
+
+  it("shows Argon Weekly from its own group, before the Claude meters", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    probeSummary(ctx, withArgon(makeQuotaSummaryPayload(), [
+      { bucketId: "argon-weekly", window: "weekly", remainingFraction: 0.3, resetTime: "2026-07-06T07:00:00Z" },
+    ]))
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Argon Weekly", "Claude", "Claude Weekly"])
+    const argon = result.lines[2]
+    expect(argon.used).toBe(70)
+    expect(argon.periodDurationMs).toBe(WEEK_MS)
+    expect(argon.resetsAt).toBe("2026-07-06T07:00:00Z")
+  })
+
+  it("drops an Argon quota that is disabled, ambiguous or not weekly", async () => {
+    const cases = [
+      [{ bucketId: "argon-weekly", window: "weekly", remainingFraction: 0.3, disabled: true }],
+      [{ bucketId: "argon-weekly", window: "weekly", remainingFraction: 0.3, disabled: "no" }],
+      [
+        { bucketId: "argon-weekly", window: "weekly", remainingFraction: 0.3 },
+        { bucketId: "argon-weekly-2", window: "weekly", remainingFraction: 0.5 },
+      ],
+      [{ bucketId: "argon-5h", window: "5h", remainingFraction: 0.3 }],
+      [{ bucketId: "gemini-weekly", window: "weekly", remainingFraction: 0.3 }],
+    ]
+    for (const buckets of cases) {
+      const ctx = makeCtx()
+      setupDbToken(ctx)
+      probeSummary(ctx, withArgon(makeQuotaSummaryPayload(), buckets))
+
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+
+      expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Claude", "Claude Weekly"])
+      // A shared bucket id inside the Argon group never replaces the shared pool's own value.
+      expect(result.lines[1].used).toBe(10)
+    }
+  })
+
+  it("keeps Argon models out of the Gemini Session pool", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    const models = makeCloudCodeResponse()
+    models.models["gemini-4-argon-high"] = {
+      displayName: "Gemini 4 Argon (High)",
+      model: "gemini-4-argon-high",
+      quotaInfo: { remainingFraction: 0, resetTime: "2026-02-08T10:00:00Z" },
+    }
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(claudeOnlySummary()) }
+      if (url.includes("fetchAvailableModels")) return { status: 200, bodyText: JSON.stringify(models) }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude", "Claude Weekly"])
+    expect(result.lines[0].used).toBe(20)
+  })
+
+  it("reads the plan from loadCodeAssist on the Antigravity login's Cloud Code path", async () => {
+    for (const [load, plan] of [
+      [makeAgyLoadResponse({ paidTier: { id: "g1-ultra-tier", name: "Google AI Ultra" }, currentTier: { name: "Antigravity" } }), "Google AI Ultra"],
+      [makeAgyLoadResponse({ paidTier: { id: "g1-ultra-tier" }, currentTier: { name: "Antigravity" } }), "Google AI Ultra"],
+      [makeAgyLoadResponse({ paidTier: undefined, currentTier: { name: "Antigravity" } }), "Antigravity"],
+    ]) {
+      const ctx = makeCtx()
+      setupDbToken(ctx)
+      ctx.host.http.request.mockImplementation((opts) => {
+        const url = String(opts.url)
+        if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+        if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(load) }
+        return { status: 500, bodyText: "" }
+      })
+
+      const plugin = await loadPlugin()
+      expect(plugin.probe(ctx).plan).toBe(plan)
+    }
+  })
 })
