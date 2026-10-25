@@ -636,9 +636,19 @@
       (value) => typeof value === "number" && Number.isFinite(value) && value >= 0
     ) && (poolUsage.autoPercentUsed > 0 || poolUsage.apiPercentUsed > 0 || spent === 0)
 
+    const su = usage.spendLimitUsage
+    const isTeamAccount = (
+      normalizedPlanName === "team" ||
+      (su && typeof su.limitType === "string" && su.limitType.toLowerCase() === "team") ||
+      (su && typeof su.pooledLimit === "number" && su.pooledLimit > 0)
+    )
+    // Structured pools replace a missing limit only on team seats; on any other account the
+    // request-based fallbacks below still apply, or a missing total would read as 0%.
+    const teamPools = isTeamAccount && hasModelPools
+
     // Enterprise and some Team request-based accounts can return no planUsage
     // or a planUsage object without limit from the Connect API.
-    const needsRequestBasedFallback = usage.enabled !== false && (!hasPlanUsage || (planUsageLimitMissing && !hasModelPools)) && (
+    const needsRequestBasedFallback = usage.enabled !== false && (!hasPlanUsage || (planUsageLimitMissing && !teamPools)) && (
       normalizedPlanName === "enterprise" ||
       normalizedPlanName === "team"
     )
@@ -652,7 +662,7 @@
     }
 
     const needsFallbackWithoutPlanInfo = usage.enabled !== false &&
-      (!hasPlanUsage || (planUsageLimitMissing && !hasModelPools)) &&
+      (!hasPlanUsage || (planUsageLimitMissing && !teamPools)) &&
       !hasTotalUsagePercent &&
       !normalizedPlanName &&
       planInfoUnavailable
@@ -661,7 +671,7 @@
       return buildUnknownRequestBasedResult(ctx, accessToken, planName)
     }
 
-    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent && !hasModelPools) {
+    if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent && !teamPools) {
       ctx.host.log.warn("planUsage.limit missing, attempting REST usage API fallback")
       try {
         return buildUnknownRequestBasedResult(ctx, accessToken, planName)
@@ -719,7 +729,7 @@
     }
 
     // Total usage (always present) - fallback primary metric
-    if (!hasPlanUsageLimit && !hasTotalUsagePercent && !hasModelPools) {
+    if (!hasPlanUsageLimit && !hasTotalUsagePercent && !teamPools) {
       throw "Total usage limit missing from API response."
     }
     const planUsed = hasPlanUsageLimit
@@ -742,14 +752,7 @@
       billingPeriodMs = cycleEnd - cycleStart // already in ms
     }
 
-    const su = usage.spendLimitUsage
-    const isTeamAccount = (
-      normalizedPlanName === "team" ||
-      (su && typeof su.limitType === "string" && su.limitType.toLowerCase() === "team") ||
-      (su && typeof su.pooledLimit === "number" && su.pooledLimit > 0)
-    )
-
-    if (isTeamAccount && hasModelPools) {
+    if (teamPools) {
       if (hasTotalUsagePercent) {
         lines.push(ctx.line.progress({
           label: "Total usage", used: pu.totalPercentUsed, limit: 100,
