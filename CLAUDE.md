@@ -89,6 +89,11 @@ This file holds the project facts that are easy to get wrong.
   in `TASKBAR_STRIP_COLOR_SCALES`, "base" = the text color). The strip and the tray styles that show numbers
   exclude each other: enabling the strip sets the tray to "icon", picking another style turns it off.
   A strip click opens the panel above the strip (`tray::toggle_panel_at`, via `run_on_main_thread`).
+  Placement (`taskbar_strip/placement.rs`): Right = beside the tray; "left" = the free side away from it,
+  the left edge, or the middle when `TaskbarAl` = 0 (icons left; Settings then labels it Center). The
+  strip keeps to the gaps between the buttons that `taskbar_strip/uia.rs` measures every second with UI
+  Automation (Windows 11's Start, Widgets and app buttons are XAML, no windows to measure), on its own
+  thread because those calls wait on Explorer.
 - Panel: the title bar pin (`panelPinned`) keeps it always on top. "Remember position": `tray.rs`
   records every position it sets itself (`place`); any other move while visible is the user's drag
   and is saved as `panelPosition` (outer top-left, physical px) in settings.json, then used by
@@ -139,13 +144,23 @@ This file holds the project facts that are easy to get wrong.
   crate can silently bump `tauri` in Cargo.lock: check the lock diff (`tauri-plugin-single-instance`
   is pinned `=2.4.5` because 2.5 needs tauri 2.12).
 - A second launch only shows the running app's panel (single-instance plugin), and the app exits at
-  once in session 0 (an installer running as SYSTEM). Both make the MSI's `AUTOLAUNCHAPP=True`
-  (Tauri's template starts the app after install) safe for winget: add
-  `InstallerSwitches: Custom: AUTOLAUNCHAPP=True` to the winget installer manifest (from 0.7.1).
+  once in session 0 (an installer running as SYSTEM). Both make starting the app after a winget
+  install safe.
+- Installer: per-user NSIS only (`%LOCALAPPDATA%\OpenTokenUsage`, no admin). No MSI: Tauri's MSI is
+  always per-machine, so every update asked for admin. Up to 0.7.7 the MSI shipped; those installs
+  update to the NSIS setup, which uninstalls the MSI once (one admin prompt). Start on login is
+  rewritten only when its Run entry names an exe that no longer exists (`autostart_stale`, which
+  the removed MSI copy makes true), so a dev or test build never takes it over. WinGet gets the same setup: `InstallerType:
+  nullsoft`, `Scope: user`, `InstallerSwitches: Custom: /R` (Tauri's NSIS starts the app after a
+  silent install with `/R`, as the MSI's `AUTOLAUNCHAPP=True` did). komac copies the previous
+  manifest's fields, so the first version after the 0.7.7 MSI needs its winget PR checked and, if
+  komac kept `wix`/`machine`/`AUTOLAUNCHAPP`, fixed on its branch in the `PowerUserZ/winget-pkgs`
+  fork before it merges. winget won't upgrade an MSI install to the EXE ("install technology is
+  different"): those users move with the in-app update.
 - Release: bump the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
   (+ `Cargo.lock`), add a `## vX.Y.Z` section to `CHANGELOG.md` (required: it becomes the release
   body the in-app changelog shows), then push a `v*` tag → `publish.yml` (windows-latest) builds
-  NSIS + MSI and signs updater artifacts with the `TAURI_SIGNING_*` repo secrets. The updater points
+  the NSIS setup and signs updater artifacts with the `TAURI_SIGNING_*` repo secrets. The updater points
   at this fork's `latest.json`, never upstream's. `git fetch upstream` must not bring upstream's
   Swift `v0.7.x` tags (`remote.upstream.tagOpt --no-tags`).
 - Workflow actions are pinned to full commit SHAs (version in a comment) and Bun to an exact

@@ -701,10 +701,10 @@ describe("antigravity plugin", () => {
     expect(called.every((call) => call.auth === "Bearer agy-keychain-token")).toBe(true)
     expect(called.every((call) => call.userAgent === "antigravity")).toBe(true)
     expect(called.map((call) => call.url)).toEqual([
-      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
       "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
-      "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
-      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
     ])
     expect(result.plan).toBe("Google AI Pro")
     expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude"])
@@ -843,7 +843,7 @@ describe("antigravity plugin", () => {
       const url = String(opts.url)
       if (url.includes("fetchAvailableModels")) {
         calledUrls.push(url)
-        if (url.includes("daily-cloudcode")) {
+        if (!url.includes("daily-cloudcode")) {
           throw new Error("network error")
         }
         return { status: 200, bodyText: JSON.stringify(makeCloudCodeResponse()) }
@@ -854,9 +854,10 @@ describe("antigravity plugin", () => {
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
 
-    expect(calledUrls.length).toBe(2)
-    expect(calledUrls[0]).toContain("daily-cloudcode-pa.googleapis.com")
-    expect(calledUrls[1]).toContain("cloudcode-pa.googleapis.com")
+    expect(calledUrls).toEqual([
+      "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
+    ])
     expect(result.lines.length).toBeGreaterThan(0)
   })
 
@@ -2011,6 +2012,29 @@ describe("antigravity plugin", () => {
     expect(calls.filter((u) => u.includes("fetchAvailableModels")).length).toBe(0)
   })
 
+  // Seen 2026-10-17: daily-cloudcode-pa answered 200 with only the Claude group; production had both.
+  it("Cloud Code quota summary comes from production, which keeps the Gemini group", async () => {
+    const ctx = makeCtx()
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.test-token", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) {
+        const payload = makeQuotaSummaryPayload()
+        if (url.includes("daily-cloudcode")) payload.groups = payload.groups.slice(0, 1)
+        return { status: 200, bodyText: JSON.stringify(payload) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Claude", "Claude Weekly"])
+  })
+
   it("agy Cloud Code tries the quota summary first and takes the plan from loadCodeAssist", async () => {
     const ctx = makeCtx()
     setupSqliteMock(ctx, null)
@@ -2042,5 +2066,95 @@ describe("antigravity plugin", () => {
     expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Claude", "Claude Weekly"])
     const calls = ctx.host.http.request.mock.calls.map((c) => String(c[0].url))
     expect(calls.filter((u) => u.includes("retrieveUserQuota") && !u.includes("retrieveUserQuotaSummary")).length).toBe(0)
+  })
+
+  // Seen 2026-10-25: both Cloud Code hosts answered the summary with only the Claude group, while
+  // fetchAvailableModels still carried every Gemini model's 5h quota. The tray's Session read "--".
+  function claudeOnlySummary() {
+    const payload = makeQuotaSummaryPayload()
+    payload.groups = payload.groups.slice(0, 1)
+    return payload
+  }
+
+  it("fills Session from the per-model quotas when the Cloud Code summary has no Gemini group", async () => {
+    const ctx = makeCtx()
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.test-token", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+
+    const models = makeCloudCodeResponse()
+    // Image models have their own quota (gemini-image-5h): one running out must not fill Session.
+    models.models["gemini-3.1-flash-image"] = {
+      displayName: "Gemini 3.1 Flash Image",
+      model: "gemini-3.1-flash-image",
+      quotaInfo: { remainingFraction: 0, resetTime: "2026-02-08T10:00:00Z" },
+    }
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(claudeOnlySummary()) }
+      if (url.includes("fetchAvailableModels")) return { status: 200, bodyText: JSON.stringify(models) }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude", "Claude Weekly"])
+    expect(result.lines.map((l) => l.used)).toEqual([20, 60, 0])
+    expect(result.lines[0].periodDurationMs).toBe(SESSION_MS)
+    expect(result.lines[0].resetsAt).toBe("2026-02-08T10:00:00Z")
+  })
+
+  it("fills Session from GetUserStatus when the LS summary has no Gemini group", async () => {
+    const ctx = makeCtx()
+    ctx.host.ls.discover.mockReturnValue(makeDiscovery())
+
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("GetUnleashData")) return { status: 200, bodyText: "{}" }
+      if (url.includes("RetrieveUserQuotaSummary")) {
+        return { status: 200, bodyText: JSON.stringify({ response: claudeOnlySummary() }) }
+      }
+      if (url.includes("GetUserStatus")) {
+        return { status: 200, bodyText: JSON.stringify(makeUserStatusResponse({ userTier: { name: "Google AI Ultra" } })) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.plan).toBe("Google AI Ultra")
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude", "Claude Weekly"])
+    expect(result.lines.map((l) => l.used)).toEqual([20, 60, 0])
+  })
+
+  it("fills Session for the agy login when its summary has no Gemini group", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) => {
+      if (service === "gemini" && account === "antigravity") {
+        return "go-keyring-base64:" + ctx.base64.encode(JSON.stringify({
+          tokens: { access_token: "agy-keychain-token" },
+        }))
+      }
+      return null
+    })
+
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(claudeOnlySummary()) }
+      if (url.includes("fetchAvailableModels")) return { status: 200, bodyText: JSON.stringify(makeCloudCodeResponse()) }
+      if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.plan).toBe("Google AI Pro")
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude", "Claude Weekly"])
+    expect(result.lines.map((l) => l.used)).toEqual([20, 60, 0])
   })
 })

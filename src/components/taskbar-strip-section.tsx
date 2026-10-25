@@ -29,6 +29,7 @@ import { colorOnScale, stripPluginSettings } from "@/lib/taskbar-strip"
 import { cn } from "@/lib/utils"
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
+import { StripPlacement } from "@/components/strip-placement"
 
 const FONT_SIZES = [10, 11, 12, 13, 14, 15]
 
@@ -295,6 +296,7 @@ export function TaskbarStripSection({ onMenubarIconStyleChange }: { onMenubarIco
           )}
 
           <StripMonitors value={style.monitors} onChange={(monitors) => update({ monitors })} />
+          <StripPlacement position={style.position} offset={style.offset} onChange={update} />
 
           <div>
             <div className="text-xs text-muted-foreground mb-1">

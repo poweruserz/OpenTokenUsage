@@ -4,31 +4,35 @@ Tracks GitHub Copilot usage quotas for both paid and free tier users.
 
 ## Authentication
 
-The plugin looks for a GitHub token in this order:
+The plugin reads the GitHub CLI token (`gh auth login`) from Windows Credential Manager (`gh:<host>:`, `gh:github.com:` by default) on every probe and never stores it. The gh token can carry repo, org and workflow scopes, so it is not copied anywhere; a plain-text copy that versions up to 0.7.4 left in `auth.json` is wiped on the next probe.
 
-1. **OpenUsage Keychain** (`OpenUsage-copilot`) — Token previously cached by the plugin
-2. **GitHub CLI Keychain** (`gh:github.com`) — Token from `gh auth login`
-3. **State File** (`auth.json`) — Fallback file-based storage
+### GitHub Enterprise Cloud (`*.ghe.com`)
+
+Host selection, in order:
+
+1. The `GH_HOST` environment variable, if set to `github.com` or a `*.ghe.com` host (for example `example.ghe.com`). Other values are ignored.
+2. `github.com`.
+3. If github.com has no token, or rejects it (401/403), any other `*.ghe.com` host `gh` has a stored login for (Credential Manager entries matching `gh:*`, listed only at this point).
+
+Only `github.com` and `*.ghe.com` hosts ever receive the token. For a non-github.com host the usage endpoint is `https://api.<host>/copilot_internal/user`. Log in with `gh auth login --hostname <host>`.
 
 ### Setup
 
 Install and authenticate with the GitHub CLI:
 
 ```bash
-# Install gh CLI (macOS)
-brew install gh
+# Install gh CLI
+winget install GitHub.cli
 
 # Authenticate
 gh auth login
 ```
 
-Choose "GitHub.com" and follow the prompts. The plugin will automatically read the token from the gh CLI keychain.
-
-Once authenticated via gh CLI, the plugin caches the token in the OpenUsage keychain for faster access on subsequent probes.
+Choose "GitHub.com" and follow the prompts. The plugin will automatically read the token from Credential Manager.
 
 ## API
 
-**Endpoint:** `https://api.github.com/copilot_internal/user`
+**Endpoint:** `https://api.github.com/copilot_internal/user` (`https://api.<host>/copilot_internal/user` for GHE.com)
 
 **Headers:**
 ```

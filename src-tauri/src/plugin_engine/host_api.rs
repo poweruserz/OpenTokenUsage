@@ -25,7 +25,8 @@ pub(crate) fn silent_command(program: &str) -> Command {
     cmd
 }
 
-const WHITELISTED_ENV_VARS: [&str; 16] = [
+const WHITELISTED_ENV_VARS: [&str; 17] = [
+    "GH_HOST",
     "CODEX_HOME",
     "CLAUDE_CONFIG_DIR",
     "CLAUDE_CODE_OAUTH_TOKEN",
@@ -334,6 +335,11 @@ fn redact_url(url: &str) -> String {
     }
 }
 
+/// reqwest's error text embeds the full URL; plugins log it, so its query values must be redacted too.
+fn request_error_message(err: reqwest::Error, url: &str) -> String {
+    format!("{} ({})", err.without_url(), redact_url(url))
+}
+
 /// Redact sensitive patterns in response body for logging
 fn redact_body(body: &str) -> String {
     let mut result = body.to_string();
@@ -484,6 +490,12 @@ pub(crate) fn redact_log_message(msg: &str) -> String {
         regex_lite::Regex::new(r#"(/(?:Users|home|opt|private|var|tmp|Applications)/[^\s"')]+)"#)
     {
         result = path_re.replace_all(&result, "[PATH]").to_string();
+    }
+    // Windows profiles (C:\Users\<name>) and WSL homes (\\wsl.localhost\<distro>\home\<name>).
+    if let Ok(user_re) =
+        regex_lite::Regex::new(r#"(?i)([a-z]:[\\/]Users[\\/]|\\home\\)[^\\/"'\r\n]+"#)
+    {
+        result = user_re.replace_all(&result, "${1}[USER]").to_string();
     }
     result
 }
@@ -1037,9 +1049,9 @@ fn inject_http<'js>(
                     builder = builder.body(body);
                 }
 
-                let response = builder
-                    .send()
-                    .map_err(|e| Exception::throw_message(&ctx_inner, &e.to_string()))?;
+                let response = builder.send().map_err(|e| {
+                    Exception::throw_message(&ctx_inner, &request_error_message(e, &req.url))
+                })?;
 
                 let status = response.status().as_u16();
                 let mut resp_headers = std::collections::HashMap::new();
@@ -2786,6 +2798,50 @@ fn read_windows_credential(_service: &str, _account: &str) -> Option<String> {
     None
 }
 
+/// Lists Credential Manager target names matching a wildcard filter such as `gh:*`.
+#[cfg(windows)]
+fn list_windows_credential_targets(filter: &str) -> Vec<String> {
+    use windows_sys::Win32::Foundation::{GetLastError, ERROR_NOT_FOUND};
+    use windows_sys::Win32::Security::Credentials::{CredEnumerateW, CredFree, CREDENTIALW};
+    let filter_w: Vec<u16> = filter.encode_utf16().chain(Some(0)).collect();
+    let mut count: u32 = 0;
+    let mut creds: *mut *mut CREDENTIALW = std::ptr::null_mut();
+    // SAFETY: on success CredEnumerateW fills `creds` with `count` valid CREDENTIALW pointers
+    // that stay valid until the single CredFree below; TargetName is NUL-terminated or null.
+    if unsafe { CredEnumerateW(filter_w.as_ptr(), 0, &mut count, &mut creds) } == 0 {
+        let err = unsafe { GetLastError() };
+        if err != ERROR_NOT_FOUND {
+            log::warn!("CredEnumerateW failed: error {}", err);
+        }
+        return Vec::new();
+    }
+    let mut targets = Vec::new();
+    for i in 0..count as usize {
+        let target_ptr = unsafe { (**creds.add(i)).TargetName };
+        if target_ptr.is_null() {
+            continue;
+        }
+        let mut len = 0usize;
+        while unsafe { *target_ptr.add(len) } != 0 {
+            len += 1;
+        }
+        let slice = unsafe { std::slice::from_raw_parts(target_ptr, len) };
+        targets.push(String::from_utf16_lossy(slice));
+    }
+    unsafe { CredFree(creds as *const _) };
+    targets
+}
+
+#[cfg(not(windows))]
+fn list_windows_credential_targets(_filter: &str) -> Vec<String> {
+    Vec::new()
+}
+
+/// Plugins may only enumerate `gh:`-prefixed credential names (the GitHub CLI's entries).
+fn is_allowed_credential_filter(filter: &str) -> bool {
+    filter.starts_with("gh:")
+}
+
 /// Windows has no macOS Keychain. `readGenericPassword(service, account)` reads the
 /// go-keyring item from Credential Manager; Credential Manager has no service-only lookup,
 /// so every other call fails fast and plugins fall back to their file-based sources.
@@ -2810,6 +2866,19 @@ fn inject_keychain<'js>(
                     }),
                     None => Err(Exception::throw_message(&ctx_inner, UNSUPPORTED)),
                 }
+            },
+        )?,
+    )?;
+    keychain_obj.set(
+        "listGenericPasswordTargets",
+        Function::new(
+            ctx.clone(),
+            |_ctx_inner: Ctx<'_>, filter: String| -> rquickjs::Result<String> {
+                if !is_allowed_credential_filter(&filter) {
+                    return Ok("[]".to_string());
+                }
+                Ok(serde_json::to_string(&list_windows_credential_targets(&filter))
+                    .unwrap_or_else(|_| "[]".to_string()))
             },
         )?,
     )?;
@@ -3252,6 +3321,29 @@ mod tests {
                 .get("writeGenericPasswordForCurrentUser")
                 .expect("writeGenericPasswordForCurrentUser");
         });
+    }
+
+    #[test]
+    fn credential_listing_is_restricted_to_gh_prefix() {
+        assert!(is_allowed_credential_filter("gh:*"));
+        assert!(!is_allowed_credential_filter("*"));
+        assert!(!is_allowed_credential_filter("Microsoft*"));
+
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            let app_data = std::env::temp_dir();
+            inject_host_api(&ctx, "test", &app_data, "0.0.0").expect("inject host api");
+            let out: String = ctx
+                .eval(r#"__openusage_ctx.host.keychain.listGenericPasswordTargets("*")"#)
+                .expect("js eval");
+            assert_eq!(out, "[]");
+        });
+    }
+
+    #[test]
+    fn gh_host_is_env_allowlisted() {
+        assert!(WHITELISTED_ENV_VARS.contains(&"GH_HOST"));
     }
 
     #[test]
@@ -3698,6 +3790,40 @@ mod tests {
     }
 
     #[test]
+    fn request_error_message_keeps_query_values_redacted() {
+        // A transport error (here: nothing listens on port 1) carries the full request URL.
+        let url = "http://127.0.0.1:1/getUsageLimits?profileArn=arn:aws:codewhisperer:us-east-1:699475941385:profile/EHGA3GRVQMUK";
+        let err = reqwest::blocking::Client::new()
+            .get(url)
+            .send()
+            .unwrap_err();
+        let msg = request_error_message(err, url);
+        assert!(!msg.contains("699475941385"), "profileArn leaked: {msg}");
+        assert!(
+            msg.contains("127.0.0.1:1/getUsageLimits"),
+            "endpoint should stay visible: {msg}"
+        );
+    }
+
+    #[test]
+    fn redact_log_message_hides_windows_user_names() {
+        let msg = r"readJson failed for C:\Users\Jane Doe\AppData\Roaming/com.sunstory.openusage/plugins_data/kiro/auth.json; WSL home \\wsl.localhost\Ubuntu\home\jdoe\.codex";
+        let out = redact_log_message(msg);
+        assert!(
+            !out.contains("Jane") && !out.contains("jdoe"),
+            "user name leaked: {out}"
+        );
+        assert!(
+            out.contains(r"C:\Users\[USER]\AppData"),
+            "rest of the path should stay: {out}"
+        );
+        assert!(
+            out.contains(r"\home\[USER]\.codex"),
+            "rest of the path should stay: {out}"
+        );
+    }
+
+    #[test]
     fn redact_body_redacts_jwt() {
         let body = r#"{"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"}"#;
         let redacted = redact_body(body);
@@ -3745,7 +3871,7 @@ mod tests {
 
     #[test]
     fn redact_body_redacts_user_id_and_email() {
-        let body = r#"{"user_id": "user-iupzZ7KFykMLrnzpkHSq7wjo", "email": "rob@sunstory.com"}"#;
+        let body = r#"{"user_id": "user-iupzZ7KFykMLrnzpkHSq7wjo", "email": "jane@example.com"}"#;
         let redacted = redact_body(body);
         assert!(
             !redacted.contains("user-iupzZ7KFykMLrnzpkHSq7wjo"),
@@ -3753,7 +3879,7 @@ mod tests {
             redacted
         );
         assert!(
-            !redacted.contains("rob@sunstory.com"),
+            !redacted.contains("jane@example.com"),
             "email should be redacted, got: {}",
             redacted
         );
@@ -3764,7 +3890,7 @@ mod tests {
             redacted
         );
         assert!(
-            redacted.contains("rob@....com"),
+            redacted.contains("jane....com"),
             "email should show first4...last4, got: {}",
             redacted
         );
@@ -3798,7 +3924,7 @@ mod tests {
 
     #[test]
     fn redact_body_redacts_devin_org_and_account_display_name() {
-        let body = r#"{"orgId":"org-6b6e9de248db472bb25b296599ea3dc0","accountDisplayName":"rob@sunstory.com","devinInfo":{"org_id":"org-abcdef1234567890","account_display_name":"team@example.com"}}"#;
+        let body = r#"{"orgId":"org-6b6e9de248db472bb25b296599ea3dc0","accountDisplayName":"jane@example.com","devinInfo":{"org_id":"org-abcdef1234567890","account_display_name":"team@example.com"}}"#;
         let redacted = redact_body(body);
         assert!(
             !redacted.contains("org-6b6e9de248db472bb25b296599ea3dc0"),
@@ -3806,7 +3932,7 @@ mod tests {
             redacted
         );
         assert!(
-            !redacted.contains("rob@sunstory.com"),
+            !redacted.contains("jane@example.com"),
             "accountDisplayName should be redacted, got: {}",
             redacted
         );
@@ -3826,7 +3952,7 @@ mod tests {
             redacted
         );
         assert!(
-            redacted.contains("rob@....com"),
+            redacted.contains("jane....com"),
             "accountDisplayName should show first4...last4, got: {}",
             redacted
         );
@@ -3834,7 +3960,7 @@ mod tests {
 
     #[test]
     fn redact_body_redacts_team_id_payment_id_and_paths() {
-        let body = r#"{"teamId":"cc1ac023-9ff5-4c1f-a5a4-ae2a82df4243","paymentId":"cus_S5m1PGxjLWoc1c","binaryPath":"/opt/homebrew/bin/bunx","homePath":"/Users/rebers/.claude"}"#;
+        let body = r#"{"teamId":"cc1ac023-9ff5-4c1f-a5a4-ae2a82df4243","paymentId":"cus_S5m1PGxjLWoc1c","binaryPath":"/opt/homebrew/bin/bunx","homePath":"/Users/jdoe/.claude"}"#;
         let redacted = redact_body(body);
         assert!(
             !redacted.contains("cc1ac023-9ff5-4c1f-a5a4-ae2a82df4243"),
@@ -3852,7 +3978,7 @@ mod tests {
             redacted
         );
         assert!(
-            !redacted.contains("/Users/rebers/.claude"),
+            !redacted.contains("/Users/jdoe/.claude"),
             "path should be redacted, got: {}",
             redacted
         );
@@ -3911,10 +4037,10 @@ mod tests {
 
     #[test]
     fn redact_log_message_redacts_account_and_paths() {
-        let msg = "keychain read: service=Claude Code-credentials, account=rebers path=/opt/homebrew/bin/bunx home=/Users/rebers/.claude";
+        let msg = "keychain read: service=Claude Code-credentials, account=jdoe path=/opt/homebrew/bin/bunx home=/Users/jdoe/.claude";
         let redacted = redact_log_message(msg);
         assert!(
-            !redacted.contains("account=rebers"),
+            !redacted.contains("account=jdoe"),
             "account should be redacted, got: {}",
             redacted
         );
@@ -3924,7 +4050,7 @@ mod tests {
             redacted
         );
         assert!(
-            !redacted.contains("/Users/rebers/.claude"),
+            !redacted.contains("/Users/jdoe/.claude"),
             "path should be redacted, got: {}",
             redacted
         );
@@ -3943,10 +4069,10 @@ mod tests {
     #[test]
     fn redact_body_redacts_login_and_analytics_tracking_id() {
         let body =
-            r#"{"login":"robinebers","analytics_tracking_id":"c9df3f012bb8c2eb7aae6868ee8da6cf"}"#;
+            r#"{"login":"janedoe","analytics_tracking_id":"c9df3f012bb8c2eb7aae6868ee8da6cf"}"#;
         let redacted = redact_body(body);
         assert!(
-            !redacted.contains("robinebers"),
+            !redacted.contains("janedoe"),
             "login should be redacted, got: {}",
             redacted
         );
@@ -3971,19 +4097,19 @@ mod tests {
     #[test]
     fn redact_body_redacts_name_field() {
         let body =
-            r#"{"userStatus":{"name":"Robin Ebers","email":"rob@sunstory.com","planStatus":{}}}"#;
+            r#"{"userStatus":{"name":"Jane Doe","email":"jane@example.com","planStatus":{}}}"#;
         let redacted = redact_body(body);
         assert!(
-            !redacted.contains("Robin Ebers"),
+            !redacted.contains("Jane Doe"),
             "name should be redacted, got: {}",
             redacted
         );
         assert!(
-            !redacted.contains("rob@sunstory.com"),
+            !redacted.contains("jane@example.com"),
             "email should be redacted, got: {}",
             redacted
         );
-        // "Robin Ebers" is 11 chars (<=12) so becomes [REDACTED]
+        // "Jane Doe" is 8 chars (<=12) so becomes [REDACTED]
         assert!(
             redacted.contains("\"name\": \"[REDACTED]\""),
             "name should show [REDACTED], got: {}",
@@ -4035,15 +4161,15 @@ mod tests {
     fn redact_body_redacts_claude_profile_identity() {
         // [claude] GET /api/oauth/profile (live plan badge): identity fields must not reach logs,
         // while the plan fields the plugin reads stay readable.
-        let body = r#"{"account":{"uuid":"4f2c9a1e-8b3d-4e6f-9a7c-1d2e3f4a5b6c","full_name":"Robin Ebers","display_name":"Robin","email":"rob@sunstory.com","has_claude_max":true},"organization":{"uuid":"9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b","name":"Sunstory","organization_type":"claude_max","rate_limit_tier":"default_claude_max_20x"}}"#;
+        let body = r#"{"account":{"uuid":"4f2c9a1e-8b3d-4e6f-9a7c-1d2e3f4a5b6c","full_name":"Jane Doe","display_name":"Jane","email":"jane@example.com","has_claude_max":true},"organization":{"uuid":"9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b","name":"Example Org","organization_type":"claude_max","rate_limit_tier":"default_claude_max_20x"}}"#;
         let redacted = redact_body(body);
         for secret in [
             "4f2c9a1e-8b3d-4e6f-9a7c-1d2e3f4a5b6c",
             "9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b",
-            "Robin Ebers",
-            "\"Robin\"",
-            "rob@sunstory.com",
-            "Sunstory\"",
+            "Jane Doe",
+            "\"Jane\"",
+            "jane@example.com",
+            "Example Org\"",
         ] {
             assert!(
                 !redacted.contains(secret),

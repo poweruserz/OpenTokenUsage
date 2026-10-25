@@ -47,12 +47,13 @@ fn load_and_resolve_proxy() -> Option<ResolvedProxy> {
         Ok(contents) => match serde_json::from_str::<AppConfig>(&contents) {
             Ok(cfg) => cfg,
             Err(e) => {
-                log::warn!("[config] failed to parse {}: {}, using defaults", path.display(), e);
+                // The literal path: the real one holds the Windows user name.
+                log::warn!("[config] failed to parse ~/.openusage/config.json: {}, using defaults", e);
                 return None;
             }
         },
         Err(_) => {
-            log::debug!("[config] no config file at {}, using defaults", path.display());
+            log::debug!("[config] no config file at ~/.openusage/config.json, using defaults");
             return None;
         }
     };

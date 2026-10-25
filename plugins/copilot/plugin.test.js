@@ -29,13 +29,6 @@ function makeUsageResponse(overrides = {}) {
   };
 }
 
-function setKeychainToken(ctx, token) {
-  ctx.host.keychain.readGenericPassword.mockImplementation((service) => {
-    if (service === "OpenUsage-copilot") return JSON.stringify({ token });
-    return null;
-  });
-}
-
 function setGhCliKeychain(ctx, value) {
   // gh's Credential Manager item for the active account: `gh:github.com:` (empty user).
   ctx.host.keychain.readGenericPassword.mockImplementation((service, account) => {
@@ -64,21 +57,111 @@ describe("copilot plugin", () => {
     if (vi.resetModules) vi.resetModules();
   });
 
+  it("uses GH_HOST for keychain service and API host", async () => {
+    const ctx = makePluginTestContext();
+    ctx.host.env.get.mockImplementation((name) => (name === "GH_HOST" ? "example.ghe.com" : null));
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) =>
+      service === "gh:example.ghe.com" && account === "" ? "gho_ghe_token" : null,
+    );
+    mockUsageOk(ctx);
+    const plugin = await loadPlugin();
+    plugin.probe(ctx);
+    const call = ctx.host.http.request.mock.calls[0][0];
+    expect(call.url).toBe("https://api.example.ghe.com/copilot_internal/user");
+    expect(call.headers.Authorization).toBe("token gho_ghe_token");
+  });
+
+  it("falls back to a stored *.ghe.com login when github.com has none", async () => {
+    const ctx = makePluginTestContext();
+    ctx.host.keychain.listGenericPasswordTargets.mockReturnValue(
+      JSON.stringify(["gh:example.ghe.com:", "gh:example.ghe.com:someuser"]),
+    );
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) =>
+      service === "gh:example.ghe.com" && account === "" ? "gho_ghe_token" : null,
+    );
+    mockUsageOk(ctx);
+    const plugin = await loadPlugin();
+    plugin.probe(ctx);
+    const call = ctx.host.http.request.mock.calls[0][0];
+    expect(call.url).toBe("https://api.example.ghe.com/copilot_internal/user");
+  });
+
+  it("ignores a GH_HOST outside github.com / *.ghe.com and never sends the token there", async () => {
+    const ctx = makePluginTestContext();
+    ctx.host.env.get.mockImplementation((name) => (name === "GH_HOST" ? "evil.example.com" : null));
+    ctx.host.keychain.readGenericPassword.mockImplementation((service) =>
+      service === "gh:github.com" ? "gho_github_token" : "gho_leaked_token",
+    );
+    mockUsageOk(ctx);
+    const plugin = await loadPlugin();
+    plugin.probe(ctx);
+    const urls = ctx.host.http.request.mock.calls.map((c) => c[0].url);
+    expect(urls).toEqual(["https://api.github.com/copilot_internal/user"]);
+  });
+
+  it("rejects malformed ghe.com hosts from the credential listing", async () => {
+    const ctx = makePluginTestContext();
+    ctx.host.keychain.listGenericPasswordTargets.mockReturnValue(
+      JSON.stringify(["gh:evil.com:", "gh:..ghe.com:", "gh:-a.ghe.com:", "gh:notghe.com:"]),
+    );
+    ctx.host.keychain.readGenericPassword.mockReturnValue(null);
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow("Not logged in");
+    expect(ctx.host.http.request).not.toHaveBeenCalled();
+  });
+
+  it("does not list credentials when github.com already works", async () => {
+    const ctx = makePluginTestContext();
+    setGhCliKeychain(ctx, "gho_plain_token");
+    mockUsageOk(ctx);
+    const plugin = await loadPlugin();
+    plugin.probe(ctx);
+    expect(ctx.host.keychain.listGenericPasswordTargets).not.toHaveBeenCalled();
+  });
+
+  it("falls through to a ghe.com host when the github.com token is rejected", async () => {
+    const ctx = makePluginTestContext();
+    ctx.host.keychain.listGenericPasswordTargets.mockReturnValue(
+      JSON.stringify(["gh:github.com:", "gh:example.ghe.com:"]),
+    );
+    ctx.host.keychain.readGenericPassword.mockImplementation((service) =>
+      service === "gh:github.com" ? "gho_stale" : "gho_ghe_token",
+    );
+    ctx.host.http.request.mockImplementation((req) =>
+      req.url.indexOf("api.github.com") !== -1
+        ? { status: 401, bodyText: "{}" }
+        : { status: 200, bodyText: JSON.stringify(makeUsageResponse()) },
+    );
+    const plugin = await loadPlugin();
+    const result = plugin.probe(ctx);
+    expect(result.lines.find((l) => l.label === "Credits")).toBeTruthy();
+    expect(ctx.host.http.request.mock.calls.map((c) => c[0].url)).toEqual([
+      "https://api.github.com/copilot_internal/user",
+      "https://api.example.ghe.com/copilot_internal/user",
+    ]);
+  });
+
+  it("reports an invalid token when every host rejects it", async () => {
+    const ctx = makePluginTestContext();
+    setGhCliKeychain(ctx, "gho_stale");
+    ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "{}" });
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow("Token invalid");
+  });
+
+  it("survives a failing credential listing", async () => {
+    const ctx = makePluginTestContext();
+    ctx.host.keychain.listGenericPasswordTargets.mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow("Not logged in");
+  });
+
   it("throws when no token found", async () => {
     const ctx = makePluginTestContext();
     const plugin = await loadPlugin();
     expect(() => plugin.probe(ctx)).toThrow("Not logged in. Run `gh auth login` first.");
-  });
-
-  it("loads token from OpenUsage keychain", async () => {
-    const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "ghu_keychain");
-    mockUsageOk(ctx);
-    const plugin = await loadPlugin();
-    const result = plugin.probe(ctx);
-    expect(result.lines.find((l) => l.label === "Credits")).toBeTruthy();
-    const call = ctx.host.http.request.mock.calls[0][0];
-    expect(call.headers.Authorization).toBe("token ghu_keychain");
   });
 
   it("loads token from gh CLI keychain (plain)", async () => {
@@ -104,71 +187,29 @@ describe("copilot plugin", () => {
     expect(call.headers.Authorization).toBe("token gho_encoded_token");
   });
 
-  it("loads token from state file", async () => {
+  // The gh token can carry repo/org/workflow scopes: it stays in Credential Manager only.
+  it("never writes the gh token to disk", async () => {
     const ctx = makePluginTestContext();
-    setStateFileToken(ctx, "ghu_state");
-    mockUsageOk(ctx);
-    const plugin = await loadPlugin();
-    const result = plugin.probe(ctx);
-    expect(result.lines.find((l) => l.label === "Credits")).toBeTruthy();
-    const call = ctx.host.http.request.mock.calls[0][0];
-    expect(call.headers.Authorization).toBe("token ghu_state");
-  });
-
-  it("prefers keychain over gh-cli", async () => {
-    const ctx = makePluginTestContext();
-    ctx.host.keychain.readGenericPassword.mockImplementation((service) => {
-      if (service === "OpenUsage-copilot")
-        return JSON.stringify({ token: "ghu_keychain" });
-      if (service === "gh:github.com") return "gho_ghcli";
-      return null;
-    });
+    setGhCliKeychain(ctx, "gho_secret");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     plugin.probe(ctx);
-    const call = ctx.host.http.request.mock.calls[0][0];
-    expect(call.headers.Authorization).toBe("token ghu_keychain");
+    const writes = ctx.host.fs.writeText.mock.calls.map((call) => String(call[1]));
+    expect(writes.some((text) => text.includes("gho_secret"))).toBe(false);
   });
 
-  it("prefers keychain over state file", async () => {
+  it("wipes a token an older version cached in auth.json and never uses it", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "ghu_keychain");
-    setStateFileToken(ctx, "ghu_state");
-    mockUsageOk(ctx);
+    setStateFileToken(ctx, "gho_old_copy");
     const plugin = await loadPlugin();
-    plugin.probe(ctx);
-    const call = ctx.host.http.request.mock.calls[0][0];
-    expect(call.headers.Authorization).toBe("token ghu_keychain");
-  });
-
-  it("persists token from gh-cli to keychain and state file", async () => {
-    const ctx = makePluginTestContext();
-    setGhCliKeychain(ctx, "gho_persist");
-    mockUsageOk(ctx);
-    const plugin = await loadPlugin();
-    plugin.probe(ctx);
-    expect(ctx.host.keychain.writeGenericPassword).toHaveBeenCalledWith(
-      "OpenUsage-copilot",
-      JSON.stringify({ token: "gho_persist" }),
-    );
-    const stateFile = ctx.host.fs.readText(
-      ctx.app.pluginDataDir + "/auth.json",
-    );
-    expect(JSON.parse(stateFile).token).toBe("gho_persist");
-  });
-
-  it("does not persist token loaded from OpenUsage keychain", async () => {
-    const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "ghu_already");
-    mockUsageOk(ctx);
-    const plugin = await loadPlugin();
-    plugin.probe(ctx);
-    expect(ctx.host.keychain.writeGenericPassword).not.toHaveBeenCalled();
+    expect(() => plugin.probe(ctx)).toThrow("Not logged in. Run `gh auth login` first.");
+    expect(ctx.host.fs.readText(ctx.app.pluginDataDir + "/auth.json")).not.toContain("gho_old_copy");
+    expect(ctx.host.http.request).not.toHaveBeenCalled();
   });
 
   it("renders both Credits and Chat lines for paid tier", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     const result = plugin.probe(ctx);
@@ -183,7 +224,7 @@ describe("copilot plugin", () => {
 
   it("renders only Credits when Chat is missing", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -207,7 +248,7 @@ describe("copilot plugin", () => {
 
   it("shows 'No usage data' when both snapshots missing", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify({ copilot_plan: "free" }),
@@ -219,16 +260,24 @@ describe("copilot plugin", () => {
 
   it("returns plan label from copilot_plan", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     const result = plugin.probe(ctx);
     expect(result.plan).toBe("Pro");
   });
 
+  it("returns a null plan when copilot_plan is missing", async () => {
+    const ctx = makePluginTestContext();
+    setGhCliKeychain(ctx, "gho_tok");
+    mockUsageOk(ctx, makeUsageResponse({ copilot_plan: null }));
+    const plugin = await loadPlugin();
+    expect(plugin.probe(ctx).plan).toBeNull();
+  });
+
   it("capitalizes multi-word plan labels", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -242,7 +291,7 @@ describe("copilot plugin", () => {
 
   it("propagates resetsAt from quota_reset_date", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     const result = plugin.probe(ctx);
@@ -252,7 +301,7 @@ describe("copilot plugin", () => {
 
   it("clamps usedPercent to 0 when percent_remaining > 100", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -275,7 +324,7 @@ describe("copilot plugin", () => {
 
   it("suppresses buckets flagged unlimited", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -306,7 +355,7 @@ describe("copilot plugin", () => {
 
   it("suppresses buckets with the -1 entitlement/remaining sentinel", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -337,7 +386,7 @@ describe("copilot plugin", () => {
 
   it("suppresses zero-entitlement placeholder buckets", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -362,7 +411,7 @@ describe("copilot plugin", () => {
 
   it("renders Completions from quota_snapshots", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -387,7 +436,7 @@ describe("copilot plugin", () => {
 
   it("emits Extra Usage alongside a real Credits meter when overage is permitted", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -415,7 +464,7 @@ describe("copilot plugin", () => {
 
   it("shows a real zero for Extra Usage when overage is permitted but unused", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -441,7 +490,7 @@ describe("copilot plugin", () => {
 
   it("omits Extra Usage when overage is not permitted", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -467,7 +516,7 @@ describe("copilot plugin", () => {
     // Org-managed Business placeholder: overage_permitted true on a zero-entitlement
     // bucket. Without a real Credits meter, an "Extra Usage: 0" row is meaningless.
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -496,7 +545,7 @@ describe("copilot plugin", () => {
     // Org-managed Business seat: zero entitlement, but the premium bucket carries the
     // user's own consumption. Must show it instead of an empty "No usage data" card.
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     const bucket = (creditsUsed) => ({
       unlimited: true, token_based_billing: true, credits_used: creditsUsed,
       entitlement: 0, percent_remaining: 100.0,
@@ -518,7 +567,7 @@ describe("copilot plugin", () => {
 
   it("keeps 'No usage data' on an unused org-managed seat", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     mockUsageOk(ctx, {
       copilot_plan: "business",
       token_based_billing: true,
@@ -542,7 +591,7 @@ describe("copilot plugin", () => {
 
   it("does not render limited_user_quotas when quota_snapshots produced lines", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -577,7 +626,7 @@ describe("copilot plugin", () => {
 
   it("falls back to limited_user_quotas when all snapshots are suppressed", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify(
@@ -610,7 +659,7 @@ describe("copilot plugin", () => {
 
   it("throws on 401", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "" });
     const plugin = await loadPlugin();
     expect(() => plugin.probe(ctx)).toThrow("Token invalid. Run `gh auth login` to re-authenticate.");
@@ -618,7 +667,7 @@ describe("copilot plugin", () => {
 
   it("throws on 403", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({ status: 403, bodyText: "" });
     const plugin = await loadPlugin();
     expect(() => plugin.probe(ctx)).toThrow("Token invalid. Run `gh auth login` to re-authenticate.");
@@ -626,7 +675,7 @@ describe("copilot plugin", () => {
 
   it("throws on HTTP 500", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({ status: 500, bodyText: "" });
     const plugin = await loadPlugin();
     expect(() => plugin.probe(ctx)).toThrow(
@@ -636,7 +685,7 @@ describe("copilot plugin", () => {
 
   it("throws on network error", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockImplementation(() => {
       throw new Error("ECONNREFUSED");
     });
@@ -648,7 +697,7 @@ describe("copilot plugin", () => {
 
   it("throws on invalid JSON response", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: "not-json",
@@ -661,7 +710,7 @@ describe("copilot plugin", () => {
 
   it("uses 'token' auth header format (not 'Bearer')", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "ghu_format");
+    setGhCliKeychain(ctx, "ghu_format");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     plugin.probe(ctx);
@@ -672,7 +721,7 @@ describe("copilot plugin", () => {
 
   it("includes correct User-Agent and editor headers", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     plugin.probe(ctx);
@@ -684,7 +733,7 @@ describe("copilot plugin", () => {
 
   it("includes periodDurationMs on paid tier progress lines", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     mockUsageOk(ctx);
     const plugin = await loadPlugin();
     const result = plugin.probe(ctx);
@@ -696,7 +745,7 @@ describe("copilot plugin", () => {
 
   it("renders Chat and Completions for free tier (limited_user_quotas)", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify({
@@ -719,7 +768,7 @@ describe("copilot plugin", () => {
 
   it("includes periodDurationMs on free tier progress lines", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify({
@@ -739,7 +788,7 @@ describe("copilot plugin", () => {
 
   it("propagates resetsAt from limited_user_reset_date for free tier", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify({
@@ -757,7 +806,7 @@ describe("copilot plugin", () => {
 
   it("handles free tier with partially used quotas", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify({
@@ -775,80 +824,9 @@ describe("copilot plugin", () => {
     expect(completions.used).toBe(50); // 50% used
   });
 
-  it("handles graceful keychain write failure", async () => {
-    const ctx = makePluginTestContext();
-    setGhCliKeychain(ctx, "gho_tok");
-    mockUsageOk(ctx);
-    ctx.host.keychain.writeGenericPassword.mockImplementation(() => {
-      throw new Error("keychain locked");
-    });
-    const plugin = await loadPlugin();
-    expect(() => plugin.probe(ctx)).not.toThrow();
-    expect(ctx.host.log.warn).toHaveBeenCalled();
-  });
-
-  it("retries with gh-cli token when cached keychain token is stale", async () => {
-    const ctx = makePluginTestContext();
-    let callCount = 0;
-    // First call returns stale keychain token, second call returns fresh gh-cli token
-    ctx.host.keychain.readGenericPassword.mockImplementation((service) => {
-      if (service === "OpenUsage-copilot") {
-        return JSON.stringify({ token: "stale_token" });
-      }
-      if (service === "gh:github.com") {
-        return "fresh_gh_token";
-      }
-      return null;
-    });
-    // First request with stale token returns 401, second with fresh token succeeds
-    ctx.host.http.request.mockImplementation((opts) => {
-      callCount++;
-      if (opts.headers.Authorization === "token stale_token") {
-        return { status: 401, bodyText: "" };
-      }
-      return { status: 200, bodyText: JSON.stringify(makeUsageResponse()) };
-    });
-    const plugin = await loadPlugin();
-    const result = plugin.probe(ctx);
-    expect(result.lines.find((l) => l.label === "Credits")).toBeTruthy();
-    expect(callCount).toBe(2);
-    // Should have cleared the stale token
-    expect(ctx.host.keychain.deleteGenericPassword).toHaveBeenCalledWith("OpenUsage-copilot");
-    // Should have saved the fresh token
-    expect(ctx.host.keychain.writeGenericPassword).toHaveBeenCalled();
-  });
-
-  it("throws when stale keychain token and no fallback available", async () => {
-    const ctx = makePluginTestContext();
-    ctx.host.keychain.readGenericPassword.mockImplementation((service) => {
-      if (service === "OpenUsage-copilot") {
-        return JSON.stringify({ token: "stale_token" });
-      }
-      return null; // No gh-cli fallback
-    });
-    ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "" });
-    const plugin = await loadPlugin();
-    expect(() => plugin.probe(ctx)).toThrow("Token invalid");
-  });
-
-  it("falls back when OpenUsage keychain payload lacks token field", async () => {
-    const ctx = makePluginTestContext();
-    ctx.host.keychain.readGenericPassword.mockImplementation((service) => {
-      if (service === "OpenUsage-copilot") return JSON.stringify({ notToken: "x" });
-      if (service === "gh:github.com") return "gho_fallback";
-      return null;
-    });
-    mockUsageOk(ctx, makeUsageResponse({ copilot_plan: null }));
-
-    const plugin = await loadPlugin();
-    const result = plugin.probe(ctx);
-    expect(result.plan).toBeNull();
-    expect(result.lines.find((l) => l.label === "Credits")).toBeTruthy();
-  });
-
   it("shows status badge when free-tier quotas are present but invalid", async () => {
     const ctx = makePluginTestContext();
-    setKeychainToken(ctx, "tok");
+    setGhCliKeychain(ctx, "tok");
     ctx.host.http.request.mockReturnValue({
       status: 200,
       bodyText: JSON.stringify({

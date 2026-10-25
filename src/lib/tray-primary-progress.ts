@@ -1,7 +1,7 @@
 import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
 import type { PluginSettings } from "@/lib/settings"
 import { DEFAULT_DISPLAY_MODE, type DisplayMode } from "@/lib/settings"
-import { clamp01 } from "@/lib/utils"
+import { getDisplayedUsage } from "@/lib/usage-display"
 
 type PluginState = {
   data: PluginOutput | null
@@ -103,11 +103,7 @@ export function getTrayPrimaryBars(args: {
             isProgressLine(line) && line.label === metricLabel
         )
         if (metricLine && metricLine.limit > 0) {
-          const shownAmount =
-            displayMode === "used"
-              ? metricLine.used
-              : metricLine.limit - metricLine.used
-          fraction = clamp01(shownAmount / metricLine.limit)
+          fraction = getDisplayedUsage(metricLine.used, metricLine.limit, displayMode).fraction
         }
       }
     }

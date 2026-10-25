@@ -15,6 +15,7 @@ import { REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerDisplayMode, type
 import type { ManifestLine, MetricLine, PluginLink } from "@/lib/plugin-types"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
 import { clamp01, formatCountNumber, formatFixedPrecisionNumber } from "@/lib/utils"
+import { getDisplayedUsage } from "@/lib/usage-display"
 import { calculateDeficit, calculatePaceStatus, type PaceStatus } from "@/lib/pace-status"
 import { buildPaceDetailText, formatDeficitText, formatRunsOutText, getPaceStatusText } from "@/lib/pace-tooltip"
 import { formatResetAbsoluteLabel, formatResetRelativeLabel, formatResetTooltipText } from "@/lib/reset-tooltip"
@@ -428,11 +429,8 @@ function MetricLineRenderer({
     const periodDurationMs = line.periodDurationMs
     const hasPaceContext = Number.isFinite(resetsAtMs) && Number.isFinite(periodDurationMs)
     const hasTimeMarkerContext = hasPaceContext && periodDurationMs! > 0
-    const shownAmount =
-      displayMode === "used"
-        ? line.used
-        : Math.max(0, line.limit - line.used)
-    const percent = Math.round(clamp01(shownAmount / line.limit) * 10000) / 100
+    const { amount: shownAmount, fraction: shownFraction } = getDisplayedUsage(line.used, line.limit, displayMode)
+    const percent = Math.round(shownFraction * 10000) / 100
     const amountText =
       line.format.kind === "percent"
         ? `${Math.round(shownAmount)}%`

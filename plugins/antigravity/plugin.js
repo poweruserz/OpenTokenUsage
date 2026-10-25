@@ -6,9 +6,10 @@
   ]
   var AGY_KEYCHAIN_SERVICE = "gemini"
   var AGY_KEYCHAIN_ACCOUNT = "antigravity"
+  // Production first: daily can answer 200 without the Gemini group (as upstream found too).
   var CLOUD_CODE_URLS = [
-    "https://daily-cloudcode-pa.googleapis.com",
     "https://cloudcode-pa.googleapis.com",
+    "https://daily-cloudcode-pa.googleapis.com",
   ]
   var LOAD_CODE_ASSIST_PATH = "/v1internal:loadCodeAssist"
   var FETCH_MODELS_PATH = "/v1internal:fetchAvailableModels"
@@ -571,6 +572,46 @@
     return lines
   }
 
+  // Seen 2026-10-25: both Cloud Code hosts answered with only the Claude group while the per-model
+  // quotas still carried every Gemini model. A summary that reports other pools but no Gemini bucket
+  // at all gets its Session (Gemini 5h) from those quotas; Gemini's weekly window stays unknown.
+  function summaryLacksGemini(data, lines) {
+    if (lines.length === 0) return false
+    var groups = (data.response && data.response.groups) || data.groups || []
+    for (var i = 0; i < groups.length; i++) {
+      var buckets = (groups[i] && Array.isArray(groups[i].buckets)) ? groups[i].buckets : []
+      for (var j = 0; j < buckets.length; j++) {
+        var id = buckets[j] && buckets[j].bucketId
+        if (id === "gemini-5h" || id === "gemini-weekly") return false
+      }
+    }
+    return true
+  }
+
+  function withLegacyGemini(ctx, lines, configs) {
+    // Image models have a quota of their own (gemini-image-5h), not the shared Gemini pool.
+    var pooled = configs.filter(function (c) { return !/image/i.test(String(c.label)) })
+    var legacy = buildModelLines(ctx, pooled)
+    for (var i = 0; i < legacy.length; i++) {
+      if (legacy[i].label === SESSION_LABEL) return [legacy[i]].concat(lines)
+    }
+    return lines
+  }
+
+  function withCloudGemini(ctx, token, summary, lines) {
+    if (!summaryLacksGemini(summary, lines)) return lines
+    ctx.host.log.warn("quota summary has no Gemini group; Session comes from fetchAvailableModels")
+    var models = requestCloudCodeJson(ctx, FETCH_MODELS_PATH, token, "antigravity", {})
+    return models && !models._authFailed ? withLegacyGemini(ctx, lines, parseCloudCodeModels(models)) : lines
+  }
+
+  function dropBlacklisted(configs) {
+    return configs.filter(function (c) {
+      var mid = c && c.modelOrAlias && c.modelOrAlias.model
+      return !(mid && CC_MODEL_BLACKLIST[mid])
+    })
+  }
+
   // --- Cloud Code API ---
 
   function requestCloudCodeJson(ctx, path, token, userAgent, body) {
@@ -617,7 +658,7 @@
     if (summary && summary._authFailed) return summary
     if (summary) {
       var summaryLines = parseQuotaSummary(ctx, summary)
-      if (summaryLines) return { plan: null, lines: summaryLines }
+      if (summaryLines) return { plan: null, lines: withCloudGemini(ctx, token, summary, summaryLines) }
       // 2xx but not a summary payload — the parser said so; fall to the legacy chain.
     }
 
@@ -695,7 +736,7 @@
       if (summaryLines) {
         var planData = requestCloudCodeJson(ctx, LOAD_CODE_ASSIST_PATH, token, "antigravity", {})
         var plan = (planData && !planData._authFailed) ? readAgyPlan(planData) : null
-        return { plan: plan, lines: summaryLines }
+        return { plan: plan, lines: withCloudGemini(ctx, token, summary, summaryLines) }
       }
     }
 
@@ -765,13 +806,19 @@
       if (summaryLines) {
         // The plan comes from an independent GetUserStatus call; a failed plan lookup
         // just leaves the plan blank.
-        var summaryPlan = null
+        var statusData = null
         try {
-          summaryPlan = readLsPlan(callLs(ctx, found.port, found.scheme, discovery.csrf, "GetUserStatus", { metadata: metadata }))
+          statusData = callLs(ctx, found.port, found.scheme, discovery.csrf, "GetUserStatus", { metadata: metadata })
         } catch (e) {
           ctx.host.log.warn("GetUserStatus threw: " + String(e))
         }
-        return { plan: summaryPlan, lines: summaryLines }
+        if (summaryLacksGemini(summaryData, summaryLines)) {
+          ctx.host.log.warn("quota summary has no Gemini group; Session comes from GetUserStatus")
+          var statusConfigs = statusData && statusData.userStatus &&
+            (statusData.userStatus.cascadeModelConfigData || {}).clientModelConfigs
+          summaryLines = withLegacyGemini(ctx, summaryLines, dropBlacklisted(statusConfigs || []))
+        }
+        return { plan: readLsPlan(statusData), lines: summaryLines }
       }
       // 2xx but not a summary payload — fall to the legacy flow.
     }
@@ -800,14 +847,7 @@
       return null
     }
 
-    var filtered = []
-    for (var j = 0; j < configs.length; j++) {
-      var mid = configs[j].modelOrAlias && configs[j].modelOrAlias.model
-      if (mid && CC_MODEL_BLACKLIST[mid]) continue
-      filtered.push(configs[j])
-    }
-
-    var lines = buildModelLines(ctx, filtered)
+    var lines = buildModelLines(ctx, dropBlacklisted(configs))
     if (lines.length === 0) return null
 
     var plan = hasUserStatus ? readLsPlan(data) : null

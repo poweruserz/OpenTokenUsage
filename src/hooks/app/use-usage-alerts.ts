@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import type { PluginState } from "@/hooks/app/types"
 import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
-import { loadSentUsageAlerts, saveSentUsageAlerts, type AlertSettings } from "@/lib/settings"
+import { loadSentUsageAlerts, saveSentUsageAlerts, type AlertSettings, type DisplayMode } from "@/lib/settings"
 import { collectUsageAlerts, type UsageAlert } from "@/lib/usage-alerts"
 
 // The toasts stay silent (an unpackaged app can't give them its own sound); one sound per batch
@@ -22,11 +22,13 @@ export function useUsageAlerts({
   pluginsMeta,
   enabled,
   settings,
+  displayMode,
 }: {
   pluginStates: Record<string, PluginState | undefined>
   pluginsMeta: PluginMeta[]
   enabled: boolean
   settings: AlertSettings
+  displayMode: DisplayMode
 }) {
   // Keys of alerts already shown; persisted so a restart doesn't repeat them. null = still loading.
   const sentRef = useRef<Set<string> | null>(null)
@@ -62,6 +64,7 @@ export function useUsageAlerts({
           sent,
           nowMs: Date.now(),
           levels: settings.levels,
+          displayMode,
         })
       )
     }
@@ -70,5 +73,5 @@ export function useUsageAlerts({
     for (const alert of alerts) alert.keys.forEach((key) => sent.add(key))
     void saveSentUsageAlerts([...sent]).catch((error) => console.error("Failed to save sent usage alerts:", error))
     void showNotifications(alerts, settings).catch((error) => console.error("Failed to show usage notification:", error))
-  }, [pluginStates, pluginsMeta, enabled, settings])
+  }, [pluginStates, pluginsMeta, enabled, settings, displayMode])
 }

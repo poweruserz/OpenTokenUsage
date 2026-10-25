@@ -19,6 +19,7 @@ import {
   loadResetTimerDisplayMode,
   loadStartOnLogin,
   loadTimeFormatMode,
+  loadTaskbarStripStyle,
   migrateLegacyTraySettings,
   migrateWindsurfToDevin,
   loadThemeMode,
@@ -32,6 +33,7 @@ import {
   saveStartOnLogin,
   saveThemeMode,
   saveTimeFormatMode,
+  saveTaskbarStripStyle,
 } from "@/lib/settings"
 import type { PluginMeta } from "@/lib/plugin-types"
 
@@ -67,6 +69,13 @@ describe("settings", () => {
 
   it("loads defaults when no settings stored", async () => {
     await expect(loadPluginSettings()).resolves.toEqual(DEFAULT_PLUGIN_SETTINGS)
+  })
+
+  it("saves strip placement and restores it after reloading settings", async () => {
+    const original = await loadTaskbarStripStyle()
+    await saveTaskbarStripStyle({ ...original, position: "left", offset: 120 })
+    expect(storeSaveMock).toHaveBeenCalled()
+    await expect(loadTaskbarStripStyle()).resolves.toEqual({ ...original, position: "left", offset: 120 })
   })
 
   it("sanitizes stored settings", async () => {

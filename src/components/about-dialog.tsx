@@ -115,10 +115,6 @@ export function AboutDialog({ version, onClose }: AboutDialogProps) {
             <ExternalLink href="https://github.com/PowerUserZ">PowerUserZ</ExternalLink>
           </p>
           <p>
-            {t("about.original")}:{" "}
-            <ExternalLink href="https://itsbyrob.in/x">Robin Ebers</ExternalLink>
-          </p>
-          <p>
             {t("about.source")}:{" "}
             <ExternalLink href="https://github.com/PowerUserZ/OpenTokenUsage">GitHub</ExternalLink>
           </p>

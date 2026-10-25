@@ -1,0 +1,29 @@
+name: AI review
+
+# Codex and Claude review every pull request head, and a coordinator reports the result as commit status
+# `ai-review`; see https://github.com/poweruserz/ai-review. Private repositories run on the review-only
+# dreamfyre runners, public ones on GitHub-hosted runners, and fork pull requests are skipped.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment: # Codex's review-state comment wakes the coordinator; runs from the default branch only
+    types: [created, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  ai-review:
+    # Second gate next to the reusable workflow's own: other comments never start it.
+    if: github.event_name == 'pull_request' || github.event.comment.user.login == 'chatgpt-codex-connector[bot]'
+    # Tracks @main on purpose (owner's decision, 2026-10-19): the logic is maintained once for every repository.
+    # Only this account can push to poweruserz/ai-review, and it can already write here directly, so a SHA pin
+    # would cost one PR per repository per update without stopping a real attacker. Only two secrets go there.
+    uses: poweruserz/ai-review/.github/workflows/review.yml@main
+    secrets: # only these two, never `inherit`; CODEX_TRIGGER_PAT is set only where codex-fixes is on
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      CODEX_TRIGGER_PAT: ${{ secrets.CODEX_TRIGGER_PAT }}

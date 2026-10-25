@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { MetricLine } from "@/lib/plugin-types"
 import { collectUsageAlerts } from "@/lib/usage-alerts"
+import type { DisplayMode } from "@/lib/settings"
 
 const HOUR = 60 * 60 * 1000
 const NOW = Date.parse("2026-09-28T12:00:00Z")
@@ -17,8 +18,8 @@ function line(used: number, resetsInMs: number, periodMs = 5 * HOUR): MetricLine
   }
 }
 
-const collect = (lines: MetricLine[], sent: string[] = [], previousLines?: MetricLine[], levels = [80, 95]) =>
-  collectUsageAlerts({ pluginId: "claude", providerName: "Claude", lines, previousLines, sent: new Set(sent), nowMs: NOW, levels })
+const collect = (lines: MetricLine[], sent: string[] = [], previousLines?: MetricLine[], levels = [80, 95], displayMode: DisplayMode = "used") =>
+  collectUsageAlerts({ pluginId: "claude", providerName: "Claude", lines, previousLines, sent: new Set(sent), nowMs: NOW, levels, displayMode })
 
 describe("collectUsageAlerts", () => {
   it("stays quiet below the thresholds and at an easy pace", () => {
@@ -27,9 +28,24 @@ describe("collectUsageAlerts", () => {
 
   it("alerts once at 80% and remembers it", () => {
     const [alert] = collect([line(82, 2 * HOUR)])
-    expect(alert?.title).toBe("Claude: Session at 82%")
+    expect(alert?.title).toBe("Claude: Session at 82% used")
     expect(alert?.body).toBe("Resets in 2h 0m")
     expect(collect([line(85, 2 * HOUR)], alert!.keys)).toEqual([])
+  })
+
+  it("uses the selected direction in notifications without changing thresholds", () => {
+    const [left] = collect([line(82, 2 * HOUR)], [], undefined, [80, 95], "left")
+    const [used] = collect([line(82, 2 * HOUR)], [], undefined, [80, 95], "used")
+    expect(left?.title).toBe("Claude: Session at 18% left")
+    expect(used?.title).toBe("Claude: Session at 82% used")
+    expect(left?.keys).toEqual(used?.keys)
+    expect(collect([line(85, 2 * HOUR)], left!.keys, undefined, [80, 95], "used")).toEqual([])
+    expect(collect([line(97, HOUR)], [], undefined, [80, 95], "left")[0]?.title).toBe("Claude: Session at 3% left")
+  })
+
+  it("keeps an over-limit percentage when used, and stops at 0% left", () => {
+    expect(collect([line(120, HOUR)])[0]?.title).toBe("Claude: Session at 120% used")
+    expect(collect([line(120, HOUR)], [], undefined, [80, 95], "left")[0]?.title).toBe("Claude: Session at 0% left")
   })
 
   it("jumping straight past 95% sends one alert that also covers 80%", () => {
@@ -40,7 +56,7 @@ describe("collectUsageAlerts", () => {
   })
 
   it("uses the levels from the settings", () => {
-    expect(collect([line(55, 4 * HOUR)], [], undefined, [50, 100]).map((a) => a.title)).toEqual(["Claude: Session at 55%"])
+    expect(collect([line(55, 4 * HOUR)], [], undefined, [50, 100]).map((a) => a.title)).toEqual(["Claude: Session at 55% used"])
     const full = collect([line(100, HOUR)], [], undefined, [50, 100])
     expect(full[0]!.keys).toEqual(["claude|Session|" + line(100, HOUR).resetsAt + "|t100", "claude|Session|" + line(100, HOUR).resetsAt + "|t50"])
     // No levels picked: no threshold alert (a pace alert can still come; here it resets first).
@@ -79,12 +95,12 @@ describe("collectUsageAlerts", () => {
 
   it("the next window alerts again after a real reset", () => {
     const [alert] = collect([line(90, 10 * 60 * 1000)])
-    expect(collect([line(82, 5 * HOUR)], alert!.keys).map((a) => a.title)).toEqual(["Claude: Session at 82%"])
+    expect(collect([line(82, 5 * HOUR)], alert!.keys).map((a) => a.title)).toEqual(["Claude: Session at 82% used"])
   })
 
   it("a reset time that jitters later is not a reset", () => {
     expect(collect([line(85, 2 * HOUR + 34)], [], [line(84, 2 * HOUR)]).map((a) => a.title)).toEqual([
-      "Claude: Session at 85%",
+      "Claude: Session at 85% used",
     ])
   })
 })

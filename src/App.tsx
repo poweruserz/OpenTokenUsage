@@ -152,7 +152,7 @@ function App() {
     [pluginSettings, trayHiddenPlugins]
   )
 
-  useUsageAlerts({ pluginStates, pluginsMeta, enabled: usageAlerts, settings: alertSettings })
+  useUsageAlerts({ pluginStates, pluginsMeta, enabled: usageAlerts, settings: alertSettings, displayMode })
 
   const { scheduleTrayIconUpdate, traySettingsPreview } = useTrayIcon({
     pluginsMeta,

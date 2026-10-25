@@ -1,5 +1,6 @@
 mod accounts;
 mod alert_sound;
+mod autostart;
 mod config;
 mod local_http_api;
 mod log_path;
@@ -590,6 +591,8 @@ pub fn run() {
             setup_actions::open_taskbar_settings,
             taskbar_strip::set_taskbar_strip,
             taskbar_strip::list_taskbar_monitors,
+            taskbar_strip::taskbar_icons_left,
+            autostart::autostart_stale,
             accounts::list_accounts,
             accounts::add_account,
             accounts::remove_account,
@@ -625,13 +628,8 @@ pub fn run() {
                 .file_name()
                 .and_then(|value| value.to_str())
                 .unwrap_or("unknown");
-            let redacted_app_data_dir =
-                plugin_engine::host_api::redact_log_message(&app_data_dir.display().to_string());
-            log::debug!(
-                "app_data_dir: tail={}, path={}",
-                app_data_dir_tail,
-                redacted_app_data_dir
-            );
+            // Only the tail: the full path holds the Windows user name.
+            log::debug!("app_data_dir: tail={}", app_data_dir_tail);
 
             let (_, plugins) = plugin_engine::initialize_plugins(&app_data_dir, &resource_dir);
             let plugins =

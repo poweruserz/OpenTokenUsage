@@ -1,5 +1,6 @@
 //! Experimental taskbar strip: provider logos with session/weekly numbers inside the Windows 11
-//! taskbar, left of the notification area (what macOS shows as menu bar text).
+//! taskbar: left of the notification area, or on the taskbar's other free side (`placement.rs`),
+//! clear of the buttons that UI Automation measures (`uia.rs`).
 //!
 //! Windows has no API for this (deskbands are gone in Windows 11), so like TrafficMonitor each
 //! strip is a layered window made a child of a taskbar: the main one (`Shell_TrayWnd`) and, when the
@@ -12,6 +13,34 @@
 
 use std::sync::{Mutex, OnceLock};
 use tauri::AppHandle;
+
+mod placement;
+#[cfg(windows)]
+mod uia;
+use placement::Layout;
+pub use placement::Placement;
+
+/// Windows aligns the taskbar icons left (Settings → Personalization → Taskbar); missing = centered.
+#[cfg(windows)]
+fn icons_left() -> bool {
+    winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced")
+        .and_then(|key| key.get_value::<u32, _>("TaskbarAl"))
+        .is_ok_and(|value| value == 0)
+}
+
+/// For Settings: the strip's second position is Left on a centered taskbar and Center on this one.
+#[tauri::command]
+pub fn taskbar_icons_left() -> bool {
+    #[cfg(windows)]
+    {
+        icons_left()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,6 +111,7 @@ struct Shared {
     /// One image per monitor scale; empty = no strip.
     images: Vec<Pixels>,
     choice: Choice,
+    placement: Placement,
     /// The strip thread (for `PostThreadMessageW`); 0 while it hasn't started yet.
     thread_id: u32,
     thread_running: bool,
@@ -194,8 +224,10 @@ pub fn set_taskbar_strip(
     app_handle: AppHandle,
     images: Option<Vec<StripImage>>,
     monitors: Option<MonitorsArg>,
+    placement: Option<Placement>,
 ) -> Result<(), String> {
     let _ = APP.set(app_handle);
+    let placement = placement.unwrap_or_default().validate()?;
     let choice = monitors
         .map(Choice::try_from)
         .transpose()?
@@ -212,6 +244,7 @@ pub fn set_taskbar_strip(
     let show = !pixels.is_empty();
     state.images = pixels;
     state.choice = choice;
+    state.placement = placement;
     #[cfg(windows)]
     {
         if state.thread_running {
@@ -285,13 +318,11 @@ mod win {
 
     const WM_APP_RECONCILE: u32 = WM_APP + 1;
     const CLASS_NAME: &str = "OpenTokenUsageTaskbarStrip";
-    /// Space between the strip and the notification area at 100 %.
-    const GAP: i32 = 8;
     /// Taskbars change without telling us (Explorer restarts, monitors come and go): look again.
     const RECONCILE_MS: u32 = 2000;
     /// A secondary Windows 11 taskbar has no notification-area window to measure: its clock and
     /// Show desktop take about this much at 100 % (TrafficMonitor uses the same).
-    /// ponytail: fixed width; a wider clock (larger text) overlaps. UI Automation can find the edge.
+    /// Only a fallback now: the clock's buttons come from UI Automation when it can see them.
     const SECONDARY_CLOCK_WIDTH: i32 = 88;
 
     fn wide(text: &str) -> Vec<u16> {
@@ -642,6 +673,15 @@ mod win {
                 });
             }
             request_missing_dpis(strips, &have_dpis);
+            super::uia::watch(
+                strips.iter().map(|strip| strip.taskbar as isize).collect(),
+                || {
+                    if let Ok(state) = shared().lock() {
+                        wake(state.thread_id);
+                    }
+                },
+                || shared().lock().is_ok_and(|state| state.thread_running),
+            );
             for strip in strips.iter() {
                 place(strip);
             }
@@ -697,12 +737,15 @@ mod win {
         }
     }
 
-    /// Puts a strip left of its taskbar's notification area (or clock), vertically centered, and draws it.
+    /// Places a strip at the chosen edge, vertically centered, and draws it.
     fn place(strip: &Strip) {
         unsafe {
             // Copy out: the calls below talk to Explorer, never hold the lock across them.
-            let pixels = match shared().lock() {
-                Ok(state) => image_for(&state.images, strip.dpi).cloned(),
+            let (pixels, placement) = match shared().lock() {
+                Ok(state) => (
+                    image_for(&state.images, strip.dpi).cloned(),
+                    state.placement,
+                ),
                 Err(_) => return,
             };
             let Some(pixels) = pixels else {
@@ -732,12 +775,19 @@ mod win {
             } else {
                 bar.right - scaled(SECONDARY_CLOCK_WIDTH, strip.dpi)
             };
-            let x = right - bar.left - pixels.width - scaled(GAP, strip.dpi);
-            // Wider than the free space: it would cover Start and the app buttons (and catch their clicks).
-            if x < 0 {
+            let layout = super::Layout {
+                width: bar.right - bar.left,
+                tray_left: right - bar.left,
+                occupied: super::uia::spans(strip.taskbar as isize)
+                    .into_iter()
+                    .map(|(start, end)| (start - bar.left, end - bar.left))
+                    .collect(),
+                icons_left: super::icons_left(),
+            };
+            let Some(x) = placement.x(&layout, pixels.width, strip.dpi) else {
                 ShowWindow(strip.hwnd, SW_HIDE);
                 return;
-            }
+            };
             let y = (bar.bottom - bar.top - pixels.height) / 2;
             SetWindowPos(
                 strip.hwnd,
