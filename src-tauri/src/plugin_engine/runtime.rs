@@ -86,6 +86,8 @@ pub struct PluginOutput {
     pub stale_since: Option<i64>,
 }
 
+// Tests only: the app probes through run_probe_with_cache.
+#[cfg(test)]
 pub fn run_probe(plugin: &LoadedPlugin, app_data_dir: &PathBuf, app_version: &str) -> PluginOutput {
     run_probe_with_cache(plugin, app_data_dir, app_version, false)
 }
@@ -943,6 +945,7 @@ mod tests {
             &temp_app_dir("reset-credits"),
             "0.0.0",
             Duration::from_secs(1),
+            false,
         );
         let value = serde_json::to_value(output).unwrap();
         assert_eq!(value["lines"][0]["resetCredits"][0]["count"], 2);
@@ -966,6 +969,7 @@ mod tests {
             &temp_app_dir("reset-invalid"),
             "0.0.0",
             Duration::from_secs(1),
+            false,
         );
         assert!(error_text(output).contains("invalid reset credit count"));
     }
