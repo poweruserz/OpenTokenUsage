@@ -246,6 +246,8 @@ export const fr: Messages = {
 
   "label.Session": "Session",
   "label.Weekly": "Hebdomadaire",
+  "label.Claude Weekly": "Claude hebdomadaire",
+  "label.Argon Weekly": "Argon hebdomadaire",
   "label.Monthly": "Mensuel",
   "label.Today": "Aujourd'hui",
   "label.Yesterday": "Hier",

@@ -2306,4 +2306,26 @@ describe("antigravity plugin", () => {
       expect(plugin.probe(ctx).plan).toBe(plan)
     }
   })
+
+  // The probe has a 30 s deadline: an optional badge timing out on both hosts (2 × 15 s) would
+  // throw away meters already fetched.
+  it("asks for the plan once, briefly, and keeps the meters when that lookup times out", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+      if (url.includes("loadCodeAssist")) throw new Error("timeout")
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.plan).toBeNull()
+    expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Claude", "Claude Weekly"])
+    const planCalls = ctx.host.http.request.mock.calls.map((c) => c[0]).filter((o) => String(o.url).includes("loadCodeAssist"))
+    expect(planCalls).toHaveLength(1)
+    expect(planCalls[0].timeoutMs).toBeLessThanOrEqual(5000)
+  })
 })

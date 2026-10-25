@@ -246,6 +246,8 @@ export const tr: Messages = {
 
   "label.Session": "Oturum",
   "label.Weekly": "Haftalık",
+  "label.Claude Weekly": "Claude haftalık",
+  "label.Argon Weekly": "Argon haftalık",
   "label.Monthly": "Aylık",
   "label.Today": "Bugün",
   "label.Yesterday": "Dün",

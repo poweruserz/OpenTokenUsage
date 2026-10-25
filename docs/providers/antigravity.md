@@ -220,7 +220,7 @@ Eligible accounts also get a `Gemini 4 Argon` group with one `window: "weekly"` 
 
 When the merged summary reports other pools but no Gemini bucket at all (seen 2026-10-25 on both hosts), Session comes from `fetchAvailableModels`' Gemini models instead (the LS path uses `GetUserStatus`). Image models are left out: they have a quota of their own. Gemini's weekly window then has no data.
 
-The plan badge comes from `loadCodeAssist` (`User-Agent: antigravity`, body `{}`): `paidTier.name`, else a known `paidTier.id` (`g1-pro-tier`, `g1-ultra-tier`, `g1-ultra-lite-tier`), else `currentTier.name`.
+The plan badge comes from `loadCodeAssist` (`User-Agent: antigravity`, body `{}`): `paidTier.name`, else a known `paidTier.id` (`g1-pro-tier`, `g1-ultra-tier`, `g1-ultra-lite-tier`), else `currentTier.name`. It is one request to production with a 5 s timeout: the probe has a 30 s deadline, and the badge is optional, so a slow plan lookup leaves it blank instead of costing the meters.
 
 ### fetchAvailableModels
 

@@ -246,6 +246,8 @@ export const ptBR: Messages = {
 
   "label.Session": "Sessão",
   "label.Weekly": "Semanal",
+  "label.Claude Weekly": "Claude semanal",
+  "label.Argon Weekly": "Argon semanal",
   "label.Monthly": "Mensal",
   "label.Today": "Hoje",
   "label.Yesterday": "Ontem",

@@ -731,7 +731,7 @@
   // --- Cloud Code API ---
 
   // One Cloud Code host: the JSON body, { _authFailed: true }, or null (unavailable).
-  function requestCloudCodeHost(ctx, base, path, token, userAgent, body) {
+  function requestCloudCodeHost(ctx, base, path, token, userAgent, body, timeoutMs) {
     try {
       var resp = ctx.host.http.request({
         method: "POST",
@@ -743,7 +743,7 @@
           "User-Agent": userAgent || "antigravity",
         },
         bodyText: JSON.stringify(body || {}),
-        timeoutMs: 15000,
+        timeoutMs: timeoutMs || 15000,
       })
       if (!resp || typeof resp.status !== "number" || !Number.isFinite(resp.status)) {
         ctx.host.log.warn("Cloud Code returned invalid response shape (" + base + ")")
@@ -788,9 +788,12 @@
     return bodies.length ? bodies : null
   }
 
-  // The plan never gates the meters: a failed loadCodeAssist just leaves it blank.
+  // The plan never gates the meters: one short request to production, and a failed loadCodeAssist
+  // just leaves the badge blank. The probe has a 30 s deadline, and two 15 s timeouts here would
+  // throw away meters already fetched.
+  var PLAN_TIMEOUT_MS = 5000
   function loadCloudPlan(ctx, token) {
-    var data = requestCloudCodeJson(ctx, LOAD_CODE_ASSIST_PATH, token, "antigravity", {})
+    var data = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[0], LOAD_CODE_ASSIST_PATH, token, "antigravity", {}, PLAN_TIMEOUT_MS)
     return data && !data._authFailed ? readAgyPlan(data) : null
   }
 
