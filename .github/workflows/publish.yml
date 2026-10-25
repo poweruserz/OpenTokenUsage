@@ -107,6 +107,8 @@ jobs:
             echo "CHANGELOG.md has no '## $RELEASE_TAG' section; add the release notes first."
             exit 1
           fi
+          # SignPath Foundation requires release pages to name the code signing policy.
+          printf '\n---\n\n[Code signing policy](%s/%s#code-signing-policy)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" >> "$NOTES"
           {
             echo "body<<__RELEASE_NOTES__"
             cat "$NOTES"
