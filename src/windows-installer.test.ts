@@ -15,6 +15,7 @@ it("bundles only the per-user NSIS installer", () => {
 it("fails the release if an MSI ships or latest.json points elsewhere", () => {
   expect(publish).toContain("Unexpected MSI (.msi)")
   expect(publish).toContain('!p["windows-x86_64"]?.url.endsWith("-setup.exe")')
-  // WinGet's manifest is a machine-scope MSI: auto-publishing the EXE there is retired.
-  expect(publish).not.toMatch(/winget/i)
+  // WinGet gets the same per-user setup, never an MSI.
+  expect(publish).toContain("installers-regex: 'OpenTokenUsage_.*_x64-setup\\.exe$'")
+  expect(publish).not.toMatch(/installers-regex:.*\.msi/)
 })

@@ -144,13 +144,18 @@ This file holds the project facts that are easy to get wrong.
   crate can silently bump `tauri` in Cargo.lock: check the lock diff (`tauri-plugin-single-instance`
   is pinned `=2.4.5` because 2.5 needs tauri 2.12).
 - A second launch only shows the running app's panel (single-instance plugin), and the app exits at
-  once in session 0 (an installer running as SYSTEM).
+  once in session 0 (an installer running as SYSTEM). Both make starting the app after a winget
+  install safe.
 - Installer: per-user NSIS only (`%LOCALAPPDATA%\OpenTokenUsage`, no admin). No MSI: Tauri's MSI is
   always per-machine, so every update asked for admin. Up to 0.7.7 the MSI shipped; those installs
   update to the NSIS setup, which uninstalls the MSI once (one admin prompt). Start on login is
-  rewritten each start because the exe path moves. WinGet auto-publish is retired: the
-  `PowerUserZ.OpenTokenUsage` manifest is a machine-scope MSI, and a komac update keeps that
-  scope and its switches for the EXE. WinGet users migrate via the in-app update.
+  rewritten each start because the exe path moves. WinGet gets the same setup: `InstallerType:
+  nullsoft`, `Scope: user`, `InstallerSwitches: Custom: /R` (Tauri's NSIS starts the app after a
+  silent install with `/R`, as the MSI's `AUTOLAUNCHAPP=True` did). komac copies the previous
+  manifest's fields, so the first version after the 0.7.7 MSI needs its winget PR checked and, if
+  komac kept `wix`/`machine`/`AUTOLAUNCHAPP`, fixed on its branch in the `PowerUserZ/winget-pkgs`
+  fork before it merges. winget won't upgrade an MSI install to the EXE ("install technology is
+  different"): those users move with the in-app update.
 - Release: bump the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
   (+ `Cargo.lock`), add a `## vX.Y.Z` section to `CHANGELOG.md` (required: it becomes the release
   body the in-app changelog shows), then push a `v*` tag → `publish.yml` (windows-latest) builds
@@ -158,7 +163,11 @@ This file holds the project facts that are easy to get wrong.
   at this fork's `latest.json`, never upstream's. `git fetch upstream` must not bring upstream's
   Swift `v0.7.x` tags (`remote.upstream.tagOpt --no-tags`).
 - Workflow actions are pinned to full commit SHAs (version in a comment) and Bun to an exact
-  version; bump them deliberately.
+  version; bump them deliberately. The winget job needs a valid `WINGET_TOKEN` (classic PAT,
+  `public_repo` + `workflow`): the branch it creates in the `PowerUserZ/winget-pkgs` fork carries
+  upstream's `.github/workflows` changes, and without `workflow` GitHub refuses it
+  ("does not have the correct permissions to execute `CreateRef`", 0.7.0). If it fails, submit
+  with komac (see memory).
 - The owner's hook blocks force pushes (and a few destructive git commands); plain pushes pass.
 - `.claude/skills/tauri-*` are real copies (git symlinks don't work on Windows without
   Developer Mode); keep them in sync with `.agents/skills/` if you edit one.

@@ -12,11 +12,17 @@ OpenTokenUsage lives in the notification area and shows how much of your AI codi
 
 ## Download
 
-[**Download the latest release**](https://github.com/PowerUserZ/OpenTokenUsage/releases/latest) and run `OpenTokenUsage_<version>_x64-setup.exe`.
+**Install with [WinGet](https://learn.microsoft.com/windows/package-manager/winget/) (recommended):**
 
-It installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsage`), so normal updates need no admin rights. The app checks for new releases in-app and updates itself.
+```powershell
+winget install PowerUserZ.OpenTokenUsage
+```
 
-**Installed 0.7.7 or earlier (MSI or WinGet)?** Use the in-app update. It moves the app to the per-user install and asks for admin once, to remove the old per-machine copy. Your settings stay. WinGet updates are no longer published: the WinGet package is a per-machine MSI.
+Or [**download the latest release**](https://github.com/PowerUserZ/OpenTokenUsage/releases/latest) and run `OpenTokenUsage_<version>_x64-setup.exe`.
+
+Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsage`), so updates need no admin rights. The app checks for new releases in-app and updates itself.
+
+**Installed 0.7.7 or earlier (MSI or WinGet)?** Use the in-app update once. It moves the app to the per-user install and asks for admin once, to remove the old per-machine copy. Your settings stay. Until then, `winget upgrade` says the install technology is different.
 
 ## What It Does
 

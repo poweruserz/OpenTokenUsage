@@ -13,7 +13,7 @@ name: Publish
 # The matching public key + endpoints live in src-tauri/tauri.conf.json.
 #
 # Supply chain: every action is pinned to a full commit SHA (the version is in the comment), because
-# the signing key is handed to them. Bump deliberately, never to a moving tag.
+# the signing key and WINGET_TOKEN are handed to them. Bump deliberately, never to a moving tag.
 # Release notes come from the matching "## vX.Y.Z" section of CHANGELOG.md (required).
 
 on:
@@ -146,3 +146,30 @@ jobs:
               process.exit(1);
             }
           ' "$RUNNER_TEMP/latest.json"
+
+  # Auto-submit a winget-pkgs update PR for each release. No-ops unless the
+  # WINGET_TOKEN secret (a classic PAT with public_repo + workflow) is configured.
+  # workflow is needed because the new branch in the winget-pkgs fork carries
+  # upstream's .github/workflows changes.
+  # Requires the package to already exist in winget-pkgs — the initial
+  # PowerUserZ.OpenTokenUsage manifest was submitted manually for v0.6.23;
+  # this keeps subsequent versions in sync automatically.
+  # It submits the same per-user setup. komac copies the previous version's manifest fields, so
+  # the first version after the 0.7.7 MSI needs its winget PR checked (see CLAUDE.md).
+  winget:
+    name: Submit to WinGet
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - name: Publish to WinGet Community Repo
+        if: ${{ env.WINGET_TOKEN != '' }}
+        uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
+        with:
+          identifier: PowerUserZ.OpenTokenUsage
+          installers-regex: 'OpenTokenUsage_.*_x64-setup\.exe$'
+          release-tag: ${{ github.ref_name }}
+          token: ${{ env.WINGET_TOKEN }}
