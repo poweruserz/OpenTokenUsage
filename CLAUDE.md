@@ -149,7 +149,8 @@ This file holds the project facts that are easy to get wrong.
 - Installer: per-user NSIS only (`%LOCALAPPDATA%\OpenTokenUsage`, no admin). No MSI: Tauri's MSI is
   always per-machine, so every update asked for admin. Up to 0.7.7 the MSI shipped; those installs
   update to the NSIS setup, which uninstalls the MSI once (one admin prompt). Start on login is
-  rewritten each start because the exe path moves. WinGet gets the same setup: `InstallerType:
+  rewritten only when its Run entry names an exe that no longer exists (`autostart_stale`, which
+  the removed MSI copy makes true), so a dev or test build never takes it over. WinGet gets the same setup: `InstallerType:
   nullsoft`, `Scope: user`, `InstallerSwitches: Custom: /R` (Tauri's NSIS starts the app after a
   silent install with `/R`, as the MSI's `AUTOLAUNCHAPP=True` did). komac copies the previous
   manifest's fields, so the first version after the 0.7.7 MSI needs its winget PR checked and, if

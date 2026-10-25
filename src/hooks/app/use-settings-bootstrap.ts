@@ -113,10 +113,11 @@ export function useSettingsBootstrap({
 }: UseSettingsBootstrapArgs) {
   const applyStartOnLogin = useCallback(async (value: boolean) => {
     if (!isTauri()) return
-    // Always rewrite when on: isEnabled() only checks the Run entry exists, and the exe moves when
-    // an old per-machine MSI install becomes a per-user NSIS install.
+    // isEnabled() only checks that the Run entry exists: an MSI install that became a per-user one
+    // leaves it pointing at the removed exe. Only such a stale entry is rewritten, so a dev or test
+    // build started now and then never takes Start on login from the installed app.
     if (value) {
-      await enableAutostart()
+      if (!(await isAutostartEnabled()) || (await invoke<boolean>("autostart_stale"))) await enableAutostart()
       return
     }
 

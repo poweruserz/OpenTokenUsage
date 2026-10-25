@@ -195,14 +195,26 @@ describe("useSettingsBootstrap", () => {
     expect(enableAutostartMock).not.toHaveBeenCalled()
   })
 
-  it("rewrites autostart even when already enabled (the exe moved from MSI to per-user install)", async () => {
+  it("rewrites a stale autostart entry (the exe moved from the MSI to the per-user install)", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => cmd === "autostart_stale")
     const args = createArgs()
     const { result } = renderHook(() => useSettingsBootstrap(args))
 
     await result.current.applyStartOnLogin(true)
 
+    expect(invokeMock).toHaveBeenCalledWith("autostart_stale")
     expect(enableAutostartMock).toHaveBeenCalledTimes(1)
     expect(disableAutostartMock).not.toHaveBeenCalled()
+  })
+
+  it("leaves a working autostart entry alone, so a dev or test build never takes it over", async () => {
+    invokeMock.mockImplementation(async (cmd: string) => (cmd === "autostart_stale" ? false : []))
+    const args = createArgs()
+    const { result } = renderHook(() => useSettingsBootstrap(args))
+
+    await result.current.applyStartOnLogin(true)
+
+    expect(enableAutostartMock).not.toHaveBeenCalled()
   })
 
   it("leaves autostart alone when off and already disabled", async () => {
