@@ -43,7 +43,7 @@ export const fr: Messages = {
   "settings.autoRefresh.desc": "Fréquence d'actualisation de l'utilisation",
   "settings.autoRefresh.minutes": "{n} min",
   "settings.autoRefresh.smart": "Intelligent",
-  "settings.autoRefresh.smartHint": "Vérifie chaque minute après un changement d’utilisation. Après 5 minutes sans changement, l’intervalle passe à 2, 5, 10 puis 15 minutes par compte.",
+  "settings.autoRefresh.smartHint": "Vérifie toutes les 2 minutes après un changement d’utilisation. Si rien ne change pendant quelques vérifications, l’intervalle passe à 5, 10 puis 15 minutes par compte.",
   "settings.autoRefresh.hour": "1 heure",
   "settings.usageMode.title": "Affichage de l'utilisation",
   "settings.usageMode.desc": "Afficher ce qu'il reste ou ce qui a été utilisé",

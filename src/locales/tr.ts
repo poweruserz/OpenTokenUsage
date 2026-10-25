@@ -43,7 +43,7 @@ export const tr: Messages = {
   "settings.autoRefresh.desc": "Kullanım verilerinin alınma sıklığı",
   "settings.autoRefresh.minutes": "{n} dk",
   "settings.autoRefresh.smart": "Akıllı",
-  "settings.autoRefresh.smartHint": "Kullanım değiştikten sonra her dakika kontrol eder. 5 dakika değişiklik olmazsa hesap başına kontrol aralığını 2, 5, 10 ve ardından 15 dakikaya çıkarır.",
+  "settings.autoRefresh.smartHint": "Kullanım değiştikten sonra 2 dakikada bir kontrol eder. Birkaç kontrol boyunca değişiklik olmazsa hesap başına kontrol aralığını 5, 10 ve ardından 15 dakikaya çıkarır.",
   "settings.autoRefresh.hour": "1 saat",
   "settings.usageMode.title": "Kullanım modu",
   "settings.usageMode.desc": "Kalan veya kullanılan miktarı göster",

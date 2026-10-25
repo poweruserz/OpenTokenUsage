@@ -53,7 +53,7 @@ Settings → **Tray icon** picks what sits next to the clock. Settings → **Tas
 
 ## Smart refresh
 
-Settings → **Auto refresh → Smart** adjusts each account independently. After a quota change, it checks every minute for 5 minutes. Unchanged results then increase the wait to 2, 5, 10 and finally 15 minutes. Any further quota change restarts the one-minute checks. Existing fixed intervals and the default 15-minute setting stay available.
+Settings → **Auto refresh → Smart** adjusts each account independently. After a quota change, it checks every 2 minutes. Once results stay the same for a few checks, the wait grows to 5, 10 and finally 15 minutes. Any further quota change restarts the 2-minute checks. Existing fixed intervals and the default 15-minute setting stay available.
 
 Checks are scheduled after results arrive, so a slow account does not overlap itself or block another account. Failures use a separate 2/5/10/15-minute backoff, and the existing HTTP rate-limit gate still enforces server retry delays. Opening the panel refreshes data at least a minute old, without bypassing error backoff. At the 15-minute cadence, usage elsewhere can take up to 15 minutes to be detected.
 

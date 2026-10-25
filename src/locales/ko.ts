@@ -43,7 +43,7 @@ export const ko: Messages = {
   "settings.autoRefresh.desc": "사용량을 가져오는 주기",
   "settings.autoRefresh.minutes": "{n}분",
   "settings.autoRefresh.smart": "스마트",
-  "settings.autoRefresh.smartHint": "사용량이 변경되면 매분 확인합니다. 5분 동안 변화가 없으면 계정별 확인 간격을 2분, 5분, 10분, 15분으로 늘립니다.",
+  "settings.autoRefresh.smartHint": "사용량이 변경되면 2분마다 확인합니다. 몇 번 확인해도 변화가 없으면 계정별 확인 간격을 5분, 10분, 15분으로 늘립니다.",
   "settings.autoRefresh.hour": "1시간",
   "settings.usageMode.title": "사용량 표시",
   "settings.usageMode.desc": "남은 양 또는 사용한 양 표시",

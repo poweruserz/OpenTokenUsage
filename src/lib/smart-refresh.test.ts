@@ -8,21 +8,20 @@ const output = (used = 20): PluginOutput => ({
 })
 
 describe("Smart refresh schedule", () => {
-  it("holds one minute for five minutes, then backs off 2, 5, 10, 15 and stays capped", () => {
+  // Two minutes, not one, while usage changes: an account in steady use otherwise asks its
+  // provider every minute for as long as the user works (Claude's usage endpoint rate-limits).
+  it("checks every 2 minutes for five minutes after a change, then backs off 2, 5, 10, 15 and stays capped", () => {
     let now = 100_000
     let state = completeSmartCheck(newSmartSchedule(now), output(), false, now)
-    for (let minute = 1; minute < 5; minute++) {
-      now = state.nextAt!
-      state = completeSmartCheck(state, output(), false, now)
-      expect(state.nextAt! - now).toBe(MINUTE)
-    }
-    for (const minutes of [2, 5, 10, 15, 15]) {
+    expect(state.nextAt! - now).toBe(2 * MINUTE)
+    // Checks at +2 and +4 are still inside the five active minutes; the idle steps follow.
+    for (const minutes of [2, 2, 2, 5, 10, 15, 15]) {
       now = state.nextAt!
       state = completeSmartCheck(state, output(), false, now)
       expect(state.nextAt! - now).toBe(minutes * MINUTE)
     }
     state = completeSmartCheck(state, output(20.01), false, now)
-    expect(state.nextAt).toBe(now + MINUTE)
+    expect(state.nextAt).toBe(now + 2 * MINUTE)
   })
 
   it("compares raw numbers independently of text, countdowns, charts and ordering", () => {
@@ -48,6 +47,6 @@ describe("Smart refresh schedule", () => {
     expect(state.failures).toBe(6)
     state = completeSmartCheck(state, output(), false, now)
     expect(state.failures).toBe(0)
-    expect(state.nextAt).toBe(now + MINUTE)
+    expect(state.nextAt).toBe(now + 2 * MINUTE)
   })
 })

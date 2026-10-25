@@ -43,7 +43,7 @@ export const it: Messages = {
   "settings.autoRefresh.desc": "Frequenza di aggiornamento dei dati di utilizzo",
   "settings.autoRefresh.minutes": "{n} min",
   "settings.autoRefresh.smart": "Intelligente",
-  "settings.autoRefresh.smartHint": "Controlla ogni minuto dopo una variazione dell’utilizzo. Dopo 5 minuti senza variazioni, l’intervallo passa a 2, 5, 10 e infine 15 minuti per account.",
+  "settings.autoRefresh.smartHint": "Controlla ogni 2 minuti dopo una variazione dell’utilizzo. Se non cambia per alcuni controlli, l’intervallo passa a 5, 10 e infine 15 minuti per account.",
   "settings.autoRefresh.hour": "1 ora",
   "settings.usageMode.title": "Visualizzazione utilizzo",
   "settings.usageMode.desc": "Mostra la quota rimanente o quella utilizzata",

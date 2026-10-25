@@ -43,7 +43,7 @@ export const de: Messages = {
   "settings.autoRefresh.desc": "Wie oft die Nutzung abgerufen wird",
   "settings.autoRefresh.minutes": "{n} Min.",
   "settings.autoRefresh.smart": "Intelligent",
-  "settings.autoRefresh.smartHint": "Prüft nach Nutzungsänderungen jede Minute. Nach 5 Minuten ohne Änderung verlängert sich der Abstand pro Konto auf 2, 5, 10 und schließlich 15 Minuten.",
+  "settings.autoRefresh.smartHint": "Prüft nach Nutzungsänderungen alle 2 Minuten. Bleibt die Nutzung einige Prüfungen lang gleich, verlängert sich der Abstand pro Konto auf 5, 10 und schließlich 15 Minuten.",
   "settings.autoRefresh.hour": "1 Stunde",
   "settings.usageMode.title": "Nutzungsanzeige",
   "settings.usageMode.desc": "Verbleibende oder verbrauchte Menge anzeigen",

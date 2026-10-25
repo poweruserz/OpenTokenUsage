@@ -308,7 +308,7 @@ describe("SettingsPage", () => {
     const onAutoUpdateIntervalChange = vi.fn()
     render(<SettingsPage {...defaultProps} autoUpdateInterval="smart" onAutoUpdateIntervalChange={onAutoUpdateIntervalChange} />)
     expect(screen.getByRole("radio", { name: "Smart" })).toHaveAttribute("aria-checked", "true")
-    expect(screen.getByText(/After 5 quiet minutes/)).toBeInTheDocument()
+    expect(screen.getByText(/Checks every 2 minutes after usage changes/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole("radio", { name: "15 min" }))
     expect(onAutoUpdateIntervalChange).toHaveBeenCalledWith(15)
   })

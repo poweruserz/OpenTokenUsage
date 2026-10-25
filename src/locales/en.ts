@@ -43,7 +43,7 @@ export const en = {
   "settings.autoRefresh.desc": "How often usage is fetched",
   "settings.autoRefresh.minutes": "{n} min",
   "settings.autoRefresh.smart": "Smart",
-  "settings.autoRefresh.smartHint": "Checks every minute after usage changes. After 5 quiet minutes, slows to 2, 5, 10, then 15 minutes per account.",
+  "settings.autoRefresh.smartHint": "Checks every 2 minutes after usage changes. Once it stays the same for a few checks, slows to 5, 10, then 15 minutes per account.",
   "settings.autoRefresh.hour": "1 hour",
   "settings.usageMode.title": "Usage mode",
   "settings.usageMode.desc": "Show what's left or what you've used",

@@ -1,6 +1,9 @@
 import type { PluginOutput } from "@/lib/plugin-types"
 
 export const MINUTE = 60_000
+// While usage changes, not every minute: an account in steady use would otherwise ask its provider
+// every minute for as long as the user works, and Claude's usage endpoint rate-limits.
+export const ACTIVE_MINUTES = 2
 const IDLE_MINUTES = [2, 5, 10, 15]
 
 export type SmartSchedule = {
@@ -15,7 +18,7 @@ export type SmartSchedule = {
 export function newSmartSchedule(now: number): SmartSchedule {
   return {
     signature: null, activeUntil: now + 5 * MINUTE, idleStep: 0,
-    failures: 0, completedAt: 0, nextAt: now + MINUTE,
+    failures: 0, completedAt: 0, nextAt: now + ACTIVE_MINUTES * MINUTE,
   }
 }
 
@@ -43,6 +46,6 @@ export function completeSmartCheck(schedule: SmartSchedule, output: PluginOutput
     idleStep: active ? 0 : Math.min(idleStep + 1, 3),
     failures: 0,
     completedAt: now,
-    nextAt: now + (active ? 1 : IDLE_MINUTES[idleStep]) * MINUTE,
+    nextAt: now + (active ? ACTIVE_MINUTES : IDLE_MINUTES[idleStep]) * MINUTE,
   }
 }

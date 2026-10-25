@@ -43,7 +43,7 @@ export const esES: Messages = {
   "settings.autoRefresh.desc": "Frecuencia con la que se consulta el uso",
   "settings.autoRefresh.minutes": "{n} min",
   "settings.autoRefresh.smart": "Inteligente",
-  "settings.autoRefresh.smartHint": "Consulta cada minuto tras un cambio de uso. Después de 5 minutos sin cambios, el intervalo aumenta a 2, 5, 10 y luego 15 minutos por cuenta.",
+  "settings.autoRefresh.smartHint": "Consulta cada 2 minutos tras un cambio de uso. Si no cambia durante algunas consultas, el intervalo aumenta a 5, 10 y luego 15 minutos por cuenta.",
   "settings.autoRefresh.hour": "1 hora",
   "settings.usageMode.title": "Modo de uso",
   "settings.usageMode.desc": "Mostrar lo que queda o lo que has usado",

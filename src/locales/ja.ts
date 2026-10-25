@@ -43,7 +43,7 @@ export const ja: Messages = {
   "settings.autoRefresh.desc": "使用状況を取得する間隔",
   "settings.autoRefresh.minutes": "{n}分",
   "settings.autoRefresh.smart": "スマート",
-  "settings.autoRefresh.smartHint": "使用量が変化すると毎分確認します。5分間変化がなければ、アカウントごとに確認間隔を2分、5分、10分、15分に延ばします。",
+  "settings.autoRefresh.smartHint": "使用量が変化すると2分ごとに確認します。数回確認しても変化がなければ、アカウントごとに確認間隔を5分、10分、15分に延ばします。",
   "settings.autoRefresh.hour": "1時間",
   "settings.usageMode.title": "使用量の表示",
   "settings.usageMode.desc": "残量または使用量を表示",

@@ -43,7 +43,7 @@ export const zhCN: Messages = {
   "settings.autoRefresh.desc": "获取用量的频率",
   "settings.autoRefresh.minutes": "{n}分钟",
   "settings.autoRefresh.smart": "智能",
-  "settings.autoRefresh.smartHint": "用量变化后每分钟检查一次。连续5分钟没有变化后，每个账户的检查间隔逐步延长为2、5、10、15分钟。",
+  "settings.autoRefresh.smartHint": "用量变化后每2分钟检查一次。连续几次检查都没有变化后，每个账户的检查间隔逐步延长为5、10、15分钟。",
   "settings.autoRefresh.hour": "1小时",
   "settings.usageMode.title": "用量模式",
   "settings.usageMode.desc": "显示剩余量或已用量",
