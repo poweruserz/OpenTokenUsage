@@ -9,7 +9,9 @@ $ErrorActionPreference = "Stop"
 
 $Unit = (Resolve-Path (Join-Path $PSScriptRoot "../../..")).Path
 $Exe = Join-Path $Unit "src-tauri\target\release\opentokenusage.exe"
-$Installed = "C:\Program Files\OpenTokenUsage\opentokenusage.exe"
+# The per-user install (0.7.8+), else an older per-machine MSI one.
+$Installed = @("$env:LOCALAPPDATA\OpenTokenUsage\opentokenusage.exe", "C:\Program Files\OpenTokenUsage\opentokenusage.exe") |
+  Where-Object { Test-Path $_ } | Select-Object -First 1
 $Api = "http://127.0.0.1:6736/v1/usage"
 
 # Win32 only in C#: compiling against System.Drawing breaks across .NET versions (pwsh 7 / .NET 10
@@ -133,7 +135,7 @@ switch ($Command) {
     "restore" {
         # Back to the installed release (it copies its own bundled plugins back on start).
         & $PSCommandPath stop
-        if (-not (Test-Path $Installed)) { throw "no installed app at $Installed" }
+        if (-not $Installed) { throw "no installed app in %LOCALAPPDATA%\OpenTokenUsage or Program Files" }
         Start-Process -FilePath $Installed | Out-Null
         Start-Sleep -Seconds 3
         $app = Get-App | Select-Object -First 1

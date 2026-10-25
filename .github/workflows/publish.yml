@@ -1,8 +1,11 @@
 name: Publish
 
 # OpenTokenUsage is a Windows fork: this workflow builds and publishes the
-# Windows installers (NSIS .exe + MSI) plus the signed native-updater assets
+# per-user NSIS installer (.exe) plus the signed native-updater assets
 # (latest.json + .sig) consumed by the in-app auto-updater.
+# No MSI: Tauri's MSI is always per-machine, so every update asked for admin
+# rights. An MSI install (0.7.7 or older) updates to the NSIS build, whose
+# installer removes the MSI (one admin prompt) and installs per user.
 #
 # REQUIRED updater secrets (add BEFORE tagging a release, or the build fails):
 #   TAURI_SIGNING_PRIVATE_KEY          - contents of the updater private key file
@@ -130,9 +133,19 @@ jobs:
           ASSETS=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | tr -d '\r')
 
           printf '%s\n' "$ASSETS" | grep -Eq '\.exe$' || { echo "Missing NSIS installer (.exe)"; exit 1; }
-          printf '%s\n' "$ASSETS" | grep -Eq '\.msi$' || { echo "Missing MSI installer (.msi)"; exit 1; }
+          ! printf '%s\n' "$ASSETS" | grep -Eq '\.msi$' || { echo "Unexpected MSI (.msi): per-machine, asks for admin on every update"; exit 1; }
           printf '%s\n' "$ASSETS" | grep -Fxq 'latest.json' || { echo "Missing updater manifest: latest.json"; exit 1; }
           printf '%s\n' "$ASSETS" | grep -Eq '\.sig$' || { echo "Missing updater signatures (.sig)"; exit 1; }
+
+          # MSI installs look up windows-x86_64-msi, then windows-x86_64: both must lead to the NSIS setup.
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir "$RUNNER_TEMP" --clobber
+          node -e '
+            const p = require(process.argv[1]).platforms;
+            if (p["windows-x86_64-msi"] || !p["windows-x86_64"]?.url.endsWith("-setup.exe")) {
+              console.error("latest.json must send every Windows install to the NSIS setup.exe:", Object.keys(p));
+              process.exit(1);
+            }
+          ' "$RUNNER_TEMP/latest.json"
 
   # Auto-submit a winget-pkgs update PR for each release. No-ops unless the
   # WINGET_TOKEN secret (a classic PAT with public_repo + workflow) is configured.
@@ -141,6 +154,8 @@ jobs:
   # Requires the package to already exist in winget-pkgs — the initial
   # PowerUserZ.OpenTokenUsage manifest was submitted manually for v0.6.23;
   # this keeps subsequent versions in sync automatically.
+  # It submits the same per-user setup. komac copies the previous version's manifest fields, so
+  # the first version after the 0.7.7 MSI needs its winget PR checked (see CLAUDE.md).
   winget:
     name: Submit to WinGet
     needs: publish
@@ -155,6 +170,6 @@ jobs:
         uses: vedantmgoyal9/winget-releaser@4ffc7888bffd451b357355dc214d43bb9f23917e # v2
         with:
           identifier: PowerUserZ.OpenTokenUsage
-          installers-regex: 'OpenTokenUsage_.*_x64_en-US\.msi$'
+          installers-regex: 'OpenTokenUsage_.*_x64-setup\.exe$'
           release-tag: ${{ github.ref_name }}
           token: ${{ env.WINGET_TOKEN }}

@@ -1,5 +1,6 @@
 mod accounts;
 mod alert_sound;
+mod autostart;
 mod config;
 mod local_http_api;
 mod log_path;
@@ -585,6 +586,7 @@ pub fn run() {
             taskbar_strip::set_taskbar_strip,
             taskbar_strip::list_taskbar_monitors,
             taskbar_strip::taskbar_icons_left,
+            autostart::autostart_stale,
             accounts::list_accounts,
             accounts::add_account,
             accounts::remove_account,
