@@ -132,6 +132,14 @@ Response returns new `access_token`, and optionally new `refresh_token` and `id_
 
 A login inside a running WSL distro shows as its own `Codex · WSL` card when it's a different account than the ones already shown. A stopped distro is never started; its card keeps its last data.
 
+### Upstream 0.7.14 compatibility
+
+The plugin already refreshes OAuth tokens and saves them to the selected account's own `auth.json`.
+Local spend now follows that same file's parent folder, including `~/.config/codex` and extra accounts
+(a keychain login falls back to `CODEX_HOME`). History in WSL remains disabled to avoid slow network
+paths.
+Plans `prolite`, `pro`, and `promax` display as Pro 100, Pro 200, and Pro 500.
+
 ## Banked reset expiry
 
 The reset row shows the available count and each expiry in local time, with a live days/hours countdown. Expired entries are removed locally between probes. The usage-page button opens the provider dashboard; this app never redeems a reset.

@@ -253,6 +253,8 @@ export const ja: Messages = {
 
   "label.Session": "セッション",
   "label.Weekly": "週間",
+  "label.Claude Weekly": "Claude 週間",
+  "label.Argon Weekly": "Argon 週間",
   "label.Monthly": "月間",
   "label.Today": "今日",
   "label.Yesterday": "昨日",

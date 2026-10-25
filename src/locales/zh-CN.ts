@@ -253,6 +253,8 @@ export const zhCN: Messages = {
 
   "label.Session": "会话",
   "label.Weekly": "每周",
+  "label.Claude Weekly": "Claude 每周",
+  "label.Argon Weekly": "Argon 每周",
   "label.Monthly": "每月",
   "label.Today": "今天",
   "label.Yesterday": "昨天",

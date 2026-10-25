@@ -253,6 +253,8 @@ export const de: Messages = {
 
   "label.Session": "Sitzung",
   "label.Weekly": "Wöchentlich",
+  "label.Claude Weekly": "Claude wöchentlich",
+  "label.Argon Weekly": "Argon wöchentlich",
   "label.Monthly": "Monatlich",
   "label.Today": "Heute",
   "label.Yesterday": "Gestern",
