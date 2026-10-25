@@ -42,7 +42,7 @@ pwsh -NoProfile -File $d launch                          # stops every running c
 pwsh -NoProfile -File $d usage                           # one line per provider: plan, fetchedAt (UTC), line labels
 pwsh -NoProfile -File $d panel                           # a second launch makes the running app show its panel
 pwsh -NoProfile -File $d ss "$env:TEMP\otu-panel.png"   # PNG of the panel window (physical pixels)
-pwsh -NoProfile -File $d restore                         # back to the installed release in C:\Program Files
+pwsh -NoProfile -File $d restore                         # back to the installed release (%LOCALAPPDATA%\OpenTokenUsage, or an old Program Files MSI)
 pwsh -NoProfile -File $d quit                            # stop whatever copy is running
 ```
 

@@ -989,11 +989,9 @@ describe("App", () => {
   it("applies start on login state on startup in tauri", async () => {
     state.isTauriMock.mockReturnValue(true)
     state.loadStartOnLoginMock.mockResolvedValueOnce(true)
-    state.autostartIsEnabledMock.mockResolvedValueOnce(false)
 
     render(<App />)
 
-    await waitFor(() => expect(state.autostartIsEnabledMock).toHaveBeenCalled())
     await waitFor(() => expect(state.autostartEnableMock).toHaveBeenCalled())
     expect(state.autostartDisableMock).not.toHaveBeenCalled()
   })
@@ -1017,7 +1015,7 @@ describe("App", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     state.isTauriMock.mockReturnValue(true)
     state.loadStartOnLoginMock.mockResolvedValueOnce(true)
-    state.autostartIsEnabledMock.mockRejectedValueOnce(new Error("autostart status failed"))
+    state.autostartEnableMock.mockRejectedValueOnce(new Error("autostart enable failed"))
 
     render(<App />)
 
@@ -1031,9 +1029,7 @@ describe("App", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     state.isTauriMock.mockReturnValue(true)
     state.loadStartOnLoginMock.mockResolvedValueOnce(false)
-    state.autostartIsEnabledMock
-      .mockResolvedValueOnce(false)
-      .mockRejectedValueOnce(new Error("toggle failed"))
+    state.autostartEnableMock.mockRejectedValueOnce(new Error("toggle failed"))
 
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
