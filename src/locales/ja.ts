@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const ja: Messages = {
+  "banked.available": "{count} 回利用可能",
+  "banked.expiresIn": "{count} 回分のリセットはあと {time} で期限切れ",
+  "banked.unknownExpiry": "{count} 回分のリセット：有効期限不明",
+  "banked.openUsage": "使用状況ページを開いてリセットを使う",
+  "banked.linkFailed": "使用状況ページを開けませんでした。もう一度お試しください。",
+  "banked.alertTitle": "{provider}：リセットの有効期限が近づいています",
+  "banked.alertBody": "{count} 回分のリセットはあと {time} で期限切れになります。プロバイダーの使用状況ページを開いて利用してください。",
   "app.minimize": "トレイに最小化",
   "app.pin": "常に手前に表示",
   "app.unpin": "手前に表示しない",
@@ -147,7 +154,7 @@ export const ja: Messages = {
   "settings.startOnLogin.desc": "Windows へのサインイン時に OpenTokenUsage を開く",
   "settings.startOnLogin.label": "サインイン時に起動",
   "settings.alerts.title": "通知",
-  "settings.alerts.desc": "選んだ使用量に達したとき、リセット前に上限に達しそうなとき、リセットされたときに通知",
+  "settings.alerts.desc": "使用量のしきい値、利用ペース、上限のリセット、および有効期限まで7日または24時間の保存済みリセット",
   "settings.alerts.label": "使用状況の通知",
   "settings.panel.title": "パネル",
   "settings.panel.desc": "パネルを開く位置。タイトル バーのピンで、ほかのウィンドウより手前に表示し続けます。",

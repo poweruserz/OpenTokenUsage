@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const zhCN: Messages = {
+  "banked.available": "{count} 次可用",
+  "banked.expiresIn": "{count} 次重置将在 {time} 后到期",
+  "banked.unknownExpiry": "{count} 次重置：到期时间未知",
+  "banked.openUsage": "打开用量页面使用重置",
+  "banked.linkFailed": "无法打开用量页面，请重试。",
+  "banked.alertTitle": "{provider}：重置即将到期",
+  "banked.alertBody": "{count} 次重置将在 {time} 后到期。请打开提供商的用量页面使用。",
   "app.minimize": "最小化到通知区域",
   "app.pin": "置顶",
   "app.unpin": "取消置顶",
@@ -147,7 +154,7 @@ export const zhCN: Messages = {
   "settings.startOnLogin.desc": "登录 Windows 时打开 OpenTokenUsage",
   "settings.startOnLogin.label": "登录时启动",
   "settings.alerts.title": "通知",
-  "settings.alerts.desc": "用量达到你选择的级别、重置前将用完以及额度重置时通知",
+  "settings.alerts.desc": "用量阈值、使用速度、限额重置，以及将在七天或24小时内到期的已保存重置",
   "settings.alerts.label": "用量通知",
   "settings.panel.title": "面板",
   "settings.panel.desc": "面板打开的位置。标题栏中的图钉可让面板保持在其他窗口之上。",

@@ -306,7 +306,7 @@
     }
   }
 
-  function fetchUsage(ctx, accessToken, accountId) {
+  function fetchUsage(ctx, accessToken, accountId, url) {
     const headers = {
       Authorization: "Bearer " + accessToken,
       Accept: "application/json",
@@ -317,7 +317,7 @@
     }
     return ctx.util.request({
       method: "GET",
-      url: USAGE_URL,
+      url: url || USAGE_URL,
       headers,
       timeoutMs: 10000,
     })
@@ -827,10 +827,42 @@
           ? readNumber(data.rate_limit_reset_credits.available_count)
           : null
       if (resetCredits !== null && resetCredits >= 0) {
-        lines.push(ctx.line.text({
-          label: "Rate Limit Resets",
-          value: Math.floor(resetCredits) + " available",
-        }))
+        let inventory = [{ count: Math.floor(resetCredits) }]
+        if (resetCredits > 0) {
+          try {
+            const detail = fetchUsage(
+              ctx,
+              auth.tokens.access_token,
+              accountId,
+              "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"
+            )
+            const body = detail.status >= 200 && detail.status < 300 ? ctx.util.tryParseJson(detail.bodyText) : null
+            if (body && Array.isArray(body.credits)) {
+              inventory = body.credits
+                .filter((credit) => credit && credit.status === "available")
+                .map((credit) => ({ count: 1, expiresAt: ctx.util.toIso(credit.expires_at) || undefined }))
+              const knownCount = inventory.length
+              const total = body.available_count == null ? resetCredits : readNumber(body.available_count)
+              if (total !== null && total > knownCount) inventory.push({ count: Math.floor(total) - knownCount })
+            } else {
+              ctx.host.log.warn("Reset credit expiry unavailable (HTTP " + detail.status + ")")
+            }
+          } catch (error) {
+            ctx.host.log.error("Reset credit expiry request failed: " + String(error))
+          }
+        }
+        lines.push(
+          ctx.line.text({
+            label: "Rate Limit Resets",
+            value:
+              inventory.reduce(
+                (sum, credit) =>
+                  sum + (!credit.expiresAt || Date.parse(credit.expiresAt) > Date.now() ? credit.count : 0),
+                0
+              ) + " available",
+            resetCredits: inventory
+          })
+        )
       }
 
       const creditsRemaining = readCreditsRemaining(resp, data)

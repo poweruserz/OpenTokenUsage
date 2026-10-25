@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const es419: Messages = {
+  "banked.available": "{count} disponibles",
+  "banked.expiresIn": "{count} reinicios vencen en {time}",
+  "banked.unknownExpiry": "{count} reinicios: vencimiento desconocido",
+  "banked.openUsage": "Abrir la página de uso para utilizar un reinicio",
+  "banked.linkFailed": "No se pudo abrir la página de uso. Intenta de nuevo.",
+  "banked.alertTitle": "{provider}: los reinicios vencen pronto",
+  "banked.alertBody": "{count} reinicios vencen en {time}. Abre la página de uso del proveedor para utilizarlos.",
   "app.minimize": "Minimizar a la bandeja",
   "app.pin": "Mantener encima",
   "app.unpin": "Dejar de mantener encima",
@@ -147,7 +154,7 @@ export const es419: Messages = {
   "settings.startOnLogin.desc": "Abrir OpenTokenUsage al iniciar sesión en Windows",
   "settings.startOnLogin.label": "Abrir al iniciar sesión",
   "settings.alerts.title": "Notificaciones",
-  "settings.alerts.desc": "En los niveles de uso que elijas, cuando se agotará antes de restablecerse y cuando se restablece",
+  "settings.alerts.desc": "Umbrales de uso, ritmo, reinicios de límites y reinicios guardados que vencen en siete días o 24 horas",
   "settings.alerts.label": "Notificaciones de uso",
   "settings.panel.title": "Panel",
   "settings.panel.desc": "Dónde se abre el panel. El pin de la barra de título lo mantiene sobre las demás ventanas.",

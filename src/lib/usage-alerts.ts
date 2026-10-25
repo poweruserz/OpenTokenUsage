@@ -1,3 +1,4 @@
+import { liveResetCredits, RESET_WARNING_MS } from "@/lib/reset-credits"
 import { t, tLabel } from "@/lib/i18n"
 import type { MetricLine } from "@/lib/plugin-types"
 import type { DisplayMode } from "@/lib/settings"
@@ -78,7 +79,7 @@ export function collectUsageAlerts(args: {
         alerts.push({
           title: t("alert.reset.title", { provider: providerName, label }),
           body: t("alert.reset.body"),
-          keys: [resetKey],
+          keys: [resetKey]
         })
       }
     }
@@ -94,7 +95,7 @@ export function collectUsageAlerts(args: {
         alerts.push({
           title: t(displayMode === "left" ? "alert.threshold.left" : "alert.threshold.title", { provider: providerName, label, percent: shownPercent }),
           body: timeLeft ? t("reset.in", { time: timeLeft }) : "",
-          keys,
+          keys
         })
       }
       continue // no pace alert on top of a threshold alert
@@ -111,9 +112,40 @@ export function collectUsageAlerts(args: {
       alerts.push({
         title: t("alert.pace.title", { provider: providerName, label }),
         body: t("alert.pace.body", { time: formatCompactDuration(etaMs) ?? "" }),
-        keys: [paceKey],
+        keys: [paceKey]
       })
     }
   }
   return alerts
+}
+
+/** Two reminders per expiry: seven days, then the final 24 hours. No credit identifiers needed. */
+export function collectResetCreditAlerts(args: {
+  pluginId: string
+  providerName: string
+  lines: MetricLine[]
+  sent: ReadonlySet<string>
+  nowMs: number
+}): UsageAlert[] {
+  const { pluginId, providerName, sent, nowMs } = args
+  const credits = args.lines.flatMap((line) => (line.type === "text" ? (line.resetCredits ?? []) : []))
+  const byExpiry = new Map<string, number>()
+  for (const credit of liveResetCredits(credits, nowMs)) {
+    if (credit.expiresAt) byExpiry.set(credit.expiresAt, (byExpiry.get(credit.expiresAt) ?? 0) + credit.count)
+  }
+  return [...byExpiry].flatMap(([expiry, count]) => {
+    const left = Date.parse(expiry) - nowMs
+    if (left > RESET_WARNING_MS) return []
+    const prefix = `${pluginId}|banked|${expiry}|`
+    const urgent = left <= 24 * 60 * 60 * 1000
+    const key = prefix + (urgent ? "24h" : "7d")
+    if (sent.has(key)) return []
+    return [
+      {
+        title: t("banked.alertTitle", { provider: providerName }),
+        body: t("banked.alertBody", { count, time: formatCompactDuration(left) ?? "" }),
+        keys: urgent ? [key, prefix + "7d"] : [key]
+      }
+    ]
+  })
 }

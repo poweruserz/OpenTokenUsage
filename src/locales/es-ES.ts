@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const esES: Messages = {
+  "banked.available": "{count} disponibles",
+  "banked.expiresIn": "{count} reinicios caducan en {time}",
+  "banked.unknownExpiry": "{count} reinicios: caducidad desconocida",
+  "banked.openUsage": "Abrir la página de uso para utilizar un reinicio",
+  "banked.linkFailed": "No se pudo abrir la página de uso. Inténtalo de nuevo.",
+  "banked.alertTitle": "{provider}: los reinicios caducan pronto",
+  "banked.alertBody": "{count} reinicios caducan en {time}. Abre la página de uso del proveedor para utilizarlos.",
   "app.minimize": "Minimizar a la bandeja",
   "app.pin": "Mantener encima",
   "app.unpin": "Dejar de mantener encima",
@@ -147,7 +154,7 @@ export const esES: Messages = {
   "settings.startOnLogin.desc": "Abrir OpenTokenUsage al iniciar sesión en Windows",
   "settings.startOnLogin.label": "Abrir al iniciar sesión",
   "settings.alerts.title": "Notificaciones",
-  "settings.alerts.desc": "En los niveles de uso que elijas, cuando se agotará antes de restablecerse y cuando se restablece",
+  "settings.alerts.desc": "Umbrales de uso, ritmo, reinicios de límites y reinicios guardados que caducan en siete días o 24 horas",
   "settings.alerts.label": "Notificaciones de uso",
   "settings.panel.title": "Panel",
   "settings.panel.desc": "Dónde se abre el panel. La chincheta de la barra de título lo mantiene sobre las demás ventanas.",

@@ -370,6 +370,7 @@ mod tests {
             display_name: name.to_string(),
             plan: Some("Pro".to_string()),
             lines: vec![MetricLine::Text {
+                reset_credits: None,
                 label: "Usage".to_string(),
                 value: "42%".to_string(),
                 color: None,

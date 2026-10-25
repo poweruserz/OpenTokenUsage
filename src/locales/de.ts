@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const de: Messages = {
+  "banked.available": "{count} verfügbar",
+  "banked.expiresIn": "{count} Reset(s) verfallen in {time}",
+  "banked.unknownExpiry": "{count} Reset(s): Ablaufdatum unbekannt",
+  "banked.openUsage": "Nutzungsseite zum Einlösen öffnen",
+  "banked.linkFailed": "Nutzungsseite konnte nicht geöffnet werden. Erneut versuchen.",
+  "banked.alertTitle": "{provider}: Resets verfallen bald",
+  "banked.alertBody": "{count} Reset(s) verfallen in {time}. Öffne die Nutzungsseite des Anbieters zum Einlösen.",
   "app.minimize": "In Infobereich minimieren",
   "app.pin": "Im Vordergrund halten",
   "app.unpin": "Nicht mehr im Vordergrund halten",
@@ -147,7 +154,7 @@ export const de: Messages = {
   "settings.startOnLogin.desc": "OpenTokenUsage bei der Anmeldung bei Windows öffnen",
   "settings.startOnLogin.label": "Beim Anmelden starten",
   "settings.alerts.title": "Benachrichtigungen",
-  "settings.alerts.desc": "Bei den gewählten Nutzungsstufen, wenn das Limit vor dem Zurücksetzen erreicht wird, und beim Zurücksetzen",
+  "settings.alerts.desc": "Nutzungsschwellen, Verbrauchstempo, Limit-Resets und gespeicherte Resets, die in sieben Tagen oder 24 Stunden verfallen",
   "settings.alerts.label": "Nutzungsbenachrichtigungen",
   "settings.panel.title": "Bereich",
   "settings.panel.desc": "Wo sich der Bereich öffnet. Die Stecknadel in der Titelleiste hält ihn über anderen Fenstern.",

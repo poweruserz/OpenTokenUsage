@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const it: Messages = {
+  "banked.available": "{count} disponibili",
+  "banked.expiresIn": "{count} ripristini scadono tra {time}",
+  "banked.unknownExpiry": "{count} ripristini: scadenza sconosciuta",
+  "banked.openUsage": "Apri la pagina di utilizzo per usare un ripristino",
+  "banked.linkFailed": "Impossibile aprire la pagina di utilizzo. Riprova.",
+  "banked.alertTitle": "{provider}: i ripristini scadono presto",
+  "banked.alertBody": "{count} ripristini scadono tra {time}. Apri la pagina di utilizzo del fornitore per usarli.",
   "app.minimize": "Riduci a icona nell'area di notifica",
   "app.pin": "Mantieni in primo piano",
   "app.unpin": "Non mantenere in primo piano",
@@ -147,7 +154,7 @@ export const it: Messages = {
   "settings.startOnLogin.desc": "Apri OpenTokenUsage quando accedi a Windows",
   "settings.startOnLogin.label": "Avvia all'accesso",
   "settings.alerts.title": "Notifiche",
-  "settings.alerts.desc": "Ai livelli di utilizzo che scegli, se il limite verrà raggiunto prima dell'azzeramento e quando si azzera",
+  "settings.alerts.desc": "Soglie di utilizzo, ritmo, ripristini dei limiti e ripristini accumulati in scadenza entro sette giorni o 24 ore",
   "settings.alerts.label": "Notifiche di utilizzo",
   "settings.panel.title": "Pannello",
   "settings.panel.desc": "Dove si apre il pannello. La puntina nella barra del titolo lo tiene sopra le altre finestre.",

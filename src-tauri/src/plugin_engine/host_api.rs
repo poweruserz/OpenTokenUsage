@@ -405,6 +405,11 @@ fn redact_body(body: &str) -> String {
         "orgId",
         "account_display_name",
         "accountDisplayName",
+        "credit_id",
+        "creditId",
+        "grant_id",
+        "grantId",
+        "next_grant_id",
         "payment_id",
         "paymentId",
         "profile_arn",
@@ -426,6 +431,22 @@ fn redact_body(body: &str) -> String {
                 })
                 .to_string();
         }
+    }
+
+    // Reset inventories use a generic `id`; scope it to credit/grant arrays so model ids
+    // in Claude's usage limits stay readable.
+    if let (Ok(inventories), Ok(ids)) = (
+        regex_lite::Regex::new(r#""(?:credits|grants)"\s*:\s*\[[^\]]*\]"#),
+        regex_lite::Regex::new(r#""id":\s*"([^"]+)""#),
+    ) {
+        result = inventories
+            .replace_all(&result, |array: &regex_lite::Captures| {
+                ids.replace_all(&array[0], |id: &regex_lite::Captures| {
+                    format!("\"id\": \"{}\"", redact_value(&id[1]))
+                })
+                .to_string()
+            })
+            .to_string();
     }
 
     // [claude] /api/oauth/profile account.display_name is the user's name; the same key under
@@ -1168,6 +1189,7 @@ pub fn inject_utils(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
                     var line = { type: "text", label: opts.label, value: opts.value };
                     if (opts.color) line.color = opts.color;
                     if (opts.subtitle) line.subtitle = opts.subtitle;
+                    if (opts.resetCredits) line.resetCredits = opts.resetCredits;
                     return line;
                 },
                 progress: function(opts) {
@@ -2877,8 +2899,10 @@ fn inject_keychain<'js>(
                 if !is_allowed_credential_filter(&filter) {
                     return Ok("[]".to_string());
                 }
-                Ok(serde_json::to_string(&list_windows_credential_targets(&filter))
-                    .unwrap_or_else(|_| "[]".to_string()))
+                Ok(
+                    serde_json::to_string(&list_windows_credential_targets(&filter))
+                        .unwrap_or_else(|_| "[]".to_string()),
+                )
             },
         )?,
     )?;
@@ -4188,6 +4212,16 @@ mod tests {
             "got: {}",
             redacted
         );
+    }
+
+    #[test]
+    fn redact_body_redacts_reset_credit_identifiers() {
+        let body = r#"{"credits":[{"id":"private-credit-123456","credit_id":"private-credit-123456","status":"available","expires_at":2000000000}],"cedar_ember":{"next_grant_id":"private-grant-123456","grants":[{"id":"private-grant-123456","resets_left":1,"ends_at":"2099-01-01T00:00:00Z"}]}}"#;
+        let redacted = redact_body(body);
+        assert!(!redacted.contains("private-credit-123456"));
+        assert!(!redacted.contains("private-grant-123456"));
+        assert!(redacted.contains("expires_at"));
+        assert!(redacted.contains("resets_left"));
     }
 
     #[test]

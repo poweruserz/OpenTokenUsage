@@ -356,7 +356,8 @@ ctx.line.text({
   label: string,      // Required: label shown on the left
   value: string,      // Required: value shown on the right
   color?: string,     // Optional: hex color for value text
-  subtitle?: string   // Optional: smaller text below the line
+  subtitle?: string,  // Optional: smaller text below the line
+  resetCredits?: { count: number; expiresAt?: string }[] // Banked resets; ISO expiry, omitted when unknown
 }): MetricLine
 ```
 

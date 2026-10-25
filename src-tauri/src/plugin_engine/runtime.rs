@@ -25,11 +25,24 @@ pub struct BarChartPoint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetCredit {
+    count: u32,
+    expires_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum MetricLine {
     Text {
         label: String,
         value: String,
+        #[serde(
+            rename = "resetCredits",
+            default,
+            skip_serializing_if = "Option::is_none"
+        )]
+        reset_credits: Option<Vec<ResetCredit>>,
         color: Option<String>,
         subtitle: Option<String>,
     },
@@ -322,9 +335,37 @@ fn parse_lines(result: &Object) -> Result<Vec<MetricLine>, String> {
         match line_type.as_str() {
             "text" => {
                 let value = line.get::<_, String>("value").unwrap_or_default();
+                let reset_credits = line
+                    .get::<_, Array>("resetCredits")
+                    .ok()
+                    .map(|credits| {
+                        credits
+                            .iter::<Object>()
+                            .map(|entry| {
+                                let entry =
+                                    entry.map_err(|_| "invalid reset credit entry".to_string())?;
+                                let count = entry
+                                    .get::<_, f64>("count")
+                                    .map_err(|_| "reset credit missing count".to_string())?;
+                                if !count.is_finite()
+                                    || count < 0.0
+                                    || count.fract() != 0.0
+                                    || count > u32::MAX as f64
+                                {
+                                    return Err("invalid reset credit count".to_string());
+                                }
+                                Ok(ResetCredit {
+                                    count: count as u32,
+                                    expires_at: entry.get::<_, String>("expiresAt").ok(),
+                                })
+                            })
+                            .collect::<Result<Vec<_>, String>>()
+                    })
+                    .transpose()?;
                 out.push(MetricLine::Text {
                     label,
                     value,
+                    reset_credits,
                     color,
                     subtitle,
                 });
@@ -886,6 +927,47 @@ mod tests {
         );
 
         assert_eq!(error_text(output), "probe timed out after 5ms");
+    }
+
+    #[test]
+    fn reset_credit_inventory_survives_probe_and_serialization() {
+        let plugin = test_plugin(
+            r#"
+            globalThis.__openusage_plugin = {
+                probe(ctx) { return { lines: [ctx.line.text({ label: "Rate Limit Resets", value: "2 available", resetCredits: [{count: 2, expiresAt: "2099-01-01T00:00:00Z"}] })] }; }
+            };
+        "#,
+        );
+        let output = run_probe_with_timeout(
+            &plugin,
+            &temp_app_dir("reset-credits"),
+            "0.0.0",
+            Duration::from_secs(1),
+        );
+        let value = serde_json::to_value(output).unwrap();
+        assert_eq!(value["lines"][0]["resetCredits"][0]["count"], 2);
+        assert_eq!(
+            value["lines"][0]["resetCredits"][0]["expiresAt"],
+            "2099-01-01T00:00:00Z"
+        );
+    }
+
+    #[test]
+    fn reset_credit_inventory_rejects_invalid_counts() {
+        let plugin = test_plugin(
+            r#"
+            globalThis.__openusage_plugin = {
+                probe(ctx) { return { lines: [ctx.line.text({ label: "Rate Limit Resets", value: "bad", resetCredits: [{count: -1}] })] }; }
+            };
+        "#,
+        );
+        let output = run_probe_with_timeout(
+            &plugin,
+            &temp_app_dir("reset-invalid"),
+            "0.0.0",
+            Duration::from_secs(1),
+        );
+        assert!(error_text(output).contains("invalid reset credit count"));
     }
 
     #[test]

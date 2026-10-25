@@ -1,6 +1,13 @@
 import type { Messages } from "@/locales/en"
 
 export const ko: Messages = {
+  "banked.available": "{count}회 사용 가능",
+  "banked.expiresIn": "리셋 {count}회가 {time} 후 만료됩니다",
+  "banked.unknownExpiry": "리셋 {count}회: 만료일 알 수 없음",
+  "banked.openUsage": "사용량 페이지를 열어 리셋 사용",
+  "banked.linkFailed": "사용량 페이지를 열 수 없습니다. 다시 시도하세요.",
+  "banked.alertTitle": "{provider}: 리셋이 곧 만료됩니다",
+  "banked.alertBody": "리셋 {count}회가 {time} 후 만료됩니다. 제공업체의 사용량 페이지를 열어 사용하세요.",
   "app.minimize": "트레이로 최소화",
   "app.pin": "항상 위에 표시",
   "app.unpin": "항상 위에 표시 안 함",
@@ -147,7 +154,7 @@ export const ko: Messages = {
   "settings.startOnLogin.desc": "Windows에 로그인할 때 OpenTokenUsage 열기",
   "settings.startOnLogin.label": "로그인 시 시작",
   "settings.alerts.title": "알림",
-  "settings.alerts.desc": "선택한 사용량 도달 시, 초기화 전에 소진될 때, 한도가 초기화될 때",
+  "settings.alerts.desc": "사용량 기준, 사용 속도, 한도 리셋 및 7일 또는 24시간 이내에 만료되는 저장된 리셋",
   "settings.alerts.label": "사용량 알림",
   "settings.panel.title": "패널",
   "settings.panel.desc": "패널이 열리는 위치입니다. 제목 표시줄의 핀을 누르면 다른 창 위에 계속 표시됩니다.",

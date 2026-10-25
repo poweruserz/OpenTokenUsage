@@ -9,7 +9,8 @@
   "statusPageUrl": "https://status.claude.com",
   "links": [
     { "label": "Status", "url": "https://status.anthropic.com/" },
-    { "label": "Console", "url": "https://console.anthropic.com/" }
+    { "label": "Console", "url": "https://console.anthropic.com/" },
+    { "label": "Usage dashboard", "url": "https://claude.ai/settings/usage" }
   ],
   "wsl": { "login": ["~/.claude/.credentials.json"] },
   "lines": [

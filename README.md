@@ -30,6 +30,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
 - **Next to the clock.** The tray shows the app icon, a percent, bars, or one number or logo ring per provider.
 - **Taskbar strip (experimental).** Provider logos with session and weekly usage right in the taskbar, in your own fonts, colors and order.
 - **Pace.** Every limit says whether you're ahead or behind, and when it runs out at this rate.
+- **Banked resets.** Codex and Claude reset counts, each expiry date and a live countdown. Open the provider’s usage page with one click. With usage notifications enabled, reminders arrive in the final seven days and again in the final 24 hours while the app is running. Unknown expiry dates stay marked as unavailable.
 - **Notifications.** At the usage levels you pick, when you're on pace to run out before a reset, and when a limit resets, with a built-in sound or your own.
 - **One-click fixes.** Errors come with the fix: run the login command in a terminal, or open the provider's API key page and Windows' Environment Variables.
 - **Service status.** A badge on the card when the provider's status page reports an incident.
@@ -64,7 +65,7 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Amp**](docs/providers/amp.md) / free tier, bonus, credits
 - [**Antigravity**](docs/providers/antigravity.md) / Gemini and Claude models, session and weekly
 - [**Claude**](docs/providers/claude.md) / session, weekly, Fable, extra usage, rate limit resets, local token usage (ccusage)
-- [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits
+- [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits, banked resets with expiry countdowns
 - [**Copilot**](docs/providers/copilot.md) / credits, extra usage, chat, completions
 - [**Cursor**](docs/providers/cursor.md) / credits, total usage, requests, auto usage, API usage, Grok Bot, on-demand, bonus spend, CLI auth
 - [**Factory / Droid**](docs/providers/factory.md) / standard, premium tokens

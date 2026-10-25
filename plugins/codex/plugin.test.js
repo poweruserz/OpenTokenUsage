@@ -1574,7 +1574,7 @@ describe("codex plugin", () => {
     const creditsIndex = result.lines.findIndex((line) => line.label === "Credits")
     const firstTextIndex = result.lines.findIndex((line) => line.type === "text")
 
-    expect(result.lines[resetIndex]).toEqual({
+    expect(result.lines[resetIndex]).toMatchObject({
       type: "text",
       label: "Rate Limit Resets",
       value: "1 available",

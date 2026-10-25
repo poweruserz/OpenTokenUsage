@@ -2088,7 +2088,7 @@ describe("claude plugin", () => {
     expect(ctx.host.fs.writeText).not.toHaveBeenCalledWith(expect.stringContaining("live-plan.json"), expect.anything())
   })
 
-  it("declares Status badge, Fable (overview, below Weekly) and Rate Limit Resets in the manifest", () => {
+  it("declares Status badge, Fable (overview, below Weekly) and Rate Limit Resets (detail) in the manifest", () => {
     // The overview page filters runtime lines to manifest overview-scope labels, so the
     // not-logged-in / no-usage-data Status badge must be declared with scope "overview" or those
     // cards render a silent blank (regression for upstream #849). Fable is always visible directly
@@ -2201,7 +2201,18 @@ describe("claude plugin", () => {
           ],
         },
       })
-      expect(line).toEqual({ type: "text", label: "Rate Limit Resets", value: "4 available" })
+      expect(line).toMatchObject({ type: "text", label: "Rate Limit Resets", value: "4 available" })
+      expect(line.resetCredits).toHaveLength(3)
+      expect(line.resetCredits[0]).toEqual({ count: 1, expiresAt: "2099-10-22T16:00:00.000Z" })
+    })
+
+    it("excludes paused and explicitly unusable grants", async () => {
+      const { line } = await probeWith({ cedar_ember: { eligible: true, grants: [
+        { resets_left: 2, paused: true }, { resets_left: 1, usable_now: false },
+        { resets_left: 1, usable_now: true, ends_at: "2099-01-01T00:00:00Z" },
+      ] } })
+      expect(line.value).toBe("1 available")
+      expect(line.resetCredits).toEqual([{ count: 1, expiresAt: "2099-01-01T00:00:00.000Z" }])
     })
 
     it("reads 0 available for an ineligible account", async () => {
