@@ -2088,7 +2088,7 @@ describe("claude plugin", () => {
     expect(ctx.host.fs.writeText).not.toHaveBeenCalledWith(expect.stringContaining("live-plan.json"), expect.anything())
   })
 
-  it("declares Status badge, Fable (overview, below Weekly) and Rate Limit Resets in the manifest", () => {
+  it("declares Status badge, Fable (overview, below Weekly) and Rate Limit Resets (detail) in the manifest", () => {
     // The overview page filters runtime lines to manifest overview-scope labels, so the
     // not-logged-in / no-usage-data Status badge must be declared with scope "overview" or those
     // cards render a silent blank (regression for upstream #849). Fable is always visible directly
@@ -2096,7 +2096,7 @@ describe("claude plugin", () => {
     const manifest = JSON.parse(readFileSync("plugins/claude/plugin.json", "utf8"))
     expect(manifest.lines).toContainEqual({ type: "badge", label: "Status", scope: "overview" })
     expect(manifest.lines).toContainEqual({ type: "progress", label: "Fable", scope: "overview" })
-    expect(manifest.lines).toContainEqual({ type: "text", label: "Rate Limit Resets", scope: "overview" })
+    expect(manifest.lines).toContainEqual({ type: "text", label: "Rate Limit Resets", scope: "detail" })
     const labels = manifest.lines.map((line) => line.label)
     expect(labels.indexOf("Fable")).toBe(labels.indexOf("Weekly") + 1)
   })

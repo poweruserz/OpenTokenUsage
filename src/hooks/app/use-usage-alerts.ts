@@ -4,7 +4,14 @@ import { invoke } from "@tauri-apps/api/core"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import type { PluginState } from "@/hooks/app/types"
 import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
-import { loadSentUsageAlerts, saveSentUsageAlerts, type AlertSettings, type DisplayMode } from "@/lib/settings"
+import {
+  getEnabledPluginIds,
+  loadSentUsageAlerts,
+  saveSentUsageAlerts,
+  type AlertSettings,
+  type DisplayMode,
+  type PluginSettings
+} from "@/lib/settings"
 import { collectResetCreditAlerts, collectUsageAlerts, type UsageAlert } from "@/lib/usage-alerts"
 
 // The toasts stay silent (an unpackaged app can't give them its own sound); one sound per batch
@@ -24,12 +31,14 @@ async function showNotifications(alerts: UsageAlert[], settings: AlertSettings) 
 export function useUsageAlerts({
   pluginStates,
   pluginsMeta,
+  pluginSettings,
   enabled,
   settings,
   displayMode
 }: {
   pluginStates: Record<string, PluginState | undefined>
   pluginsMeta: PluginMeta[]
+  pluginSettings: PluginSettings | null
   enabled: boolean
   settings: AlertSettings
   displayMode: DisplayMode
@@ -57,11 +66,14 @@ export function useUsageAlerts({
   useEffect(() => {
     const sent = sentRef.current
     const names = new Map(pluginsMeta.map((plugin) => [plugin.id, plugin.name]))
+    // A disabled or removed account keeps its cached state but is no longer refreshed: the minute
+    // ticker would otherwise remind about credits that may have been spent elsewhere since.
+    const enabledIds = new Set(pluginSettings ? getEnabledPluginIds(pluginSettings) : [])
     const alerts: UsageAlert[] = []
     for (const [id, state] of Object.entries(pluginStates)) {
       const data = state?.data
       const previous = previousRef.current[id]
-      if (!data || data.staleSince || state?.error || !enabled || !sent) continue
+      if (!data || data.staleSince || state?.error || !enabled || !sent || !enabledIds.has(id)) continue
       alerts.push(
         ...collectResetCreditAlerts({
           pluginId: id,
@@ -97,5 +109,5 @@ export function useUsageAlerts({
       })
       .catch((error) => console.error("Failed to show or save usage notification:", error))
       .finally(() => ready.forEach((alert) => alert.keys.forEach((key) => pendingRef.current.delete(key))))
-  }, [pluginStates, pluginsMeta, enabled, settings, displayMode, now, loaded])
+  }, [pluginStates, pluginsMeta, pluginSettings, enabled, settings, displayMode, now, loaded])
 }

@@ -48,10 +48,12 @@ beforeEach(() => {
   vi.mocked(invoke).mockResolvedValue(undefined)
 })
 afterEach(() => vi.useRealTimers())
+const CODEX_ONLY = { order: ["codex"], disabled: [] as string[] }
 it("evaluates loaded inventory and persists deduplication across remounts", async () => {
   const props = {
     pluginStates: { codex: state(48) },
     pluginsMeta: [],
+    pluginSettings: CODEX_ONLY,
     enabled: true,
     settings: DEFAULT_ALERT_SETTINGS,
     displayMode: "used" as const
@@ -76,6 +78,7 @@ it("warns when the 24-hour boundary passes without a new probe, including while 
   const props = {
     pluginStates: { codex: state(24 + 1 / 60) },
     pluginsMeta: [],
+    pluginSettings: CODEX_ONLY,
     enabled: true,
     settings: DEFAULT_ALERT_SETTINGS,
     displayMode: "used" as const
@@ -101,6 +104,7 @@ it("stays quiet when disabled, stale or errored", async () => {
     useUsageAlerts({
       pluginStates: { stale, failed: { ...state(12), error: "offline" } },
       pluginsMeta: [],
+      pluginSettings: { order: ["stale", "failed"], disabled: [] },
       enabled: true,
       settings: DEFAULT_ALERT_SETTINGS,
       displayMode: "used" as const
@@ -110,6 +114,7 @@ it("stays quiet when disabled, stale or errored", async () => {
     useUsageAlerts({
       pluginStates: { codex: state(12) },
       pluginsMeta: [],
+      pluginSettings: CODEX_ONLY,
       enabled: false,
       settings: DEFAULT_ALERT_SETTINGS,
       displayMode: "used" as const
@@ -118,5 +123,31 @@ it("stays quiet when disabled, stale or errored", async () => {
   await act(async () => {
     await Promise.resolve()
   })
+  expect(sendNotification).not.toHaveBeenCalled()
+})
+// A disabled or removed account keeps its cached data but is no longer refreshed: crossing a
+// reminder boundary on that stale inventory must not notify (its credits may be spent elsewhere).
+it("never reminds for an account disabled or removed after its data loaded", async () => {
+  const props = {
+    pluginStates: { codex: state(24 * 7 + 1 / 60) },
+    pluginsMeta: [],
+    pluginSettings: CODEX_ONLY,
+    enabled: true,
+    settings: DEFAULT_ALERT_SETTINGS,
+    displayMode: "used" as const
+  }
+  const { rerender } = renderHook((p: typeof props) => useUsageAlerts(p), { initialProps: props })
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  expect(sendNotification).not.toHaveBeenCalled()
+  for (const pluginSettings of [{ order: ["codex"], disabled: ["codex"] }, { order: [], disabled: [] }]) {
+    rerender({ ...props, pluginSettings })
+    await act(async () => {
+      vi.advanceTimersByTime(60_000)
+      await Promise.resolve()
+    })
+  }
   expect(sendNotification).not.toHaveBeenCalled()
 })
