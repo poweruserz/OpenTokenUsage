@@ -225,6 +225,8 @@ Base URLs tried in order (production first: daily can answer 200 without the Gem
 1. `https://cloudcode-pa.googleapis.com`
 2. `https://daily-cloudcode-pa.googleapis.com`
 
+When `retrieveUserQuotaSummary` reports other pools but no Gemini bucket (seen 2026-10-25 on both hosts), Session comes from this endpoint's Gemini models instead (the LS path uses `GetUserStatus`). Image models are left out: they have a quota of their own. Gemini's weekly window then has no data.
+
 ### agy keychain fallback
 
 `agy` stores its auth in the macOS Keychain under service `gemini`, account `antigravity`. OpenUsage reads that exact account only; it does not use legacy Gemini CLI files.
