@@ -24,6 +24,8 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
 
 **Installed 0.7.7 or earlier (MSI or WinGet)?** Use the in-app update once. It moves the app to the per-user install and asks for admin once, to remove the old per-machine copy. Your settings stay. Until then, `winget upgrade` says the install technology is different.
 
+Releases are built by GitHub Actions from this repository. The installer's code signing comes from the [SignPath Foundation](https://signpath.org/); see the [code signing policy](#code-signing-policy).
+
 ## What It Does
 
 - **One glance.** All your AI tools in one panel, opened from the tray or a global shortcut. Pin it above other windows, or have it open where you left it.
@@ -90,6 +92,31 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 OpenTokenUsage is free and made by one person. If it saves you time, you can buy me a coffee.
 
 <a href="https://www.buymeacoffee.com/PowerUserZ" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+Signing starts with the first release after the SignPath Foundation accepts the project; earlier releases are unsigned.
+
+- **What is signed:** only the OpenTokenUsage app and its installer (`OpenTokenUsage_<version>_x64-setup.exe`), built by GitHub Actions ([`publish.yml`](.github/workflows/publish.yml)) from a tagged commit of this repository. Nothing built elsewhere and no third-party program is signed.
+- **Committers and reviewers:** [PowerUserZ](https://github.com/PowerUserZ). Outside contributions arrive as pull requests and are merged only after review.
+- **Approvers:** [PowerUserZ](https://github.com/PowerUserZ) (owner) approves every release.
+- **System changes:** it installs for the current Windows user in `%LOCALAPPDATA%\OpenTokenUsage`, without admin rights. Start on login is on by default (a value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`); turn it off in Settings. It asks Windows to show its tray icon next to the clock, only if you haven't chosen yourself. Updates come only from this repository's releases, are checked against the updater signing key, and install when you choose.
+- **Uninstall:** Windows Settings > Apps > Installed apps > OpenTokenUsage. The uninstaller can also delete the app's settings. Turn off Start on login first to remove its Run value too.
+
+## Privacy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
+
+OpenTokenUsage has no telemetry, no analytics and no server of its own. It connects only to:
+
+- **The AI providers you use,** with the sign-in already on your computer, to read your usage and to refresh that sign-in when it expires. Each provider receives only its own credentials.
+- **GitHub** (`api.github.com`, `github.com`), to check for updates and show the changelog.
+- **Provider status pages** (for example `status.claude.com`), for the status badge.
+- **The npm registry, through your own package manager:** when Bun, pnpm or npm is installed, the Claude and Codex cards run [ccusage](https://github.com/ryoppippi/ccusage) to total local token usage, and the package manager may download it the first time.
+
+Settings and cached usage stay on your computer (`%APPDATA%\com.sunstory.openusage`). The local HTTP API listens on `127.0.0.1` only.
 
 ## License
 
