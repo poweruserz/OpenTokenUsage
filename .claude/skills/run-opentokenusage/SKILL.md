@@ -64,13 +64,14 @@ bunx tsc --noEmit && bun run test && (cd src-tauri && cargo test --lib)
 
 - **Single instance.** While any copy runs (installed or this build), a new launch only shows that
   copy's panel and exits. `launch` stops every copy first; `panel` uses the handover on purpose.
-- **Same data as the installed app.** Both use `%APPDATA%\com.sunstory.openusage`: settings, the
-  usage cache, and the plugins folder. On start each build copies its own bundled plugins over that
-  folder, so after `restore` the installed version's plugins are back, including any that only the
-  newer build retires.
+- **Same data as the installed app.** Both use `%APPDATA%\com.poweruserz.opentokenusage`: settings,
+  the usage cache, and the plugins folder. On start each build copies its own bundled plugins over
+  that folder, so after `restore` the installed version's plugins are back, including any that only
+  the newer build retires. An installed 0.7.8 or older still uses `com.sunstory.openusage`, and a
+  newer build's first start moves that folder over: update the installed app before going back to it.
 - **The version label doesn't change.** The About window and the log say whatever `package.json`
   says for both builds. Use the exe path that `launch` prints.
-- **The release log has no plugin lines.** `%LOCALAPPDATA%\com.sunstory.openusage\logs\OpenTokenUsage.log`
+- **The release log has no plugin lines.** `%LOCALAPPDATA%\com.poweruserz.opentokenusage\logs\OpenTokenUsage.log`
   only holds startup lines. Probe results come from the local API (`usage`).
 - **The local API lists only successful probes.** Errors aren't cached, so a missing provider is
   either disabled in Settings or failing. Antigravity probes slower than the rest, so `launch` can

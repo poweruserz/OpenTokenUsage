@@ -12,6 +12,14 @@ it("bundles only the per-user NSIS installer", () => {
   expect(tauriConf.bundle.createUpdaterArtifacts).toBe(true)
 })
 
+it("keeps MSI removal and notifications working after the identifier change", () => {
+  // The setup removes an MSI only when its Publisher matches; 0.7.7's MSI says "sunstory".
+  expect(tauriConf.bundle.publisher).toBe("sunstory")
+  // Updates keep the old Start menu shortcut, whose AppUserModelID toasts need to match.
+  expect(tauriConf.bundle.windows.nsis.installerHooks).toBe("./windows/hooks.nsh")
+  expect(readFileSync("src-tauri/windows/hooks.nsh", "utf8")).toContain("SetLnkAppUserModelId")
+})
+
 it("fails the release if an MSI ships or latest.json points elsewhere", () => {
   expect(publish).toContain("Unexpected MSI (.msi)")
   expect(publish).toContain('!p["windows-x86_64"]?.url.endsWith("-setup.exe")')

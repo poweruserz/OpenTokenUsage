@@ -3831,7 +3831,7 @@ mod tests {
 
     #[test]
     fn redact_log_message_hides_windows_user_names() {
-        let msg = r"readJson failed for C:\Users\Jane Doe\AppData\Roaming/com.sunstory.openusage/plugins_data/kiro/auth.json; WSL home \\wsl.localhost\Ubuntu\home\jdoe\.codex";
+        let msg = r"readJson failed for C:\Users\Jane Doe\AppData\Roaming/com.poweruserz.opentokenusage/plugins_data/kiro/auth.json; WSL home \\wsl.localhost\Ubuntu\home\jdoe\.codex";
         let out = redact_log_message(msg);
         assert!(
             !out.contains("Jane") && !out.contains("jdoe"),

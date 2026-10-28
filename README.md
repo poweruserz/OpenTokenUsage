@@ -116,7 +116,7 @@ OpenTokenUsage has no telemetry, no analytics and no server of its own. It conne
 - **Provider status pages** (for example `status.claude.com`), for the status badge.
 - **The npm registry, through your own package manager:** when Bun, pnpm or npm is installed, the Claude and Codex cards run [ccusage](https://github.com/ryoppippi/ccusage) to total local token usage, and the package manager may download it the first time.
 
-Settings and cached usage stay on your computer (`%APPDATA%\com.sunstory.openusage`). The local HTTP API listens on `127.0.0.1` only.
+Settings and cached usage stay on your computer (`%APPDATA%\com.poweruserz.opentokenusage`). The local HTTP API listens on `127.0.0.1` only.
 
 ## License
 
