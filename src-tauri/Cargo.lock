@@ -2476,6 +2476,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "junction"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cde48f36530cbd91b65f050101e6c056d6eb743cea2a8f0f19beef69c6742ff8"
+dependencies = [
+ "scopeguard",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3128,6 +3138,7 @@ dependencies = [
  "base64 0.22.1",
  "dirs 6.0.0",
  "iana-time-zone",
+ "junction",
  "libc",
  "log",
  "regex-lite",

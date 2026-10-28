@@ -10,3 +10,13 @@
     !insertmacro SetLnkAppUserModelId "$DESKTOP\${PRODUCTNAME}.lnk"
   ${EndIf}
 !macroend
+
+; data_dirs.rs leaves the old accounts folder as a junction to the new one. When the app data is
+; deleted, remove that link too (RmDir without /r deletes only the link) and the then-empty folder.
+!macro NSIS_HOOK_POSTUNINSTALL
+  ${If} $DeleteAppDataCheckboxState = 1
+  ${AndIf} $UpdateMode <> 1
+    RmDir "$APPDATA\com.sunstory.openusage\accounts"
+    RmDir "$APPDATA\com.sunstory.openusage"
+  ${EndIf}
+!macroend

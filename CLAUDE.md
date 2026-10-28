@@ -158,8 +158,10 @@ This file holds the project facts that are easy to get wrong.
   fork before it merges. winget won't upgrade an MSI install to the EXE ("install technology is
   different"): those users move with the in-app update.
 - Identifier `com.poweruserz.opentokenusage` (0.7.8 and older: upstream's `com.sunstory.openusage`).
-  It names `%APPDATA%\<id>` and `%LOCALAPPDATA%\<id>`; `data_dirs.rs` moves the old folders before
-  the builder runs. Notifications use it as the AppUserModelID, which must be on the Start menu
+  It names `%APPDATA%\<id>` and `%LOCALAPPDATA%\<id>`; `data_dirs.rs` moves the old folders' entries
+  before the builder runs (never overwriting, merging folders both have) and leaves the old
+  `accounts` as a junction, since Settings tells users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an
+  account's folder. Notifications use it as the AppUserModelID, which must be on the Start menu
   shortcut: updates don't recreate shortcuts, so `src-tauri/windows/hooks.nsh` stamps it on every
   install. `bundle.publisher` stays `"sunstory"` (it was the default from the old identifier)
   because the NSIS setup only removes an MSI whose Publisher matches it; change it once 0.7.7 MSI
