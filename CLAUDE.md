@@ -22,7 +22,7 @@ This file holds the project facts that are easy to get wrong.
   timeout (30 s), one probe per plugin at a time, panics → error result. Don't re-implement in JS.
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
-- Release builds run only the bundled plugins (copied to `%APPDATA%\com.sunstory.openusage\plugins`);
+- Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);
   the repo's `plugins/` is picked up from the cwd in **debug builds only** (`#[cfg(debug_assertions)]`
   in `plugin_engine/mod.rs`) — never make that path reachable in release. Plugin ids must match
   `[a-z0-9-]`; `entry` and `icon` must stay inside the plugin folder.
@@ -157,6 +157,15 @@ This file holds the project facts that are easy to get wrong.
   komac kept `wix`/`machine`/`AUTOLAUNCHAPP`, fixed on its branch in the `PowerUserZ/winget-pkgs`
   fork before it merges. winget won't upgrade an MSI install to the EXE ("install technology is
   different"): those users move with the in-app update.
+- Identifier `com.poweruserz.opentokenusage` (0.7.8 and older: upstream's `com.sunstory.openusage`).
+  It names `%APPDATA%\<id>` and `%LOCALAPPDATA%\<id>`; `data_dirs.rs` moves the old folders' entries
+  before the builder runs (never overwriting, merging folders both have, but an account folder only
+  moves whole) and leaves a junction at the old path of `accounts` or of each account folder it
+  moved, since Settings tells users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an account's folder. Notifications use it as the AppUserModelID, which must be on the Start menu
+  shortcut: updates don't recreate shortcuts, so `src-tauri/windows/hooks.nsh` stamps it on every
+  install. `bundle.publisher` stays `"sunstory"` (it was the default from the old identifier)
+  because the NSIS setup only removes an MSI whose Publisher matches it; change it once 0.7.7 MSI
+  installs are gone.
 - Release: bump the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
   (+ `Cargo.lock`), add a `## vX.Y.Z` section to `CHANGELOG.md` (required: it becomes the release
   body the in-app changelog shows), then push a `v*` tag → `publish.yml` (windows-latest) builds

@@ -2,6 +2,7 @@ mod accounts;
 mod alert_sound;
 mod autostart;
 mod config;
+mod data_dirs;
 mod local_http_api;
 mod log_path;
 mod panel;
@@ -545,6 +546,9 @@ pub fn run() {
     let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
     let _guard = runtime.enter();
 
+    let context = tauri::generate_context!();
+    let migrated = data_dirs::migrate_legacy(&context.config().identifier);
+
     tauri::Builder::default()
         // First, so a second launch (Start menu, installer) only opens the running app's panel.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -600,7 +604,7 @@ pub fn run() {
             alert_sound::play_alert_sound,
             alert_sound::save_custom_alert_sound
         ])
-        .setup(|app| {
+        .setup(move |app| {
             use tauri::Manager;
 
             // Disable the window shadow to avoid a visible border around the
@@ -618,6 +622,9 @@ pub fn run() {
 
             let version = app.package_info().version.to_string();
             log::info!("OpenTokenUsage v{} starting", version);
+            for line in &migrated {
+                log::info!("data folder migration: {line}");
+            }
 
             // Load config early (lazy init via OnceLock, zero-cost after)
             let _proxy = config::get_resolved_proxy();
@@ -696,7 +703,7 @@ pub fn run() {
 
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|_, event| match event {
             tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
