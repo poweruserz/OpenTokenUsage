@@ -17,10 +17,15 @@ const loadPlugin = async () => {
   return globalThis.__openusage_plugin
 }
 
-// Counts /api/oauth/usage requests only: a successful fetch is followed by one
-// /api/oauth/profile lookup per token (live plan badge), which these counts ignore.
+// Counts plain /api/oauth/usage polls only: a successful fetch is followed by one
+// /api/oauth/profile lookup per token (live plan badge) and an hourly reset-grants check
+// (?cedar_ember=1), which these counts ignore.
+const isGrantsCheck = (url) => String(url).includes("cedar_ember=1")
+const isUsagePoll = (url) => String(url).includes("/api/oauth/usage") && !isGrantsCheck(url)
 const usageRequestCount = (ctx) =>
-  ctx.host.http.request.mock.calls.filter((call) => String(call[0]?.url).includes("/api/oauth/usage")).length
+  ctx.host.http.request.mock.calls.filter((call) => isUsagePoll(call[0]?.url)).length
+const grantsCheckCount = (ctx) =>
+  ctx.host.http.request.mock.calls.filter((call) => isGrantsCheck(call[0]?.url)).length
 
 const okUsageResponse = (body) => ({ status: 200, bodyText: JSON.stringify(body), headers: {} })
 
@@ -1238,7 +1243,7 @@ describe("claude plugin", () => {
     let usageCalls = 0
     let firstUsageHeaders = null
     ctx.host.http.request.mockImplementation((opts) => {
-      if (String(opts.url).includes("/api/oauth/usage")) {
+      if (isUsagePoll(opts.url)) {
         usageCalls += 1
         if (!firstUsageHeaders) firstUsageHeaders = opts.headers
         if (usageCalls === 1) {
@@ -1261,7 +1266,7 @@ describe("claude plugin", () => {
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
     expect(usageCalls).toBe(2)
-    expect(firstUsageHeaders["User-Agent"]).toBe("claude-cli/2.1.280 (external, cli)")
+    expect(firstUsageHeaders["User-Agent"]).toBe("claude-cli/2.1.294 (external, cli)")
     expect(result.lines.find((line) => line.label === "Session")).toBeTruthy()
   })
 
@@ -2182,10 +2187,75 @@ describe("claude plugin", () => {
       return { ctx, line: result.lines.find((l) => l.label === "Rate Limit Resets") }
     }
 
-    it("opts in to reset grants on the usage request", async () => {
+    it("polls plain usage and asks for grants with Claude Code's own request (upstream #1367)", async () => {
       const { ctx } = await probeWith({})
-      const usageCall = ctx.host.http.request.mock.calls.find((c) => String(c[0].url).includes("/api/oauth/usage"))
-      expect(usageCall[0].url).toBe("https://api.anthropic.com/api/oauth/usage?cedar_ember=1")
+      const urls = ctx.host.http.request.mock.calls.map((c) => String(c[0].url)).filter((u) => u.includes("/usage"))
+      expect(urls).toEqual([
+        "https://api.anthropic.com/api/oauth/usage",
+        "https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1",
+      ])
+    })
+
+    describe("hourly grants check", () => {
+      const GRANTS = { eligible: true, grants: [{ resets_left: 1, ends_at: "2099-01-01T00:00:00Z" }] }
+      const CACHE = "/tmp/openusage-test/plugin/reset-grants.json"
+      const setup = (grantsResponse) => {
+        const ctx = makeCtx()
+        ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "token" } }))
+        ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-1" } }))
+        ctx.host.http.request.mockImplementation((opts) =>
+          isGrantsCheck(opts.url)
+            ? grantsResponse()
+            : okUsageResponse({ five_hour: { utilization: 10, resets_at: null } })
+        )
+        return ctx
+      }
+      const probe = async (ctx) => {
+        const result = (await loadPlugin()).probe(ctx) // fresh runtime: only pluginDataDir carries over
+        return { session: result.lines.find((l) => l.label === "Session"), resets: result.lines.find((l) => l.label === "Rate Limit Resets") }
+      }
+      const ageCache = (ctx, ms) => {
+        const cached = JSON.parse(ctx.host.fs.readText(CACHE))
+        ctx.host.fs.writeText(CACHE, JSON.stringify({ ...cached, checkedAt: cached.checkedAt - ms }))
+      }
+
+      it("asks once an hour and shows the last answer in between", async () => {
+        const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+        expect((await probe(ctx)).resets?.value).toBe("1 available")
+        expect((await probe(ctx)).resets?.value).toBe("1 available")
+        expect(usageRequestCount(ctx)).toBe(2)
+        expect(grantsCheckCount(ctx)).toBe(1)
+
+        ageCache(ctx, 60 * 60 * 1000)
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(2)
+      })
+
+      it("keeps the last answer and the bars when a check fails, and waits an hour to retry", async () => {
+        let grantsResponse = () => okUsageResponse({ cedar_ember: GRANTS })
+        const ctx = setup(() => grantsResponse())
+        await probe(ctx)
+        ageCache(ctx, 60 * 60 * 1000)
+        grantsResponse = () => ({ status: 429, bodyText: "", headers: { "retry-after": "3000" } })
+
+        const failed = await probe(ctx)
+        expect(failed.session?.used).toBe(10)
+        expect(failed.resets?.value).toBe("1 available")
+        expect(ctx.host.log.warn).toHaveBeenCalledWith(expect.stringContaining("reset grants check failed (status=429)"))
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(2)
+      })
+
+      it("asks again for another account instead of showing the previous one's grants", async () => {
+        const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+        await probe(ctx)
+        ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-2" } }))
+        ctx.host.http.request.mockImplementation((opts) =>
+          isGrantsCheck(opts.url) ? okUsageResponse({ cedar_ember: null }) : okUsageResponse({})
+        )
+        expect((await probe(ctx)).resets).toBeUndefined()
+        expect(grantsCheckCount(ctx)).toBe(2)
+      })
     })
 
     it("counts each remaining reset, skipping spent and lapsed grants", async () => {

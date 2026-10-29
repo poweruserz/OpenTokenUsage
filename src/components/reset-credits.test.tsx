@@ -4,7 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener"
 import { ResetCredits } from "@/components/reset-credits"
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }))
 const now = Date.parse("2026-10-24T12:00:00Z")
-const url = "https://chatgpt.com/codex/settings/usage"
+const url = "https://chatgpt.com/settings/usage"
 describe("reset inventory", () => {
   it("shows live count, countdown, absolute expiry, unknown expiry and opens usage", async () => {
     render(

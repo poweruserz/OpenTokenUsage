@@ -178,3 +178,4 @@ Returns session token usage and web search quotas.
 | HTTP error    | "Usage request failed (HTTP {status}). Try again later."   |
 | Network error | "Usage request failed. Check your connection."             |
 | Invalid JSON  | "Usage response invalid. Try again later."                 |
+| Key without a GLM Coding Plan (2xx, `success: false`, `msg` naming the coding plan) | "No active GLM Coding Plan. Subscribe at z.ai/subscribe to see usage." |
