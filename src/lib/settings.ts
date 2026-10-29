@@ -63,6 +63,7 @@ const MAX_SENT_USAGE_ALERTS = 300;
 const GLOBAL_SHORTCUT_KEY = "globalShortcut";
 const START_ON_LOGIN_KEY = "startOnLogin";
 const LANGUAGE_KEY = "language";
+const UPDATE_RELAUNCH_KEY = "updateRelaunchVersion";
 
 export const DEFAULT_AUTO_UPDATE_INTERVAL: AutoUpdateInterval = 15;
 export const DEFAULT_THEME_MODE: ThemeMode = "dark";
@@ -458,6 +459,18 @@ export async function saveRememberPanelPosition(value: boolean, position: { x: n
   await store.set(REMEMBER_PANEL_POSITION_KEY, value);
   if (value && position) await store.set(PANEL_POSITION_KEY, { x: position.x, y: position.y });
   else await store.delete(PANEL_POSITION_KEY);
+  await store.save();
+}
+
+/** The version an in-app update is installing; the app that starts as that version opens its panel. */
+export async function loadUpdateRelaunchVersion(): Promise<string | null> {
+  const stored = await store.get<unknown>(UPDATE_RELAUNCH_KEY);
+  return typeof stored === "string" ? stored : null;
+}
+
+export async function saveUpdateRelaunchVersion(version: string | null): Promise<void> {
+  if (version === null) await store.delete(UPDATE_RELAUNCH_KEY);
+  else await store.set(UPDATE_RELAUNCH_KEY, version);
   await store.save();
 }
 

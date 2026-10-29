@@ -261,6 +261,8 @@ vi.mock("@/lib/settings", async () => {
     saveGlobalShortcut: state.saveGlobalShortcutMock,
     loadStartOnLogin: state.loadStartOnLoginMock,
     saveStartOnLogin: state.saveStartOnLoginMock,
+    loadUpdateRelaunchVersion: vi.fn(async () => null),
+    saveUpdateRelaunchVersion: vi.fn(async () => undefined),
   }
 })
 

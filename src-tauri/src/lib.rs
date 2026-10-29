@@ -158,6 +158,11 @@ fn catch_probe_panic(
 fn init_panel() {}
 
 #[tauri::command]
+fn show_panel(app_handle: tauri::AppHandle) {
+    panel::show_panel(&app_handle);
+}
+
+#[tauri::command]
 fn hide_panel(app_handle: tauri::AppHandle) {
     panel::hide_panel(&app_handle);
 }
@@ -577,6 +582,7 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             init_panel,
+            show_panel,
             hide_panel,
             reanchor_window,
             open_devtools,

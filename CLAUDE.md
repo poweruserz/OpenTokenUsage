@@ -146,6 +146,11 @@ This file holds the project facts that are easy to get wrong.
 - A second launch only shows the running app's panel (single-instance plugin), and the app exits at
   once in session 0 (an installer running as SYSTEM). Both make starting the app after a winget
   install safe.
+- In-app updates run the setup quietly (`plugins.updater.windows.installMode: "quiet"` = `/S /UPDATE /R`):
+  `update.install()` exits the app (the JS `relaunch()` after it never runs) and the setup starts it again.
+  `use-app-update.ts` saves the version being installed (`updateRelaunchVersion`); the app that starts as
+  that version reopens its panel. The mode in effect is the *installed* version's, so a change here
+  reaches users one update later.
 - Installer: per-user NSIS only (`%LOCALAPPDATA%\OpenTokenUsage`, no admin). No MSI: Tauri's MSI is
   always per-machine, so every update asked for admin. Up to 0.7.7 the MSI shipped; those installs
   update to the NSIS setup, which uninstalls the MSI once (one admin prompt). Start on login is
