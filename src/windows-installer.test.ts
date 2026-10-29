@@ -12,6 +12,11 @@ it("bundles only the per-user NSIS installer", () => {
   expect(tauriConf.bundle.createUpdaterArtifacts).toBe(true)
 })
 
+it("updates in-app without a setup window", () => {
+  // Quiet runs the setup with /S; /R still starts the app, which then reopens its panel.
+  expect(tauriConf.plugins.updater.windows.installMode).toBe("quiet")
+})
+
 it("keeps MSI removal and notifications working after the identifier change", () => {
   // The setup removes an MSI only when its Publisher matches; 0.7.7's MSI says "sunstory".
   expect(tauriConf.bundle.publisher).toBe("sunstory")

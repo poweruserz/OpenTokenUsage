@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { isTauri } from "@tauri-apps/api/core"
+import { getVersion } from "@tauri-apps/api/app"
+import { invoke, isTauri } from "@tauri-apps/api/core"
 import { check, type Update } from "@tauri-apps/plugin-updater"
 import { relaunch } from "@tauri-apps/plugin-process"
+import { loadUpdateRelaunchVersion, saveUpdateRelaunchVersion } from "@/lib/settings"
 
 export type UpdateStatus =
   | { status: "idle" }
@@ -13,6 +15,16 @@ export type UpdateStatus =
   | { status: "error"; message: string }
 
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+// The quiet installer (tauri.conf.json) shows no window and closes the app; the app it starts
+// opens the panel again, so the update doesn't look like a crash. A failed install leaves the old
+// version running, which only clears the mark.
+async function reopenPanelAfterUpdate() {
+  const version = await loadUpdateRelaunchVersion()
+  if (version === null) return
+  await saveUpdateRelaunchVersion(null)
+  if (version === (await getVersion())) await invoke("show_panel")
+}
 
 interface UseAppUpdateReturn {
   updateStatus: UpdateStatus
@@ -103,6 +115,10 @@ export function useAppUpdate(): UseAppUpdateReturn {
   }, [setStatus])
 
   useEffect(() => {
+    if (isTauri()) reopenPanelAfterUpdate().catch(console.error)
+  }, [])
+
+  useEffect(() => {
     mountedRef.current = true
     void checkForUpdates()
 
@@ -129,6 +145,8 @@ export function useAppUpdate(): UseAppUpdateReturn {
     try {
       inFlightRef.current.installing = true
       setStatus({ status: "installing" })
+      // Saved to disk before install() exits the app; failing to save must not block the update.
+      await saveUpdateRelaunchVersion(update.version).catch(console.error)
       await update.install()
       await relaunch()
       setStatus({ status: "idle" })

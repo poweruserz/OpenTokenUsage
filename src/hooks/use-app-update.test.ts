@@ -1,9 +1,13 @@
 import { renderHook, act } from "@testing-library/react"
 import { describe, expect, it, vi, beforeEach, afterAll } from "vitest"
 
-const { checkMock, relaunchMock } = vi.hoisted(() => ({
+const { checkMock, relaunchMock, invokeMock, getVersionMock, loadRelaunchMock, saveRelaunchMock } = vi.hoisted(() => ({
   checkMock: vi.fn(),
   relaunchMock: vi.fn(),
+  invokeMock: vi.fn(),
+  getVersionMock: vi.fn(),
+  loadRelaunchMock: vi.fn(),
+  saveRelaunchMock: vi.fn(),
 }))
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
@@ -12,6 +16,20 @@ vi.mock("@tauri-apps/plugin-updater", () => ({
 
 vi.mock("@tauri-apps/plugin-process", () => ({
   relaunch: relaunchMock,
+}))
+
+vi.mock("@tauri-apps/api/core", async () => ({
+  ...(await vi.importActual<typeof import("@tauri-apps/api/core")>("@tauri-apps/api/core")),
+  invoke: invokeMock,
+}))
+
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: getVersionMock,
+}))
+
+vi.mock("@/lib/settings", () => ({
+  loadUpdateRelaunchVersion: loadRelaunchMock,
+  saveUpdateRelaunchVersion: saveRelaunchMock,
 }))
 
 import { useAppUpdate } from "@/hooks/use-app-update"
@@ -27,6 +45,10 @@ describe("useAppUpdate", () => {
   beforeEach(() => {
     checkMock.mockReset()
     relaunchMock.mockReset()
+    invokeMock.mockReset()
+    getVersionMock.mockReset()
+    loadRelaunchMock.mockReset().mockResolvedValue(null)
+    saveRelaunchMock.mockReset().mockResolvedValue(undefined)
     // `@tauri-apps/api/core` considers `globalThis.isTauri` the runtime flag.
     globalThis.isTauri = true
   })
@@ -213,9 +235,64 @@ describe("useAppUpdate", () => {
     expect(result.current.updateStatus.status).toBe("ready")
 
     await act(() => result.current.triggerInstall())
+    expect(saveRelaunchMock).toHaveBeenCalledWith("1.0.0")
+    expect(saveRelaunchMock.mock.invocationCallOrder[0]).toBeLessThan(installMock.mock.invocationCallOrder[0])
     expect(installMock).toHaveBeenCalled()
     expect(relaunchMock).toHaveBeenCalled()
     expect(result.current.updateStatus).toEqual({ status: "idle" })
+  })
+
+  it("installs even when the relaunch mark can't be saved", async () => {
+    const installMock = vi.fn().mockResolvedValue(undefined)
+    const downloadMock = vi.fn(async (onEvent: (event: any) => void) => {
+      onEvent({ event: "Finished", data: {} })
+    })
+    saveRelaunchMock.mockRejectedValue(new Error("store failed"))
+    checkMock.mockResolvedValue({ version: "1.0.0", download: downloadMock, install: installMock })
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const { result } = renderHook(() => useAppUpdate())
+    await act(() => Promise.resolve())
+    await act(() => Promise.resolve())
+
+    await act(() => result.current.triggerInstall())
+    expect(installMock).toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
+
+  it("opens the panel when started as the version an update installed", async () => {
+    checkMock.mockReturnValue(new Promise(() => {}))
+    loadRelaunchMock.mockResolvedValue("1.2.3")
+    getVersionMock.mockResolvedValue("1.2.3")
+
+    renderHook(() => useAppUpdate())
+
+    await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith("show_panel"))
+    expect(saveRelaunchMock).toHaveBeenCalledWith(null)
+  })
+
+  it("only clears the mark when started as another version (the install failed)", async () => {
+    checkMock.mockReturnValue(new Promise(() => {}))
+    loadRelaunchMock.mockResolvedValue("1.2.3")
+    getVersionMock.mockResolvedValue("1.2.2")
+
+    renderHook(() => useAppUpdate())
+
+    await vi.waitFor(() => expect(getVersionMock).toHaveBeenCalled())
+    await act(() => Promise.resolve())
+    expect(saveRelaunchMock).toHaveBeenCalledWith(null)
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+
+  it("opens nothing without a relaunch mark", async () => {
+    checkMock.mockReturnValue(new Promise(() => {}))
+
+    renderHook(() => useAppUpdate())
+
+    await vi.waitFor(() => expect(loadRelaunchMock).toHaveBeenCalled())
+    await act(() => Promise.resolve())
+    expect(saveRelaunchMock).not.toHaveBeenCalled()
+    expect(invokeMock).not.toHaveBeenCalled()
   })
 
   it("transitions to error on install failure", async () => {
