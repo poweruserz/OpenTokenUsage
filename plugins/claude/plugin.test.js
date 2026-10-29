@@ -322,9 +322,10 @@ describe("claude plugin", () => {
 
     const plugin = await loadPlugin()
     plugin.probe(ctx)
-    // Only the legacy unhashed service is consulted — no hashed candidate.
+    // Only the legacy unhashed service is consulted — no hashed candidate. (The login is read
+    // again before a refresh, in case Claude Code renewed it meanwhile.)
     const calls = ctx.host.keychain.readGenericPasswordForCurrentUser.mock.calls.map((c) => c[0])
-    expect(calls).toEqual(["Claude Code-credentials"])
+    expect([...new Set(calls)]).toEqual(["Claude Code-credentials"])
   })
 
   it("composes the staging-oauth keychain hash correctly", async () => {
@@ -1582,6 +1583,77 @@ describe("claude plugin", () => {
     expect(
       ctx.host.http.request.mock.calls.some((call) => String(call[0]?.url).includes("/v1/oauth/token"))
     ).toBe(false)
+  })
+
+  // Claude Code's refresh tokens are single-use; refreshing alongside it can sign it out.
+  describe("refreshing alongside Claude Code (upstream #1417)", () => {
+    const CREDS = "~/.claude/.credentials.json"
+    const login = (accessToken, refreshToken, expiresInMs) => JSON.stringify({
+      claudeAiOauth: { accessToken, refreshToken, expiresAt: Date.now() + expiresInMs, subscriptionType: "pro" },
+    })
+    const usage = okUsageResponse({ five_hour: { utilization: 10, resets_at: null } })
+    const refreshCalls = (ctx) =>
+      ctx.host.http.request.mock.calls.filter(([opts]) => String(opts.url).includes("/v1/oauth/token"))
+    const usageToken = (ctx) =>
+      ctx.host.http.request.mock.calls.find(([opts]) => isUsagePoll(opts.url))[0].headers.Authorization
+
+    it("leaves a token that is about to expire to Claude Code", async () => {
+      const ctx = makeCtx()
+      ctx.host.fs.writeText(CREDS, login("old", "r1", 60_000))
+      ctx.host.http.request.mockReturnValue(usage)
+      ;(await loadPlugin()).probe(ctx)
+      expect(refreshCalls(ctx)).toHaveLength(0)
+      expect(usageToken(ctx)).toBe("Bearer old")
+    })
+
+    it("takes the login Claude Code renewed meanwhile instead of refreshing an expired one", async () => {
+      const ctx = makeCtx()
+      ctx.host.fs.writeText(CREDS, login("old", "r1", -60_000))
+      const readText = ctx.host.fs.readText
+      let reads = 0
+      ctx.host.fs.readText = (path) => {
+        // Claude Code renews the login right after the probe's first read.
+        if (path === CREDS && ++reads === 2) ctx.host.fs.writeText(CREDS, login("renewed", "r2", 3_600_000))
+        return readText(path)
+      }
+      ctx.host.http.request.mockReturnValue(usage)
+      ;(await loadPlugin()).probe(ctx)
+      expect(refreshCalls(ctx)).toHaveLength(0)
+      expect(usageToken(ctx)).toBe("Bearer renewed")
+    })
+
+    it("uses Claude Code's new login when it won the refresh race", async () => {
+      const ctx = makeCtx()
+      ctx.host.fs.writeText(CREDS, login("old", "r1", -60_000))
+      ctx.host.http.request.mockImplementation((opts) => {
+        if (String(opts.url).includes("/v1/oauth/token")) {
+          // Claude Code used r1 a moment earlier and stored its new login.
+          ctx.host.fs.writeText(CREDS, login("renewed", "r2", 3_600_000))
+          return { status: 400, bodyText: JSON.stringify({ error: "invalid_grant" }) }
+        }
+        return usage
+      })
+      const result = (await loadPlugin()).probe(ctx)
+      expect(result.lines.find((l) => l.label === "Session")?.used).toBe(10)
+      expect(usageToken(ctx)).toBe("Bearer renewed")
+    })
+
+    it("refreshes the file login instead of taking a scope-less keychain token (env token set)", async () => {
+      const ctx = makeCtx()
+      ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+        claudeAiOauth: { accessToken: "keychain-token", expiresAt: Date.now() + 3_600_000, scopes: ["user:inference"] },
+      }))
+      ctx.host.fs.writeText(CREDS, login("old", "r1", -60_000))
+      ctx.host.env.get.mockImplementation((name) => (name === "CLAUDE_CODE_OAUTH_TOKEN" ? "env-oauth-token" : null))
+      ctx.host.http.request.mockImplementation((opts) =>
+        String(opts.url).includes("/v1/oauth/token")
+          ? { status: 200, bodyText: JSON.stringify({ access_token: "refreshed", refresh_token: "r2", expires_in: 3600 }) }
+          : usage
+      )
+      ;(await loadPlugin()).probe(ctx)
+      expect(refreshCalls(ctx)).toHaveLength(1)
+      expect(usageToken(ctx)).toBe("Bearer refreshed")
+    })
   })
 
   it("handles malformed ccusage payload shape as runner_failed", async () => {
