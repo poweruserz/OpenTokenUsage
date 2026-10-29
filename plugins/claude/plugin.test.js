@@ -1637,6 +1637,23 @@ describe("claude plugin", () => {
       expect(result.lines.find((l) => l.label === "Session")?.used).toBe(10)
       expect(usageToken(ctx)).toBe("Bearer renewed")
     })
+
+    it("refreshes the file login instead of taking a scope-less keychain token (env token set)", async () => {
+      const ctx = makeCtx()
+      ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+        claudeAiOauth: { accessToken: "keychain-token", expiresAt: Date.now() + 3_600_000, scopes: ["user:inference"] },
+      }))
+      ctx.host.fs.writeText(CREDS, login("old", "r1", -60_000))
+      ctx.host.env.get.mockImplementation((name) => (name === "CLAUDE_CODE_OAUTH_TOKEN" ? "env-oauth-token" : null))
+      ctx.host.http.request.mockImplementation((opts) =>
+        String(opts.url).includes("/v1/oauth/token")
+          ? { status: 200, bodyText: JSON.stringify({ access_token: "refreshed", refresh_token: "r2", expires_in: 3600 }) }
+          : usage
+      )
+      ;(await loadPlugin()).probe(ctx)
+      expect(refreshCalls(ctx)).toHaveLength(1)
+      expect(usageToken(ctx)).toBe("Bearer refreshed")
+    })
   })
 
   it("handles malformed ccusage payload shape as runner_failed", async () => {

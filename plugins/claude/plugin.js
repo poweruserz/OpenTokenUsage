@@ -433,12 +433,14 @@
   }
 
   // A newer login than ours that Claude Code stored meanwhile: taken over (creds updated in place)
-  // instead of refreshing. Null when the stored login is ours, missing, or expired too.
+  // instead of refreshing. Null when the stored login is ours, missing, expired too, or can't read
+  // live usage. Only creds' own store is reread: with CLAUDE_CODE_OAUTH_TOKEN set, loadCredentials
+  // may have passed over a scope-less keychain entry for the file.
   function adoptStoredLogin(ctx, creds) {
-    const stored = loadStoredCredentials(ctx, true)
+    const stored = creds.source === "file" ? loadFileCredentials(ctx) : loadKeychainCredentials(ctx)
     const oauth = stored && stored.oauth
     if (!oauth || !oauth.accessToken || oauth.accessToken === creds.oauth.accessToken) return null
-    if (needsRefresh(ctx, oauth, Date.now())) return null
+    if (!hasProfileScope(stored) || needsRefresh(ctx, oauth, Date.now())) return null
     ctx.host.log.info("using the login Claude Code renewed meanwhile")
     Object.assign(creds, stored)
     return oauth.accessToken
