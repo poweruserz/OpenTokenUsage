@@ -21,7 +21,9 @@
 | Auto usage | `planUsage.autoPercentUsed` | detail | percent | Omitted when field is missing or non-finite |
 | API usage | `planUsage.apiPercentUsed` | detail | percent | Omitted when field is missing or non-finite |
 | Requests | `/api/usage` (enterprise) | overview | count | Enterprise accounts only; unchanged from previous behavior |
-| On-demand | `spendLimitUsage` | detail | dollars | Only when individual or pooled limit > 0 |
+| On-demand | `spendLimitUsage` | detail | dollars | Only when individual or pooled limit > 0. Org and team-shaped seats without it get it from `/api/usage-summary` (individual bucket, else the team one) |
+
+**Plan badge**: `GetPlanInfo` can still say Pro on an Enterprise seat. When the state DB's `cursorAuth/stripeMembershipType` (or, on an org or team-shaped seat, `/api/usage-summary`'s `membershipType`) is `enterprise` or `team` and `GetPlanInfo` is missing or says Pro, the badge shows that membership. Personal memberships never change the badge, and the membership never changes which usage endpoint is used.
 
 **Enterprise flow** remains request-based via the REST `/api/usage` endpoint -- unchanged.
 

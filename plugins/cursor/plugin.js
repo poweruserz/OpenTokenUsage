@@ -105,6 +105,7 @@
         return {
           accessToken: keychainAccessToken,
           refreshToken: keychainRefreshToken,
+          membershipType: null,
           source: "keychain",
         }
       }
@@ -112,14 +113,17 @@
       return {
         accessToken: sqliteAccessToken,
         refreshToken: sqliteRefreshToken,
+        membershipType: sqliteMembershipType || null,
         source: "sqlite",
       }
     }
 
+    // Keychain-only auth has no proven link to the state DB's membership row.
     if (keychainAccessToken || keychainRefreshToken) {
       return {
         accessToken: keychainAccessToken,
         refreshToken: keychainRefreshToken,
+        membershipType: null,
         source: "keychain",
       }
     }
@@ -301,6 +305,39 @@
     return typeof value === "string" ? ctx.util.parseDateMs(value) : null
   }
 
+  // Enterprise seats can get "Pro" from GetPlanInfo while their stripeMembershipType (state DB) or
+  // usage-summary says enterprise/team (upstream #1409).
+  function normalizedMembership(value) {
+    var v = typeof value === "string" ? value.trim().toLowerCase() : ""
+    return v || null
+  }
+
+  function isOrgMembership(value) {
+    var v = normalizedMembership(value)
+    return v === "enterprise" || v === "team"
+  }
+
+  // Badge plan: org membership wins over GetPlanInfo when that is missing or still says Pro.
+  function resolvedPlanName(planInfoName, membership) {
+    var planInfo = typeof planInfoName === "string" ? planInfoName.trim() : ""
+    var lowered = planInfo.toLowerCase()
+    if (isOrgMembership(membership) && (!planInfo || lowered === "pro" || lowered === "pro plan")) {
+      return normalizedMembership(membership)
+    }
+    return planInfo || normalizedMembership(membership)
+  }
+
+  // The local org membership first, then a live org one from usage-summary over a stale personal one.
+  function preferredMembership(local, summary) {
+    if (isOrgMembership(local)) return normalizedMembership(local)
+    if (isOrgMembership(summary)) return normalizedMembership(summary)
+    return normalizedMembership(local) || normalizedMembership(summary)
+  }
+
+  function planLabelFor(ctx, name) {
+    return name ? ctx.fmt.planLabel(name) || null : null
+  }
+
   function fetchStripeBalance(ctx, accessToken) {
     var session = buildSessionToken(ctx, accessToken)
     if (!session) {
@@ -480,12 +517,7 @@
     if (grokBot) lines.push(grokBot)
     if (onDemand) lines.push(onDemand)
 
-    var plan = null
-    var planSource = planName || (summary && typeof summary.membershipType === "string" ? summary.membershipType : "")
-    if (planSource) {
-      var planLabel = ctx.fmt.planLabel(planSource)
-      if (planLabel) plan = planLabel
-    }
+    var plan = planLabelFor(ctx, resolvedPlanName(planName, summary && summary.membershipType))
 
     return { plan: plan, lines: lines }
   }
@@ -616,9 +648,13 @@
       ctx.host.log.warn("plan info fetch failed: " + String(e))
     }
 
+    // An org membership only fixes the badge and fills in On-demand; routing stays on GetPlanInfo,
+    // and personal seats keep its plan.
+    const membershipType = isOrgMembership(authState.membershipType) ? authState.membershipType : null
     const normalizedPlanName = typeof planName === "string"
       ? planName.trim().toLowerCase()
       : ""
+    const displayPlan = resolvedPlanName(planName, membershipType) || planName
 
     const hasPlanUsage = !!usage.planUsage
     const hasPlanUsageLimit = hasPlanUsage &&
@@ -637,11 +673,11 @@
     ) && (poolUsage.autoPercentUsed > 0 || poolUsage.apiPercentUsed > 0 || spent === 0)
 
     const su = usage.spendLimitUsage
-    const isTeamAccount = (
-      normalizedPlanName === "team" ||
-      (su && typeof su.limitType === "string" && su.limitType.toLowerCase() === "team") ||
-      (su && typeof su.pooledLimit === "number" && su.pooledLimit > 0)
+    const isTeamByShape = !!su && (
+      (typeof su.limitType === "string" && su.limitType.toLowerCase() === "team") ||
+      (typeof su.pooledLimit === "number" && su.pooledLimit > 0)
     )
+    const isTeamAccount = normalizedPlanName === "team" || isTeamByShape
     // Structured pools replace a missing limit only on team seats; on any other account the
     // request-based fallbacks below still apply, or a missing total would read as 0%.
     const teamPools = isTeamAccount && hasModelPools
@@ -655,10 +691,10 @@
     if (needsRequestBasedFallback) {
       if (normalizedPlanName === "enterprise") {
         ctx.host.log.info("detected enterprise account, using REST usage API")
-        return buildEnterpriseResult(ctx, accessToken, planName)
+        return buildEnterpriseResult(ctx, accessToken, displayPlan)
       }
       ctx.host.log.info("detected team request-based account, using REST usage API")
-      return buildTeamRequestBasedResult(ctx, accessToken, planName)
+      return buildTeamRequestBasedResult(ctx, accessToken, displayPlan)
     }
 
     const needsFallbackWithoutPlanInfo = usage.enabled !== false &&
@@ -668,13 +704,13 @@
       planInfoUnavailable
     if (needsFallbackWithoutPlanInfo) {
       ctx.host.log.info("plan info unavailable with missing planUsage, attempting REST usage API fallback")
-      return buildUnknownRequestBasedResult(ctx, accessToken, planName)
+      return buildUnknownRequestBasedResult(ctx, accessToken, displayPlan)
     }
 
     if (usage.enabled !== false && planUsageLimitMissing && !hasTotalUsagePercent && !teamPools) {
       ctx.host.log.warn("planUsage.limit missing, attempting REST usage API fallback")
       try {
-        return buildUnknownRequestBasedResult(ctx, accessToken, planName)
+        return buildUnknownRequestBasedResult(ctx, accessToken, displayPlan)
       } catch (e) {
         ctx.host.log.warn("REST usage fallback unavailable: " + String(e))
       }
@@ -697,13 +733,7 @@
 
     const stripeBalanceCents = fetchStripeBalance(ctx, accessToken) || 0
 
-    let plan = null
-    if (planName) {
-      const planLabel = ctx.fmt.planLabel(planName)
-      if (planLabel) {
-        plan = planLabel
-      }
-    }
+    let plan = planLabelFor(ctx, resolvedPlanName(planName, membershipType))
 
     const lines = []
     const pu = usage.planUsage
@@ -763,7 +793,7 @@
     } else if (isTeamAccount) {
       if (!hasPlanUsageLimit) {
         ctx.host.log.warn("team-inferred account missing planUsage.limit, attempting REST usage API fallback")
-        return buildUnknownRequestBasedResult(ctx, accessToken, planName)
+        return buildUnknownRequestBasedResult(ctx, accessToken, displayPlan)
       }
       lines.push(ctx.line.progress({
         label: "Total usage",
@@ -832,6 +862,26 @@
           label: "On-demand",
           value: "$" + String(ctx.fmt.dollars(spent)) + " spent",
         }))
+      }
+    }
+
+    // Org-billed and team-shaped seats can keep their pool meters here but leave on-demand out;
+    // usage-summary still has it, and its membership can fix a stale Pro badge (upstream #1409).
+    // Personal seats never make this call, nor an org seat that already has its On-demand row.
+    const localIsOrg = isOrgMembership(membershipType)
+    const hasOnDemand = lines.some((line) => line.label === "On-demand")
+    if ((localIsOrg || isTeamByShape) && !(localIsOrg && hasOnDemand)) {
+      const session = buildSessionToken(ctx, accessToken)
+      const summary = session ? fetchSessionJson(ctx, session, USAGE_SUMMARY_URL, "usage-summary") : null
+      if (summary && typeof summary === "object") {
+        if (!hasOnDemand) {
+          const cycle = billingCycle(ctx, summary, null)
+          const individual = summary.individualUsage || {}
+          const onDemand = onDemandBucketLine(ctx, cycle, individual.onDemand) ||
+            onDemandBucketLine(ctx, cycle, summary.teamUsage && summary.teamUsage.onDemand)
+          if (onDemand) lines.push(onDemand)
+        }
+        plan = planLabelFor(ctx, resolvedPlanName(planName, preferredMembership(membershipType, summary.membershipType))) || plan
       }
     }
 
