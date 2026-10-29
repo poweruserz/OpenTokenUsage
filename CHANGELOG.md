@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.10
+
+The app no longer signs Claude Code out by renewing its login at the same time, Claude's reset counts stop drawing rate limits, and Cursor Enterprise and Team seats show their plan and on-demand spend.
+
+### Bug Fixes
+- Claude: the login is renewed only once it has expired, and a login Claude Code renewed meanwhile is used instead. Claude Code's refresh tokens work only once, so renewing alongside it could sign it out (#35)
+- Claude: rate limit resets are checked once an hour instead of on every refresh, which drew rate limits of about 50 minutes; the last answer is shown in between (#33)
+- Cursor: Enterprise and Team seats show Enterprise or Team instead of Pro, and their on-demand spend (#34)
+- Codex: the usage page button opens ChatGPT's usage settings (#33)
+- Z.ai: without an active GLM Coding Plan, the card says so and links to the subscription page, in every app language (#33)
+
 ## v0.7.9
 
 The app's settings and logs move to folders named after OpenTokenUsage. Nothing to do: it happens on the first start, and your settings and sign-ins stay.
