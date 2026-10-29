@@ -8,7 +8,10 @@
   const NON_PROD_CLIENT_ID = "22422756-60c9-4084-8eb7-27705fd5cf9a"
   const SCOPES =
     "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
-  const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh 5 minutes before expiration
+  // Claude Code renews this login itself, ahead of expiry while it runs, and its refresh tokens are
+  // single-use: if both refresh at once, one is rejected and Claude Code can end up signed out
+  // (upstream #1417; seen here as `invalid_grant`). So refresh only once the token has expired.
+  const REFRESH_BUFFER_MS = 0
   // NOTE: the host runs every probe in a fresh runtime, so nothing at module scope survives
   // between probes. The host remembers 429s (answering them without a network call); anything
   // else that must persist lives in pluginDataDir.
@@ -429,7 +432,21 @@
     })
   }
 
+  // A newer login than ours that Claude Code stored meanwhile: taken over (creds updated in place)
+  // instead of refreshing. Null when the stored login is ours, missing, or expired too.
+  function adoptStoredLogin(ctx, creds) {
+    const stored = loadStoredCredentials(ctx, true)
+    const oauth = stored && stored.oauth
+    if (!oauth || !oauth.accessToken || oauth.accessToken === creds.oauth.accessToken) return null
+    if (needsRefresh(ctx, oauth, Date.now())) return null
+    ctx.host.log.info("using the login Claude Code renewed meanwhile")
+    Object.assign(creds, stored)
+    return oauth.accessToken
+  }
+
   function refreshToken(ctx, creds) {
+    const adopted = adoptStoredLogin(ctx, creds)
+    if (adopted) return adopted
     const { oauth, source, fullData } = creds
     if (!oauth.refreshToken) {
       ctx.host.log.warn("refresh skipped: no refresh token")
@@ -458,6 +475,9 @@
         if (body) errorCode = body.error || body.error_description
         ctx.host.log.error("refresh failed: status=" + resp.status + " error=" + String(errorCode))
         if (errorCode === "invalid_grant") {
+          // Claude Code may have used this refresh token first; then its new login is stored.
+          const renewed = adoptStoredLogin(ctx, creds)
+          if (renewed) return renewed
           throw "Session expired. Run `claude` to log in again."
         }
         throw "Token expired. Run `claude` to log in again."

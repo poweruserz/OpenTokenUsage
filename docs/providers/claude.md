@@ -96,7 +96,7 @@ Keychain values use the same JSON structure as the legacy credentials file:
 
 ### Token Refresh
 
-Access tokens are short-lived JWTs. Refreshed proactively 5 minutes before expiration, or reactively on 401/403.
+Access tokens are short-lived JWTs. The login is Claude Code's: it renews it ahead of expiry while it runs, and its refresh tokens are single-use, so refreshing alongside it can sign Claude Code out (upstream #1417). The plugin therefore refreshes only once the token has expired, or on 401/403, and right before refreshing reads the stored login again: if Claude Code renewed it meanwhile, that login is used instead. When the refresh comes back `invalid_grant` (Claude Code used the refresh token first), the login Claude Code stored is used; "Session expired" shows only when there is none.
 
 ```
 POST https://platform.claude.com/v1/oauth/token
