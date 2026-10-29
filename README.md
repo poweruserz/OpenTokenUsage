@@ -18,7 +18,7 @@ OpenTokenUsage lives in the notification area and shows how much of your AI codi
 winget install PowerUserZ.OpenTokenUsage
 ```
 
-Or [**download the latest release**](https://github.com/PowerUserZ/OpenTokenUsage/releases/latest) and run `OpenTokenUsage_<version>_x64-setup.exe`.
+Or [**download the latest release**](https://github.com/PowerUserZ/OpenTokenUsage/releases/latest) and run `OpenTokenUsage_<version>_x64-setup.exe`. The installer isn't code-signed, so a setup downloaded in the browser gets a Microsoft Defender SmartScreen warning ("Windows protected your PC", unknown publisher): choose **More info** → **Run anyway** (newer Windows shows **Run anyway** right away). WinGet checks the installer against its manifest's hash and doesn't show this warning, and neither do the in-app updates.
 
 Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsage`), so updates need no admin rights. The app checks for new releases in-app and updates itself.
 
