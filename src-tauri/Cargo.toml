@@ -1,6 +1,6 @@
 [package]
 name = "opentokenusage"
-version = "0.7.8"
+version = "0.7.9"
 description = "OpenTokenUsage - AI subscription usage tracker for Windows"
 authors = ["poweruserz"]
 edition = "2024"
