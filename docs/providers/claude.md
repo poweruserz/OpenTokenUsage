@@ -19,7 +19,7 @@
 
 Returns rate limit windows and optional extra credits. Every refresh reads this plain endpoint.
 
-Reset grants (`cedar_ember`) come from Claude Code's own request, `GET /api/oauth/usage?cedar_ember=1&skip_spend=1`, sent at most once an hour per account; asking for them on every refresh drew 429s with a Retry-After of about 50 minutes. The last answer is kept in `reset-grants.json` in the plugin's data folder and shown in between. A failed check (a 429 or an outage) keeps it, leaves the bars alone, and is retried an hour later.
+Reset grants (`cedar_ember`) come from Claude Code's own request, `GET /api/oauth/usage?cedar_ember=1&skip_spend=1`, sent at most once an hour per account; asking for them on every refresh drew 429s with a Retry-After of about 50 minutes. The last answer is kept in `reset-grants.json` in the plugin's data folder and shown in between. A failed check (a 429 or an outage) keeps it, leaves the bars alone, and is retried an hour later. The check has its own 429 gate (`gateScope`), so its 429 never holds the plain usage poll. When `.claude.json` (which tells accounts apart) exists but can't be read, the check is skipped.
 
 #### Headers
 

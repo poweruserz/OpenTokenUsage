@@ -498,11 +498,12 @@
     }
   }
 
-  function fetchUsage(ctx, accessToken, url) {
+  function fetchUsage(ctx, accessToken, url, gateScope) {
     const oauthConfig = getOauthConfig(ctx)
     return ctx.util.request({
       method: "GET",
       url: url || oauthConfig.usageUrl,
+      gateScope: gateScope,
       headers: {
         Authorization: "Bearer " + accessToken.trim(),
         Accept: "application/json",
@@ -600,7 +601,14 @@
 
   function resolveResetGrants(ctx, accessToken) {
     const path = resetGrantsPath(ctx)
-    const account = accountKey(ctx) || ""
+    let account
+    try {
+      account = accountKey(ctx) || ""
+    } catch (e) {
+      // Without the account, a cached answer could be another login's; the bars matter more.
+      ctx.host.log.warn("reset grants skipped: account lookup failed: " + String(e))
+      return null
+    }
     let cached = null
     try {
       const data = ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
@@ -613,7 +621,9 @@
 
     let block = cached ? cached.block : null
     try {
-      const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl)
+      // Its own 429 gate: the host's gate ignores the query, so a 429 here would hold the plain
+      // usage poll too.
+      const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl, "reset-grants")
       const data = resp.status >= 200 && resp.status < 300 ? ctx.util.tryParseJson(resp.bodyText) : null
       if (data) block = data.cedar_ember ?? null
       else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")

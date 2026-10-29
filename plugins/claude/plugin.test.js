@@ -2246,6 +2246,27 @@ describe("claude plugin", () => {
         expect(grantsCheckCount(ctx)).toBe(2)
       })
 
+      it("gives the grants check its own 429 gate, apart from the plain usage poll", async () => {
+        const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+        await probe(ctx)
+        const calls = ctx.host.http.request.mock.calls.map(([opts]) => opts)
+        expect(calls.find((opts) => isGrantsCheck(opts.url)).gateScope).toBe("reset-grants")
+        expect(calls.find((opts) => isUsagePoll(opts.url)).gateScope).toBeUndefined()
+      })
+
+      it("keeps the bars and skips grants when the account file can't be read", async () => {
+        const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+        const readText = ctx.host.fs.readText
+        ctx.host.fs.readText = (path) => {
+          if (path === "~/.claude.json") throw new Error("permission denied")
+          return readText(path)
+        }
+        const result = await probe(ctx)
+        expect(result.session?.used).toBe(10)
+        expect(result.resets).toBeUndefined()
+        expect(grantsCheckCount(ctx)).toBe(0)
+      })
+
       it("asks again for another account instead of showing the previous one's grants", async () => {
         const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
         await probe(ctx)

@@ -50,6 +50,7 @@ const deDE: PluginErrorMessages = {
 
   notInstalled: "{product} ist nicht installiert. Installieren Sie {app}, um loszulegen.",
   noActiveSubscription: "Kein aktives {product}-Abonnement.",
+  noActivePlanSubscribe: "Kein aktiver {plan}. Abonnieren Sie ihn unter {url}, um die Nutzung zu sehen.",
   enterpriseUsageUnavailable: "Enterprise-Nutzungsdaten nicht verfügbar. Versuchen Sie es später erneut.",
   teamRequestUsageUnavailable: "Anforderungsbasierte Teamnutzungsdaten nicht verfügbar. Versuchen Sie es später erneut.",
   requestUsageUnavailable: "Anforderungsbasierte {product}-Nutzungsdaten nicht verfügbar. Versuchen Sie es später erneut.",

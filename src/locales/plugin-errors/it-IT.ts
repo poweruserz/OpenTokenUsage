@@ -50,6 +50,7 @@ const itIT: PluginErrorMessages = {
 
   notInstalled: "{product} non è installato. Installa {app} per iniziare.",
   noActiveSubscription: "Nessun abbonamento {product} attivo.",
+  noActivePlanSubscribe: "Nessun {plan} attivo. Abbonati su {url} per vedere l'utilizzo.",
   enterpriseUsageUnavailable: "Dati di utilizzo Enterprise non disponibili. Riprova più tardi.",
   teamRequestUsageUnavailable: "Dati di utilizzo a richiesta del team non disponibili. Riprova più tardi.",
   requestUsageUnavailable: "Dati di utilizzo a richiesta di {product} non disponibili. Riprova più tardi.",
