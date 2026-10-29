@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.9
+
+The app's settings and logs move to folders named after OpenTokenUsage. Nothing to do: it happens on the first start, and your settings and sign-ins stay.
+
+### Changes
+- Settings, accounts, plugin data and cached usage move from `%APPDATA%\com.sunstory.openusage` to `%APPDATA%\com.poweruserz.opentokenusage`, and logs from `%LOCALAPPDATA%\com.sunstory.openusage` to `%LOCALAPPDATA%\com.poweruserz.opentokenusage`. Nothing is overwritten, and a `CLAUDE_CONFIG_DIR` or `CODEX_HOME` that points at an account under the old folder keeps working. Going back to 0.7.8 afterwards starts with default settings (#30)
+
 ## v0.7.8
 
 Updates no longer ask for administrator rights, Antigravity's meters and plan badge are back, and Smart refresh and banked-reset reminders arrive. Thanks to @ElliotDrel for three of these.
