@@ -2322,6 +2322,21 @@ describe("claude plugin", () => {
         expect(grantsCheckCount(ctx)).toBe(0)
       })
 
+      it("tells logins apart by their token pair when .claude.json has no account id", async () => {
+        const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+        ctx.host.fs.writeText("~/.claude.json", "{}")
+        await probe(ctx)
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(1)
+
+        ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "other" } }))
+        ctx.host.http.request.mockImplementation((opts) =>
+          isGrantsCheck(opts.url) ? okUsageResponse({ cedar_ember: null }) : okUsageResponse({})
+        )
+        expect((await probe(ctx)).resets).toBeUndefined()
+        expect(grantsCheckCount(ctx)).toBe(2)
+      })
+
       it("asks again for another account instead of showing the previous one's grants", async () => {
         const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
         await probe(ctx)
