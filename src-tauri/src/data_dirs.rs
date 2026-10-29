@@ -5,8 +5,9 @@
 use std::path::Path;
 
 const LEGACY_IDENTIFIER: &str = "com.sunstory.openusage";
-/// Settings tells users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an account's folder, so the old
-/// `accounts` path stays as a junction to the new one (`windows/hooks.nsh` removes it on uninstall).
+/// Settings tells users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an account's folder, so what moves
+/// out of the old `accounts`, the whole folder or one account folder, leaves a junction at its old
+/// path (`windows/hooks.nsh` removes them on uninstall).
 const LINKED_DIR: &str = "accounts";
 /// A WebView2 profile can't be merged file by file.
 const WEBVIEW_PROFILE: &str = "EBWebView";
@@ -51,11 +52,12 @@ fn move_entries(
         log.push(format!("{name}: can't create the new data folder: {err}"));
         return (0, 0);
     }
+    let in_accounts = old.ends_with(Path::new(LEGACY_IDENTIFIER).join(LINKED_DIR));
     let (mut moved, mut kept) = (0, 0);
     for entry in entries.flatten() {
         let (path, file_name) = (entry.path(), entry.file_name());
         let target = new.join(&file_name);
-        // The `accounts` junction from an earlier start: its data is already in the new folder.
+        // A junction from an earlier start: its data is already in the new folder.
         if entry.file_type().is_ok_and(|kind| kind.is_symlink()) {
             continue;
         }
@@ -76,11 +78,12 @@ fn move_entries(
             // Written under the new identifier: newer than the old copy.
             kept += 1;
         }
-        // Only once nothing of the old `accounts` is left does its path lead to the new one.
-        if accounts && !path.exists() {
+        // A CLI still pointed at the old path keeps reaching what moved.
+        if (accounts || in_accounts) && !path.exists() && target.is_dir() {
             if let Err(err) = junction::create(&target, &path) {
                 log.push(format!(
-                    "{name}: can't link the old {LINKED_DIR} folder: {err}"
+                    "{name}: can't link the old {} folder: {err}",
+                    file_name.to_string_lossy()
                 ));
             }
         }
@@ -91,7 +94,7 @@ fn move_entries(
 
 #[cfg(test)]
 mod tests {
-    use super::{move_entries, LEGACY_IDENTIFIER};
+    use super::{LEGACY_IDENTIFIER, move_entries};
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -112,6 +115,10 @@ mod tests {
 
     fn read(path: &Path) -> String {
         fs::read_to_string(path).unwrap()
+    }
+
+    fn is_link(path: &Path) -> bool {
+        fs::symlink_metadata(path).unwrap().file_type().is_symlink()
     }
 
     #[test]
@@ -151,7 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn account_folders_move_whole_and_the_link_waits_for_the_last() {
+    fn account_folders_move_whole_and_keep_their_old_paths() {
         // `accounts` failed to move (a CLI held it open) and a sign-in in the app then made
         // `claude-1` on the new side.
         let (old, new, root) = folders("accounts");
@@ -169,25 +176,21 @@ mod tests {
             read(&new.join("accounts").join("codex-2").join("auth.json")),
             "codex"
         );
+        // The moved account's old path leads to its new folder right away.
+        assert!(is_link(&accounts.join("codex-2")));
+        assert_eq!(read(&accounts.join("codex-2").join("auth.json")), "codex");
         // Two copies of one account are never mixed, and the CLI's folder stays where it points.
-        assert!(!new
-            .join("accounts")
-            .join("claude-1")
-            .join("config.json")
-            .exists());
+        assert!(
+            !new.join("accounts")
+                .join("claude-1")
+                .join("config.json")
+                .exists()
+        );
         assert_eq!(read(&accounts.join("claude-1").join("config.json")), "cli");
-        assert!(!fs::symlink_metadata(&accounts)
-            .unwrap()
-            .file_type()
-            .is_symlink());
+        assert!(!is_link(&accounts));
 
-        // Once the last old account folder is gone, the old path leads to the new folder.
-        fs::remove_dir_all(accounts.join("claude-1")).unwrap();
-        move_entries(&old, &new, "test", &mut log, true);
-        assert!(fs::symlink_metadata(&accounts)
-            .unwrap()
-            .file_type()
-            .is_symlink());
+        // A later start leaves the link alone and keeps the app's own copy.
+        assert_eq!(move_entries(&old, &new, "test", &mut log, true), (0, 1));
         assert_eq!(read(&accounts.join("codex-2").join("auth.json")), "codex");
 
         fs::remove_dir_all(&root).unwrap();

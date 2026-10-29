@@ -11,11 +11,25 @@
   ${EndIf}
 !macroend
 
-; data_dirs.rs leaves the old accounts folder as a junction to the new one. When the app data is
-; deleted, remove that link too (RmDir without /r deletes only the link) and the then-empty folder.
+; data_dirs.rs leaves junctions to the new folder at the old paths of the accounts folder and of
+; each account folder it moved. When the app data is deleted, remove them too (RmDir without /r
+; deletes a junction, and never a folder that still has files) and the then-empty folders.
 !macro NSIS_HOOK_POSTUNINSTALL
   ${If} $DeleteAppDataCheckboxState = 1
   ${AndIf} $UpdateMode <> 1
+    Push $0
+    Push $1
+    FindFirst $0 $1 "$APPDATA\com.sunstory.openusage\accounts\*"
+    ${DoWhile} $1 != ""
+      ${If} $1 != "."
+      ${AndIf} $1 != ".."
+        RmDir "$APPDATA\com.sunstory.openusage\accounts\$1"
+      ${EndIf}
+      FindNext $0 $1
+    ${Loop}
+    FindClose $0
+    Pop $1
+    Pop $0
     RmDir "$APPDATA\com.sunstory.openusage\accounts"
     RmDir "$APPDATA\com.sunstory.openusage"
   ${EndIf}

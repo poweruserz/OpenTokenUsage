@@ -160,8 +160,8 @@ This file holds the project facts that are easy to get wrong.
 - Identifier `com.poweruserz.opentokenusage` (0.7.8 and older: upstream's `com.sunstory.openusage`).
   It names `%APPDATA%\<id>` and `%LOCALAPPDATA%\<id>`; `data_dirs.rs` moves the old folders' entries
   before the builder runs (never overwriting, merging folders both have, but an account folder only
-  moves whole) and, once the old `accounts` is empty, leaves it as a junction, since Settings tells
-  users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an account's folder. Notifications use it as the AppUserModelID, which must be on the Start menu
+  moves whole) and leaves a junction at the old path of `accounts` or of each account folder it
+  moved, since Settings tells users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an account's folder. Notifications use it as the AppUserModelID, which must be on the Start menu
   shortcut: updates don't recreate shortcuts, so `src-tauri/windows/hooks.nsh` stamps it on every
   install. `bundle.publisher` stays `"sunstory"` (it was the default from the old identifier)
   because the NSIS setup only removes an MSI whose Publisher matches it; change it once 0.7.7 MSI
