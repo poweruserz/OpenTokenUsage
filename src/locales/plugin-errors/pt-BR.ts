@@ -50,6 +50,7 @@ const ptBR: PluginErrorMessages = {
 
   notInstalled: "{product} não está instalado. Instale o {app} para começar.",
   noActiveSubscription: "Nenhuma assinatura ativa do {product}.",
+  noActivePlanSubscribe: "Nenhum {plan} ativo. Assine em {url} para ver o uso.",
   enterpriseUsageUnavailable: "Dados de uso Enterprise indisponíveis. Tente novamente mais tarde.",
   teamRequestUsageUnavailable: "Dados de uso por solicitação da equipe indisponíveis. Tente novamente mais tarde.",
   requestUsageUnavailable: "Dados de uso por solicitação do {product} indisponíveis. Tente novamente mais tarde.",

@@ -50,6 +50,7 @@ const trTR: PluginErrorMessages = {
 
   notInstalled: "{product} yüklü değil. Başlamak için {app} uygulamasını yükleyin.",
   noActiveSubscription: "Etkin {product} aboneliği yok.",
+  noActivePlanSubscribe: "Etkin {plan} yok. Kullanımı görmek için {url} adresinden abone olun.",
   enterpriseUsageUnavailable: "Kurumsal kullanım verileri kullanılamıyor. Daha sonra yeniden deneyin.",
   teamRequestUsageUnavailable: "Ekip için istek tabanlı kullanım verileri kullanılamıyor. Daha sonra yeniden deneyin.",
   requestUsageUnavailable: "{product} istek tabanlı kullanım verileri kullanılamıyor. Daha sonra yeniden deneyin.",

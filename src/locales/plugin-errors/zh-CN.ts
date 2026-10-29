@@ -50,6 +50,7 @@ const zhCN: PluginErrorMessages = {
 
   notInstalled: "未安装 {product}。请安装 {app} 以开始使用。",
   noActiveSubscription: "没有有效的 {product} 订阅。",
+  noActivePlanSubscribe: "没有有效的 {plan}。请在 {url} 订阅以查看用量。",
   enterpriseUsageUnavailable: "企业版用量数据不可用。请稍后重试。",
   teamRequestUsageUnavailable: "团队按请求计费的用量数据不可用。请稍后重试。",
   requestUsageUnavailable: "{product} 按请求计费的用量数据不可用。请稍后重试。",

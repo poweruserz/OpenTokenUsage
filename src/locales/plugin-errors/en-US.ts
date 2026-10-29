@@ -50,6 +50,7 @@ const enUS = {
 
   notInstalled: "{product} not installed. Install {app} to get started.",
   noActiveSubscription: "No active {product} subscription.",
+  noActivePlanSubscribe: "No active {plan}. Subscribe at {url} to see usage.",
   enterpriseUsageUnavailable: "Enterprise usage data unavailable. Try again later.",
   teamRequestUsageUnavailable: "Team request-based usage data unavailable. Try again later.",
   requestUsageUnavailable: "{product} request-based usage data unavailable. Try again later.",

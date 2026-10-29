@@ -192,9 +192,10 @@
 
     return {
       baseApiUrl: baseApiUrl,
-      // cedar_ember=1 opts in to the usage-limit reset grants block (null without it), like
-      // Claude Code does (upstream #1290).
-      usageUrl: baseApiUrl + "/api/oauth/usage?cedar_ember=1",
+      usageUrl: baseApiUrl + "/api/oauth/usage",
+      // Claude Code's own reset-grants request: cedar_ember=1 opts in to the grants block (null
+      // without it, upstream #1290); see resolveResetGrants for how often it's sent.
+      grantsUrl: baseApiUrl + "/api/oauth/usage?cedar_ember=1&skip_spend=1",
       profileUrl: baseApiUrl + "/api/oauth/profile",
       refreshUrl: refreshUrl,
       clientId: clientId,
@@ -497,11 +498,12 @@
     }
   }
 
-  function fetchUsage(ctx, accessToken) {
+  function fetchUsage(ctx, accessToken, url, gateScope) {
     const oauthConfig = getOauthConfig(ctx)
     return ctx.util.request({
       method: "GET",
-      url: oauthConfig.usageUrl,
+      url: url || oauthConfig.usageUrl,
+      gateScope: gateScope,
       headers: {
         Authorization: "Bearer " + accessToken.trim(),
         Accept: "application/json",
@@ -509,7 +511,7 @@
         "anthropic-beta": "oauth-2025-04-20",
         // Claude Code's own UA format: Anthropic gates reset-grant eligibility by client surface,
         // and the old `claude-code/2.1.69` came back `ineligible_reason: "surface"` (upstream #1290).
-        "User-Agent": "claude-cli/2.1.280 (external, cli)",
+        "User-Agent": "claude-cli/2.1.294 (external, cli)",
       },
       timeoutMs: 10000,
     })
@@ -585,6 +587,60 @@
       orgType || creds.oauth.subscriptionType,
       org.rate_limit_tier || creds.oauth.rateLimitTier
     )
+  }
+
+  // Claude Code reads plain /api/oauth/usage and asks for reset grants only now and then; sending
+  // the grants request on every refresh drew 429s with a ~50 min Retry-After (upstream #1367). So
+  // it goes out at most hourly per account, and a failed check keeps the last answer until the next
+  // hour. Grants past their deadline still drop off, when the row is built.
+  const RESET_GRANTS_INTERVAL_MS = 60 * 60 * 1000
+
+  function resetGrantsPath(ctx) {
+    return ctx.app.pluginDataDir + "/reset-grants.json"
+  }
+
+  // The answer is kept per account; without `.claude.json`'s account id, per token pair (a new pair
+  // asks again). Unable to tell logins apart, it could show another login's grants: skipped then.
+  function resolveResetGrants(ctx, accessToken, fingerprint) {
+    const path = resetGrantsPath(ctx)
+    let account
+    try {
+      account = accountKey(ctx) || (fingerprint ? "login:" + fingerprint : null)
+    } catch (e) {
+      ctx.host.log.warn("reset grants skipped: account lookup failed: " + String(e))
+      return null
+    }
+    if (!account) {
+      ctx.host.log.warn("reset grants skipped: can't tell this login from others")
+      return null
+    }
+    let cached = null
+    try {
+      const data = ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
+      if (data && typeof data.checkedAt === "number" && data.account === account) cached = data
+    } catch (e) {
+      ctx.host.log.warn("reset grants cache read failed: " + String(e))
+    }
+    const nowMs = Date.now()
+    if (cached && nowMs - cached.checkedAt < RESET_GRANTS_INTERVAL_MS) return cached.block
+
+    let block = cached ? cached.block : null
+    try {
+      // Its own 429 gate: the host's gate ignores the query, so a 429 here would hold the plain
+      // usage poll too.
+      const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl, "reset-grants")
+      const data = resp.status >= 200 && resp.status < 300 ? ctx.util.tryParseJson(resp.bodyText) : null
+      if (data) block = data.cedar_ember ?? null
+      else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")
+    } catch (e) {
+      ctx.host.log.warn("reset grants check failed: " + String(e) + "; keeping the last answer")
+    }
+    try {
+      ctx.host.fs.writeText(path, JSON.stringify({ account: account, checkedAt: nowMs, block: block }))
+    } catch (e) {
+      ctx.host.log.warn("reset grants cache write failed: " + String(e))
+    }
+    return block
   }
 
   function parseRetryAfterSeconds(headers) {
@@ -1131,7 +1187,8 @@
           lines.push(ctx.line.text({ label: "Extra usage spent", value: "$" + String(ctx.fmt.dollars(used)) }))
         }
       }
-      pushResetGrantsLine(lines, ctx, data.cedar_ember)
+      // A refresh inside the usage request leaves the new token in creds.
+      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint))
     }
 
     const usageResult = queryTokenUsage(ctx, homePath)

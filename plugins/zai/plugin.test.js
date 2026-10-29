@@ -224,6 +224,17 @@ describe("zai plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("API key invalid")
   })
 
+  it("names a key without a GLM Coding Plan and keeps other failed bodies as before (upstream #1451)", async () => {
+    const ctx = makeCtx()
+    mockEnvWithKey(ctx, "test-key")
+    mockQuotaBody(ctx, { code: 500, msg: "The current account has no active coding plan", success: false })
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("No active GLM Coding Plan. Subscribe at z.ai/subscribe to see usage.")
+
+    mockQuotaBody(ctx, { code: 500, msg: "Internal error", success: false })
+    expect(plugin.probe(ctx).lines[0]).toMatchObject({ label: "Session", text: "No usage data" })
+  })
+
   it("throws on HTTP 500 from quota endpoint", async () => {
     const ctx = makeCtx()
     mockEnvWithKey(ctx, "test-key")

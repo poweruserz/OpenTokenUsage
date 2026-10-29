@@ -307,6 +307,7 @@
   "plugin-errors.authFileUnreadable": "70a7925126",
   "plugin-errors.notInstalled": "17299c86ac",
   "plugin-errors.noActiveSubscription": "47ccaf5371",
+  "plugin-errors.noActivePlanSubscribe": "05ff4646a3",
   "plugin-errors.enterpriseUsageUnavailable": "e38b7b1993",
   "plugin-errors.teamRequestUsageUnavailable": "2cb1c19192",
   "plugin-errors.requestUsageUnavailable": "fa26263f32",

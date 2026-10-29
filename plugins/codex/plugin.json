@@ -9,7 +9,7 @@
   "statusPageUrl": "https://status.openai.com",
   "links": [
     { "label": "Status", "url": "https://status.openai.com/" },
-    { "label": "Usage dashboard", "url": "https://chatgpt.com/codex/settings/usage" }
+    { "label": "Usage dashboard", "url": "https://chatgpt.com/settings/usage" }
   ],
   "wsl": { "login": ["~/.codex/auth.json"] },
   "lines": [

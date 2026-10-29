@@ -50,6 +50,7 @@ const frFR: PluginErrorMessages = {
 
   notInstalled: "{product} n'est pas installé. Installez {app} pour commencer.",
   noActiveSubscription: "Aucun abonnement {product} actif.",
+  noActivePlanSubscribe: "Aucun {plan} actif. Abonnez-vous sur {url} pour voir l'utilisation.",
   enterpriseUsageUnavailable: "Données d'utilisation Entreprise indisponibles. Réessayez plus tard.",
   teamRequestUsageUnavailable: "Données d'utilisation par requête de l'équipe indisponibles. Réessayez plus tard.",
   requestUsageUnavailable: "Données d'utilisation par requête de {product} indisponibles. Réessayez plus tard.",

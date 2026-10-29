@@ -684,7 +684,13 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     // WSL copy reads none: its logs live in WSL, far too slow to scan over \\wsl.localhost.
     let ccusage_id = account.map_or(plugin_id, |account| account.base_id.as_str());
     inject_ccusage(
-        ctx, &host, ccusage_id, deadline, home.is_none(), plugin_id, cache_local_usage,
+        ctx,
+        &host,
+        ccusage_id,
+        deadline,
+        home.is_none(),
+        plugin_id,
+        cache_local_usage,
     )?;
 
     probe_ctx.set("host", host)?;
@@ -983,7 +989,10 @@ fn inject_http<'js>(
                 let method_str = req.method.as_deref().unwrap_or("GET");
                 let redacted_url = redact_url(&req.url);
 
-                if let Some(wait) = super::http_gate::remaining(&pid, &req.url, Instant::now()) {
+                let gate_scope = req.gate_scope.as_deref();
+                if let Some(wait) =
+                    super::http_gate::remaining(&pid, &req.url, gate_scope, Instant::now())
+                {
                     let secs = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
                     log::info!(
                         "[plugin:{}] HTTP {} {} skipped: rate limited (429) for {}s more",
@@ -1089,6 +1098,7 @@ fn inject_http<'js>(
                     let wait = super::http_gate::record_429(
                         &pid,
                         &req.url,
+                        gate_scope,
                         resp_headers.get("retry-after").map(String::as_str),
                         Instant::now(),
                     );
@@ -1165,7 +1175,8 @@ pub fn patch_http_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
                     headers: req.headers || null,
                     bodyText: req.bodyText || null,
                     timeoutMs: req.timeoutMs || 10000,
-                    dangerouslyIgnoreTls: req.dangerouslyIgnoreTls || false
+                    dangerouslyIgnoreTls: req.dangerouslyIgnoreTls || false,
+                    gateScope: req.gateScope || null
                 });
                 var respJson = rawFn(json);
                 return JSON.parse(respJson);
@@ -1475,6 +1486,8 @@ struct HttpReqParams {
     body_text: Option<String>,
     timeout_ms: Option<u64>,
     dangerously_ignore_tls: Option<bool>,
+    /// Gives this request a 429 gate of its own on its URL (see http_gate.rs).
+    gate_scope: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -2738,27 +2751,33 @@ fn inject_ccusage<'js>(
                         CcusageQueryOpts::default()
                     }
                 };
-                Ok(super::ccusage_cache::query(&cache_id, &opts_json, reuse, || {
-                    let provider = resolve_ccusage_provider(&opts, &pid);
-                    let Some(_active_query) =
-                        CcusageQueryGuard::acquire(provider, ccusage_home_override(&opts, provider))
-                    else {
-                        log::warn!("[plugin:{}] ccusage query already running", pid);
-                        return serde_json::json!({ "status": "runner_failed" }).to_string();
-                    };
-                    let runners = collect_ccusage_runners();
-                    run_ccusage_query_with_runners(
-                        runners,
-                        &opts,
-                        provider,
-                        &pid,
-                        |kind, program, opts, provider, plugin_id| {
-                            run_ccusage_with_runner_deadline(
-                                kind, program, opts, provider, plugin_id, deadline,
-                            )
-                        },
-                    )
-                }))
+                Ok(super::ccusage_cache::query(
+                    &cache_id,
+                    &opts_json,
+                    reuse,
+                    || {
+                        let provider = resolve_ccusage_provider(&opts, &pid);
+                        let Some(_active_query) = CcusageQueryGuard::acquire(
+                            provider,
+                            ccusage_home_override(&opts, provider),
+                        ) else {
+                            log::warn!("[plugin:{}] ccusage query already running", pid);
+                            return serde_json::json!({ "status": "runner_failed" }).to_string();
+                        };
+                        let runners = collect_ccusage_runners();
+                        run_ccusage_query_with_runners(
+                            runners,
+                            &opts,
+                            provider,
+                            &pid,
+                            |kind, program, opts, provider, plugin_id| {
+                                run_ccusage_with_runner_deadline(
+                                    kind, program, opts, provider, plugin_id, deadline,
+                                )
+                            },
+                        )
+                    },
+                ))
             },
         )?,
     )?;
@@ -5249,7 +5268,7 @@ wait
     fn http_request_returns_synthetic_429_while_gated_without_network() {
         // Port 9 on loopback is closed: a real request would throw instead of returning 429.
         let url = "http://127.0.0.1:9/gated-usage";
-        super::super::http_gate::record_429("gate-js", url, Some("90"), Instant::now());
+        super::super::http_gate::record_429("gate-js", url, None, Some("90"), Instant::now());
         let rt = Runtime::new().expect("runtime");
         let ctx = Context::full(&rt).expect("context");
         ctx.with(|ctx| {
@@ -5270,6 +5289,38 @@ wait
                 .parse()
                 .expect("retry-after seconds");
             assert!((89..=90).contains(&secs), "retry-after was {}", secs);
+        });
+    }
+
+    #[test]
+    fn a_scoped_429_holds_only_requests_with_that_gate_scope() {
+        // Port 9 on loopback is closed: an ungated request throws instead of returning 429.
+        let url = "http://127.0.0.1:9/scoped-usage";
+        super::super::http_gate::record_429(
+            "gate-scope-js",
+            url,
+            Some("grants"),
+            Some("3000"),
+            Instant::now(),
+        );
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            inject_host_api(&ctx, "gate-scope-js", &std::env::temp_dir(), "0.0.0")
+                .expect("inject host api");
+            patch_http_wrapper(&ctx).expect("patch http wrapper");
+            let status: i32 = ctx
+                .eval(format!(
+                    r#"__openusage_ctx.host.http.request({{ url: "{}?grants=1", gateScope: "grants" }}).status"#,
+                    url
+                ))
+                .expect("scoped request resolves");
+            assert_eq!(status, 429);
+            let plain = ctx.eval::<i32, _>(format!(
+                r#"__openusage_ctx.host.http.request({{ url: "{}" }}).status"#,
+                url
+            ));
+            assert!(plain.is_err(), "the plain request was gated: {:?}", plain);
         });
     }
 

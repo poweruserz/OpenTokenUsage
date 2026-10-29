@@ -1,5 +1,7 @@
 //! Shared HTTP 429 gate. Every probe runs in a fresh JS runtime, so plugins cannot remember a
 //! rate limit between probes; the host does it for them, keyed by (plugin id, URL without query).
+//! A request can name a `gateScope` to get a gate of its own on the same URL (Claude's hourly
+//! reset-grants check must not hold its plain usage poll).
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -18,14 +20,24 @@ fn gates() -> &'static Mutex<GateMap> {
     GATES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn gate_key(plugin_id: &str, url: &str) -> (String, String) {
+fn gate_key(plugin_id: &str, url: &str, scope: Option<&str>) -> (String, String) {
     let base = url.split(['?', '#']).next().unwrap_or(url);
-    (plugin_id.to_string(), base.to_string())
+    // A space can't appear in a URL, so a scoped key never equals an unscoped one.
+    let key = match scope {
+        Some(scope) => format!("{base} {scope}"),
+        None => base.to_string(),
+    };
+    (plugin_id.to_string(), key)
 }
 
 /// Time left on the gate for this request, or `None` when it may hit the network.
-pub(crate) fn remaining(plugin_id: &str, url: &str, now: Instant) -> Option<Duration> {
-    let key = gate_key(plugin_id, url);
+pub(crate) fn remaining(
+    plugin_id: &str,
+    url: &str,
+    scope: Option<&str>,
+    now: Instant,
+) -> Option<Duration> {
+    let key = gate_key(plugin_id, url, scope);
     let mut gates = gates().lock().unwrap_or_else(|e| e.into_inner());
     let until = *gates.get(&key)?;
     if until > now {
@@ -39,6 +51,7 @@ pub(crate) fn remaining(plugin_id: &str, url: &str, now: Instant) -> Option<Dura
 pub(crate) fn record_429(
     plugin_id: &str,
     url: &str,
+    scope: Option<&str>,
     retry_after: Option<&str>,
     now: Instant,
 ) -> Duration {
@@ -47,7 +60,7 @@ pub(crate) fn record_429(
         .unwrap_or(DEFAULT_WAIT)
         .min(MAX_WAIT);
     let mut gates = gates().lock().unwrap_or_else(|e| e.into_inner());
-    gates.insert(gate_key(plugin_id, url), now + wait);
+    gates.insert(gate_key(plugin_id, url, scope), now + wait);
     wait
 }
 
@@ -96,35 +109,58 @@ mod tests {
     fn gates_after_429_until_expiry_ignoring_query() {
         let now = Instant::now();
         let url = "https://api.example.com/usage?x=1";
-        assert_eq!(remaining("gate-test", url, now), None);
+        assert_eq!(remaining("gate-test", url, None, now), None);
 
-        let wait = record_429("gate-test", url, Some("120"), now);
+        let wait = record_429("gate-test", url, None, Some("120"), now);
         assert_eq!(wait, Duration::from_secs(120));
 
         let later = now + Duration::from_secs(20);
         assert_eq!(
-            remaining("gate-test", "https://api.example.com/usage?x=2", later),
+            remaining(
+                "gate-test",
+                "https://api.example.com/usage?x=2",
+                None,
+                later
+            ),
             Some(Duration::from_secs(100))
         );
-        assert_eq!(remaining("other-plugin", url, later), None);
+        assert_eq!(remaining("other-plugin", url, None, later), None);
         assert_eq!(
-            remaining("gate-test", "https://api.example.com/other", later),
+            remaining("gate-test", "https://api.example.com/other", None, later),
             None
         );
 
-        assert_eq!(remaining("gate-test", url, now + wait), None);
+        assert_eq!(remaining("gate-test", url, None, now + wait), None);
+    }
+
+    #[test]
+    fn scoped_and_plain_gates_are_independent() {
+        let now = Instant::now();
+        let url = "https://api.example.com/usage";
+        let grants = "https://api.example.com/usage?grants=1";
+
+        record_429("gate-scope", grants, Some("grants"), Some("3000"), now);
+        assert_eq!(remaining("gate-scope", url, None, now), None);
+        assert!(remaining("gate-scope", grants, Some("grants"), now).is_some());
+
+        record_429("gate-scope", url, None, Some("60"), now);
+        assert!(remaining("gate-scope", url, None, now).is_some());
+        assert_eq!(remaining("gate-scope", grants, Some("other"), now), None);
     }
 
     #[test]
     fn missing_or_bad_retry_after_uses_default_and_huge_is_capped() {
         let now = Instant::now();
-        assert_eq!(record_429("gate-default", "u1", None, now), DEFAULT_WAIT);
         assert_eq!(
-            record_429("gate-default", "u2", Some("soon"), now),
+            record_429("gate-default", "u1", None, None, now),
             DEFAULT_WAIT
         );
         assert_eq!(
-            record_429("gate-default", "u3", Some("999999"), now),
+            record_429("gate-default", "u2", None, Some("soon"), now),
+            DEFAULT_WAIT
+        );
+        assert_eq!(
+            record_429("gate-default", "u3", None, Some("999999"), now),
             MAX_WAIT
         );
     }

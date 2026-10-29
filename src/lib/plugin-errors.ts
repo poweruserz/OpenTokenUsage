@@ -84,6 +84,7 @@ export const PLUGIN_ERROR_PATTERNS: readonly { pattern: RegExp; key: PluginError
 
   { pattern: /^(?<product>.+?) not installed\. Install (?<app>.+) to get started\.$/, key: "notInstalled" },
   { pattern: /^No active (?<product>.+) subscription\.$/, key: "noActiveSubscription" },
+  { pattern: /^No active (?<plan>.+?)\. Subscribe at (?<url>\S+) to see usage\.$/, key: "noActivePlanSubscribe" },
   { pattern: /^Enterprise usage data unavailable\. Try again later\.$/, key: "enterpriseUsageUnavailable" },
   { pattern: /^Team request-based usage data unavailable\. Try again later\.$/, key: "teamRequestUsageUnavailable" },
   { pattern: /^(?<product>.+?) request-based usage data unavailable\. Try again later\.$/, key: "requestUsageUnavailable" },

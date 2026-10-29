@@ -50,6 +50,7 @@ const es419: PluginErrorMessages = {
 
   notInstalled: "{product} no está instalado. Instala {app} para comenzar.",
   noActiveSubscription: "No hay ninguna suscripción activa de {product}.",
+  noActivePlanSubscribe: "No hay ningún {plan} activo. Suscríbete en {url} para ver el uso.",
   enterpriseUsageUnavailable: "Datos de uso de Enterprise no disponibles. Vuelve a intentarlo más tarde.",
   teamRequestUsageUnavailable: "Datos de uso por solicitudes del equipo no disponibles. Vuelve a intentarlo más tarde.",
   requestUsageUnavailable: "Datos de uso por solicitudes de {product} no disponibles. Vuelve a intentarlo más tarde.",

@@ -50,6 +50,7 @@ const koKR: PluginErrorMessages = {
 
   notInstalled: "{product}이(가) 설치되어 있지 않습니다. 시작하려면 {app}을(를) 설치하세요.",
   noActiveSubscription: "활성 {product} 구독이 없습니다.",
+  noActivePlanSubscribe: "활성 {plan}이(가) 없습니다. 사용량을 보려면 {url}에서 구독하세요.",
   enterpriseUsageUnavailable: "Enterprise 사용량 데이터를 가져올 수 없습니다. 나중에 다시 시도하세요.",
   teamRequestUsageUnavailable: "팀 요청 기반 사용량 데이터를 가져올 수 없습니다. 나중에 다시 시도하세요.",
   requestUsageUnavailable: "{product} 요청 기반 사용량 데이터를 가져올 수 없습니다. 나중에 다시 시도하세요.",

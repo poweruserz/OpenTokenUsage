@@ -74,6 +74,11 @@
     if (!data) {
       throw "Usage response invalid. Try again later."
     }
+    // A key without a GLM Coding Plan gets 2xx with `{"code":500,"msg":"…coding plan","success":false}`
+    // and no limits (upstream #1451).
+    if (data.success === false && /coding plan/i.test(String(data.msg || ""))) {
+      throw "No active GLM Coding Plan. Subscribe at z.ai/subscribe to see usage."
+    }
 
     return data
   }

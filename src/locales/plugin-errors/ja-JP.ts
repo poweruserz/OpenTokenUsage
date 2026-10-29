@@ -50,6 +50,7 @@ const jaJP: PluginErrorMessages = {
 
   notInstalled: "{product} がインストールされていません。{app} をインストールして開始してください。",
   noActiveSubscription: "有効な {product} サブスクリプションがありません。",
+  noActivePlanSubscribe: "有効な {plan} がありません。使用状況を表示するには {url} で登録してください。",
   enterpriseUsageUnavailable: "Enterprise の使用状況データを利用できません。後でもう一度やり直してください。",
   teamRequestUsageUnavailable: "チームのリクエスト ベースの使用状況データを利用できません。後でもう一度やり直してください。",
   requestUsageUnavailable: "{product} のリクエスト ベースの使用状況データを利用できません。後でもう一度やり直してください。",
