@@ -599,14 +599,19 @@
     return ctx.app.pluginDataDir + "/reset-grants.json"
   }
 
-  function resolveResetGrants(ctx, accessToken) {
+  // The answer is kept per account; without `.claude.json`'s account id, per token pair (a new pair
+  // asks again). Unable to tell logins apart, it could show another login's grants: skipped then.
+  function resolveResetGrants(ctx, accessToken, fingerprint) {
     const path = resetGrantsPath(ctx)
     let account
     try {
-      account = accountKey(ctx) || ""
+      account = accountKey(ctx) || (fingerprint ? "login:" + fingerprint : null)
     } catch (e) {
-      // Without the account, a cached answer could be another login's; the bars matter more.
       ctx.host.log.warn("reset grants skipped: account lookup failed: " + String(e))
+      return null
+    }
+    if (!account) {
+      ctx.host.log.warn("reset grants skipped: can't tell this login from others")
       return null
     }
     let cached = null
@@ -1183,7 +1188,7 @@
         }
       }
       // A refresh inside the usage request leaves the new token in creds.
-      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken))
+      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint))
     }
 
     const usageResult = queryTokenUsage(ctx, homePath)
