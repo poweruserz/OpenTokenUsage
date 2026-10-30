@@ -203,6 +203,28 @@ describe("ProviderCard", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "58")
   })
 
+  it("hatches usage spent since the bar was last seen, per plugin and line, in both display modes", () => {
+    const card = (used: number, displayMode: "used" | "left" = "used") => (
+      <ProviderCard
+        name="Unseen"
+        pluginId="unseen-card"
+        displayMode={displayMode}
+        lines={[{ type: "progress", label: "Session", used, limit: 100, format: { kind: "percent" } }]}
+      />
+    )
+    const hatch = () => document.querySelector<HTMLElement>('[data-slot="progress-unseen"]')
+    const { rerender } = render(card(10))
+    expect(hatch()).toBeNull()
+
+    rerender(card(25))
+    expect(hatch()?.style.left).toBe("10%")
+    expect(hatch()?.style.width).toBe("15%")
+
+    rerender(card(25, "left"))
+    expect(hatch()?.style.left).toBe("75%")
+    expect(hatch()?.style.width).toBe("15%")
+  })
+
   it("uses elapsed-time marker position in displayMode=left", () => {
     vi.useFakeTimers()
     const now = new Date("2026-02-02T18:00:00.000Z")

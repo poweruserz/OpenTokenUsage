@@ -107,6 +107,10 @@ This file holds the project facts that are easy to get wrong.
   `--support` yellow) opens `SupportDialog`; the About window and the tray menu open `SUPPORT_URL` (TS ↔ tray.rs,
   test-synced). A dialog taller than a short panel sets `data-panel-dialog`: app-shell's `has-[…]:min-h` grows the
   panel while it's open (the window follows the content height).
+- Progress bars hatch the usage spent since the open panel last showed them (`use-unseen-usage.ts`): it blinks
+  3.5 s, then the fill grows over it. Seen values are in memory, per plugin + line and in used terms (switching
+  used/left isn't spending). "Open" is asked from the OS (`isVisible`): the hidden panel's webview reports itself
+  visible before its first show.
 - Ring logos are sized by `measureLogoExtent` (how far the logo's pixels reach) so square logos stay
   inside the ring and round ones grow.
 - Themes: `dark` (default, pure black: classes `.dark.oled`) | `light`. `useSettingsTheme` also sets the
