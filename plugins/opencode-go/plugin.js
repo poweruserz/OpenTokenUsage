@@ -1,6 +1,16 @@
 (function () {
   const PROVIDER_ID = "opencode-go";
-  const AUTH_PATH = "~/.local/share/opencode/auth.json";
+  const DATA_DIR = "~/.local/share/opencode";
+  const AUTH_PATH = DATA_DIR + "/auth.json";
+  // OpenCode 2 moves logins out of auth.json into each channel database's `credential` table
+  // (opencode.db, opencode-next.db, ...) once this migration has run. OpenCode 1 creates the table
+  // too but keeps using auth.json (upstream #1323, #1365).
+  const CREDENTIALS_IMPORTED_SQL =
+    "SELECT 1 AS imported FROM migration WHERE id = '20260805200742_import_legacy_credentials' LIMIT 1";
+  const GO_KEY_SQL =
+    "SELECT json_extract(value, '$.key') AS key FROM credential " +
+    "WHERE integration_id = 'opencode-go' AND (active IS NULL OR active = 1) " +
+    "ORDER BY active DESC, time_updated DESC, id DESC LIMIT 1";
   // Official Go usage endpoint: account-wide percents, same numbers as the OpenCode dashboard.
   const USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -13,8 +23,49 @@
     "Couldn't read OpenCode's auth.json. Check its file permissions or log into OpenCode Go again.";
   const PARSE_FAILED = "Could not parse usage data.";
 
+  function queryRows(ctx, path, sql) {
+    const rows = ctx.util.tryParseJson(ctx.host.sqlite.query(path, sql));
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  // OpenCode 2's key; null once a database holds the logins but no Go key (a logout there, which
+  // auth.json must not revive); undefined when no database took the logins over yet.
+  function loadDatabaseKey(ctx) {
+    let names;
+    try {
+      names = ctx.host.fs.exists(DATA_DIR) ? ctx.host.fs.listDir(DATA_DIR) : [];
+    } catch (e) {
+      // An unreadable folder fails loud below when auth.json can't be read either.
+      ctx.host.log.warn("opencode data dir list failed: " + String(e));
+      return undefined;
+    }
+    let imported = false;
+    let unreadable = null;
+    for (const name of names.filter((n) => n.startsWith("opencode") && n.endsWith(".db"))) {
+      const path = DATA_DIR + "/" + name;
+      try {
+        if (queryRows(ctx, path, CREDENTIALS_IMPORTED_SQL).length === 0) continue;
+        const row = queryRows(ctx, path, GO_KEY_SQL)[0];
+        imported = true;
+        const key = row && typeof row.key === "string" ? row.key.trim() : "";
+        if (key) return key;
+      } catch (e) {
+        if (/no such table/i.test(String(e))) continue;
+        ctx.host.log.error("opencode credential read failed (" + name + "): " + String(e));
+        unreadable = unreadable || name;
+      }
+    }
+    // Broken storage is never mistaken for a logout.
+    if (unreadable) {
+      throw "Couldn't read OpenCode's " + unreadable + ". Check its file permissions or log into OpenCode Go again.";
+    }
+    return imported ? null : undefined;
+  }
+
   // Missing file = not logged in (null). Present but unreadable/invalid = broken storage: fail loud.
   function loadAuthKey(ctx) {
+    const databaseKey = loadDatabaseKey(ctx);
+    if (databaseKey !== undefined) return databaseKey;
     if (!ctx.host.fs.exists(AUTH_PATH)) return null;
 
     let parsed;

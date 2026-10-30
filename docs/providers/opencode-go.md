@@ -4,7 +4,7 @@
 
 ## Overview
 
-- **Auth:** `~/.local/share/opencode/auth.json`, `opencode-go` entry `key`
+- **Auth:** OpenCode 2 keeps the key in the `credential` table (`integration_id = 'opencode-go'`) of each `~/.local/share/opencode/opencode*.db`, once its `20260805200742_import_legacy_credentials` migration has run; until then (OpenCode 1) it's the `opencode-go` entry `key` in `~/.local/share/opencode/auth.json`. OpenCode 2 never deletes `auth.json`, so once a database holds the logins the file is ignored and a logout there stays a logout.
 - **Endpoint:** `GET https://opencode.ai/zen/go/v1/usage` with `Authorization: Bearer <key>`
 - **Provider ID:** `opencode-go`
 - **Usage scope:** account-wide (same numbers as the OpenCode dashboard, all devices)
@@ -21,8 +21,8 @@ Percents are clamped to 0–100.
 
 ## Errors
 
-- No `opencode-go` key in `auth.json` → "OpenCode Go not detected" (a key set only via env/config is not read; the old local `opencode.db` spend estimate was removed)
-- `auth.json` present but unreadable/invalid → error (not skipped)
+- No `opencode-go` key in the databases or `auth.json` → "OpenCode Go not detected" (a key set only via env/config is not read; the old local `opencode.db` spend estimate was removed)
+- `auth.json` or a database present but unreadable/invalid → error (not skipped)
 - `401` → key rejected, log in again
 - `403` with `error.type: "EntitlementError"` → no OpenCode Go subscription on this key
 - Other non-2xx → HTTP error
