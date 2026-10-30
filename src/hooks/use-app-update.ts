@@ -6,6 +6,7 @@ import { relaunch } from "@tauri-apps/plugin-process"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import { t } from "@/lib/i18n"
 import {
+  loadAlertSettings,
   loadUpdateNotifiedVersion,
   loadUpdateRelaunchVersion,
   saveUpdateNotifiedVersion,
@@ -34,13 +35,17 @@ async function reopenPanelAfterUpdate() {
 }
 
 // Once per version, saved before it's sent: the 15-minute checks, a restart that downloads the same
-// update again, or a denied permission never bring it back.
+// update again, or a denied permission never bring it back. The toast is silent, so the sound picked
+// for usage alerts plays with it (the host skips "none" and Do Not Disturb), as for those alerts.
 async function notifyUpdateReady(version: string) {
   if ((await loadUpdateNotifiedVersion()) === version) return
   await saveUpdateNotifiedVersion(version)
   let granted = await isPermissionGranted()
   if (!granted) granted = (await requestPermission()) === "granted"
-  if (granted) sendNotification({ title: t("alert.update.title", { version }), body: t("alert.update.body") })
+  if (!granted) return
+  sendNotification({ title: t("alert.update.title", { version }), body: t("alert.update.body") })
+  const { sound } = await loadAlertSettings()
+  await invoke("play_alert_sound", { sound, preview: false })
 }
 
 interface UseAppUpdateReturn {
