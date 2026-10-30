@@ -11,6 +11,9 @@ export type UnseenUsage = { from: number; settling: boolean }
 // Used percent each bar last showed in the open panel, by plugin + line. Page switches keep it; a
 // restart starts over from the first data.
 const seenUsed = new Map<string, number>()
+// The last usage each bar got, seen or not: dropping below it is a reset, even when it stays above
+// what was seen.
+const latestUsed = new Map<string, number>()
 
 // Asked from the OS: before its first show the hidden panel's webview reports itself visible.
 let panelOpen = false
@@ -55,10 +58,13 @@ export function useUnseenUsage(key: string | null, used: number): UnseenUsage | 
   // `seenUsed` lives outside React: re-render when it changes, even if `settling` ends where it began.
   const [, markSeen] = useReducer((count: number) => count + 1, 0)
   const seen = key === null ? undefined : seenUsed.get(key)
-  const from = seen !== undefined && used > seen ? seen : null
+  const latest = key === null ? undefined : latestUsed.get(key)
+  const isReset = latest !== undefined && used < latest
+  const from = seen !== undefined && used > seen && !isReset ? seen : null
 
   useEffect(() => {
     if (key === null) return
+    latestUsed.set(key, used)
     if (from === null) {
       // First data, or a reset: nothing was spent unseen, so it starts from here.
       seenUsed.set(key, used)

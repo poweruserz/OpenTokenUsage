@@ -78,6 +78,16 @@ describe("useUnseenUsage", () => {
     expect(result.current).toEqual({ from: 5, settling: false })
   })
 
+  it("counts a drop as a reset even when it stays above what was seen", async () => {
+    const { result, rerender } = await mount("reset-above-seen", 10)
+    rerender({ used: 60 })
+    expect(result.current).toEqual({ from: 10, settling: false })
+    rerender({ used: 30 })
+    expect(result.current).toBeNull()
+    rerender({ used: 35 })
+    expect(result.current).toEqual({ from: 30, settling: false })
+  })
+
   it("keeps it for the next open when the panel closes mid-blink", async () => {
     await setPanel(true)
     const { result, rerender } = await mount("closed-early", 10)
