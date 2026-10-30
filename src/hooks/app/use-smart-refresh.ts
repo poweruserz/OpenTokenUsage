@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { PluginState } from "@/hooks/app/types"
 import type { PluginSettings } from "@/lib/settings"
-import { completeSmartCheck, MINUTE, newSmartSchedule, type SmartSchedule } from "@/lib/smart-refresh"
+import { completeSmartCheck, MINUTE, newSmartSchedule, smartFloorMinutes, type SmartSchedule } from "@/lib/smart-refresh"
 
 type Entry = SmartSchedule & { observed?: PluginState }
 const EMPTY_STATES: Record<string, PluginState> = {}
@@ -37,7 +37,7 @@ export function useSmartRefresh({
     for (const id of ids) {
       const state = pluginStates[id]
       const existing = entries.current.get(id)
-      let entry: Entry = existing ?? newSmartSchedule(now)
+      let entry: Entry = existing ?? newSmartSchedule(now, smartFloorMinutes(id))
       if (state && state !== entry.observed) {
         // A result already there when Smart starts keeps its age, so old data is refreshed soon
         // (and on panel open) instead of counting as just checked.
@@ -78,7 +78,7 @@ export function useSmartRefresh({
       const now = Date.now()
       let changed = false
       for (const entry of entries.current.values()) {
-        if (entry.nextAt != null && !entry.failures && now - entry.completedAt >= MINUTE) {
+        if (entry.nextAt != null && !entry.failures && now - entry.completedAt >= Math.max(1, entry.floorMinutes) * MINUTE) {
           entry.nextAt = now
           changed = true
         }

@@ -4,18 +4,18 @@ import type { PluginState } from "@/hooks/app/types"
 import { useSmartRefresh } from "@/hooks/app/use-smart-refresh"
 import { MINUTE } from "@/lib/smart-refresh"
 
-const settings = { order: ["claude", "codex-work"], disabled: [] as string[] }
+const settings = { order: ["cursor", "codex-work"], disabled: [] as string[] }
 const state = (id: string, used = 20, loading = false, error: string | null = null): PluginState => ({
   data: { providerId: id, displayName: id, iconUrl: "", lines: [
     { type: "progress", label: "Session", used, limit: 100, format: { kind: "percent" } },
   ] }, loading, error, lastUpdatedAt: Date.now(), lastManualRefreshAt: null,
 })
 
-function setup(initial: Record<string, PluginState> = {}) {
+function setup(initial: Record<string, PluginState> = {}, order = settings.order) {
   let states = initial
   let enabled = true
-  let pluginSettings = settings
-  const startBatch = vi.fn().mockResolvedValue(settings.order)
+  let pluginSettings = { ...settings, order }
+  const startBatch = vi.fn().mockResolvedValue(order)
   const setLoadingForPlugins = vi.fn((ids: string[]) => {
     for (const id of ids) states = { ...states, [id]: state(id, states[id]?.data?.lines[0]?.type === "progress" ? states[id].data.lines[0].used : 20, true) }
     rerender()
@@ -34,7 +34,7 @@ function setup(initial: Record<string, PluginState> = {}) {
       act(() => { states = { ...states, [id]: state(id, used, false, error) }; rerender() })
     },
     configure(nextEnabled: boolean, disabled: string[] = []) {
-      act(() => { enabled = nextEnabled; pluginSettings = { ...settings, disabled }; rerender() })
+      act(() => { enabled = nextEnabled; pluginSettings = { ...pluginSettings, disabled }; rerender() })
     },
   }
 }
@@ -45,31 +45,31 @@ afterEach(() => { vi.useRealTimers() })
 it("schedules from completion, keeps slow accounts independent, and never overlaps a probe", async () => {
   const app = setup()
   await app.tick(2)
-  expect(app.startBatch).toHaveBeenLastCalledWith(["claude", "codex-work"], true)
+  expect(app.startBatch).toHaveBeenLastCalledWith(["cursor", "codex-work"], true)
   await app.tick(3)
   expect(app.startBatch).toHaveBeenCalledTimes(1)
-  app.complete("claude")
+  app.complete("cursor")
   expect(app.result.current).toBe(Date.now() + 2 * MINUTE)
   await app.tick(2)
-  expect(app.startBatch).toHaveBeenLastCalledWith(["claude"], true)
+  expect(app.startBatch).toHaveBeenLastCalledWith(["cursor"], true)
   expect(app.startBatch).toHaveBeenCalledTimes(2)
 })
 
 it("backs off an idle account independently of another account's usage changes", async () => {
-  const app = setup({ claude: state("claude"), "codex-work": state("codex-work") })
-  // Checks at 2, 4, 6 and 8 minutes: Claude keeps changing, Codex doesn't.
+  const app = setup({ cursor: state("cursor"), "codex-work": state("codex-work") })
+  // Checks at 2, 4, 6 and 8 minutes: Cursor keeps changing, Codex doesn't.
   for (let check = 1; check <= 4; check++) {
     await app.tick(2)
-    app.complete("claude", 20 + check)
+    app.complete("cursor", 20 + check)
     app.complete("codex-work", 20)
   }
   app.startBatch.mockClear()
-  // Minute 10: Claude stays at 2 minutes, Codex has backed off to 5 (due at 13).
+  // Minute 10: Cursor stays at 2 minutes, Codex has backed off to 5 (due at 13).
   await app.tick(2)
-  expect(app.startBatch).toHaveBeenCalledWith(["claude"], true)
-  app.complete("claude", 30)
+  expect(app.startBatch).toHaveBeenCalledWith(["cursor"], true)
+  app.complete("cursor", 30)
   await app.tick(2)
-  expect(app.startBatch).toHaveBeenLastCalledWith(["claude"], true)
+  expect(app.startBatch).toHaveBeenLastCalledWith(["cursor"], true)
   await app.tick(1)
   expect(app.startBatch).toHaveBeenLastCalledWith(["codex-work"], true)
 })
@@ -81,7 +81,7 @@ it("backs off failed starts and cancels timers when disabled or unmounted", asyn
   expect(app.result.current).toBe(Date.now() + 2 * MINUTE)
   app.configure(true, ["codex-work"])
   await app.tick(2)
-  expect(app.startBatch).toHaveBeenLastCalledWith(["claude"], true)
+  expect(app.startBatch).toHaveBeenLastCalledWith(["cursor"], true)
   app.configure(false)
   expect(app.result.current).toBeNull()
   await app.tick(30)
@@ -91,18 +91,31 @@ it("backs off failed starts and cancels timers when disabled or unmounted", asyn
 })
 
 it("refreshes stale data on panel focus without bypassing error backoff", async () => {
-  const app = setup({ claude: state("claude"), "codex-work": state("codex-work", 20, false, "offline") })
+  const app = setup({ cursor: state("cursor"), "codex-work": state("codex-work", 20, false, "offline") })
   act(() => {
     vi.setSystemTime(Date.now() + MINUTE)
     window.dispatchEvent(new Event("focus"))
   })
   await app.tick(0)
-  expect(app.startBatch).toHaveBeenCalledWith(["claude"], true)
-  app.complete("claude")
+  expect(app.startBatch).toHaveBeenCalledWith(["cursor"], true)
+  app.complete("cursor")
   app.startBatch.mockClear()
   act(() => window.dispatchEvent(new Event("focus")))
   await app.tick(0)
   expect(app.startBatch).not.toHaveBeenCalled()
+})
+
+// Anthropic allows about 30 usage reads an hour per login, shared with Claude Code.
+it("asks Claude at most every 5 minutes, panel focus included", async () => {
+  const app = setup({ claude: state("claude") }, ["claude"])
+  await app.tick(4)
+  act(() => window.dispatchEvent(new Event("focus")))
+  await app.tick(0)
+  expect(app.startBatch).not.toHaveBeenCalled()
+  await app.tick(1)
+  expect(app.startBatch).toHaveBeenCalledWith(["claude"], true)
+  app.complete("claude", 30)
+  expect(app.result.current).toBe(Date.now() + 5 * MINUTE)
 })
 
 // setTimeout runs on a monotonic clock, Date.now() on the wall clock: after an NTP slew, a clock
@@ -112,14 +125,14 @@ it("starts the due checks when the wall clock trails the timer that woke them", 
   const timerNow = Date.now
   vi.spyOn(Date, "now").mockImplementation(() => timerNow.call(Date) - 50)
   await app.tick(2)
-  expect(app.startBatch).toHaveBeenCalledWith(["claude", "codex-work"], true)
+  expect(app.startBatch).toHaveBeenCalledWith(["cursor", "codex-work"], true)
 })
 
 // Switching to Smart must not count a result from ten minutes ago as just checked.
 it("keeps the age of results that were already there when Smart starts", async () => {
-  const old = { ...state("claude"), lastUpdatedAt: Date.now() - 10 * MINUTE }
-  const app = setup({ claude: old, "codex-work": state("codex-work") })
+  const old = { ...state("cursor"), lastUpdatedAt: Date.now() - 10 * MINUTE }
+  const app = setup({ cursor: old, "codex-work": state("codex-work") })
   await app.tick(0)
   expect(app.startBatch).toHaveBeenCalledTimes(1)
-  expect(app.startBatch).toHaveBeenCalledWith(["claude"], true)
+  expect(app.startBatch).toHaveBeenCalledWith(["cursor"], true)
 })

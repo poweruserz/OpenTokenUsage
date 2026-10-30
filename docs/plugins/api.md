@@ -188,7 +188,7 @@ host.http.request({
 - **No redirects**: The HTTP client does not follow redirects (policy: none)
 - **Throws on network errors**: Connection failures, DNS errors, and timeouts throw
 - **No domain allowlist**: Any URL is allowed (for now)
-- **Shared 429 gate**: After an HTTP 429, further requests from the same plugin to the same URL (query ignored) get a synthetic `{ status: 429, headers: { "retry-after": "<seconds left>" }, bodyText: "" }` without touching the network until `Retry-After` passes (default 5 min, max 1 h). A request with a `gateScope` has a gate of its own: a 429 on it doesn't hold the same URL's other requests, and theirs doesn't hold it (Claude's hourly reset-grants check uses this)
+- **Shared 429 gate**: After an HTTP 429, further requests from the same plugin to the same URL (query ignored) get a synthetic `{ status: 429, headers: { "retry-after": "<seconds left>" }, bodyText: "" }` without touching the network until `Retry-After` passes (default 5 min, max 1 h), also after the app restarts (`http-gates.json` in the app data folder). A request with a `gateScope` has a gate of its own: a 429 on it doesn't hold the same URL's other requests, and theirs doesn't hold it (Claude's hourly reset-grants check uses this)
 
 ### Example: GET request
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { PluginOutput } from "@/lib/plugin-types"
-import { completeSmartCheck, MINUTE, newSmartSchedule, quotaSignature } from "@/lib/smart-refresh"
+import { completeSmartCheck, MINUTE, newSmartSchedule, quotaSignature, smartFloorMinutes } from "@/lib/smart-refresh"
 
 const output = (used = 20): PluginOutput => ({
   providerId: "claude", displayName: "Claude", iconUrl: "",
@@ -22,6 +22,30 @@ describe("Smart refresh schedule", () => {
     }
     state = completeSmartCheck(state, output(20.01), false, now)
     expect(state.nextAt).toBe(now + 2 * MINUTE)
+  })
+
+  // Anthropic allows about 30 usage reads an hour per login, shared with Claude Code.
+  it("keeps Claude's cards, extra accounts and WSL logins at 5 minutes or more", () => {
+    expect(["claude", "claude-1a2b3c4d", "claude-wsl-91f17ddf"].map(smartFloorMinutes)).toEqual([5, 5, 5])
+    expect(["codex", "codex-1a2b3c4d", "cursor"].map(smartFloorMinutes)).toEqual([0, 0, 0])
+
+    let now = 100_000
+    let state = newSmartSchedule(now, 5)
+    expect(state.nextAt! - now).toBe(5 * MINUTE)
+    state = completeSmartCheck(state, output(), false, now)
+    expect(state.nextAt! - now).toBe(5 * MINUTE)
+    for (const minutes of [5, 5, 10, 15]) {
+      now = state.nextAt!
+      state = completeSmartCheck(state, output(), false, now)
+      expect(state.nextAt! - now).toBe(minutes * MINUTE)
+    }
+
+    state = newSmartSchedule(now, 5)
+    for (const minutes of [5, 5, 10, 15]) {
+      state = completeSmartCheck(state, output(), true, now)
+      expect(state.nextAt! - now).toBe(minutes * MINUTE)
+      now = state.nextAt!
+    }
   })
 
   it("compares raw numbers independently of text, countdowns, charts and ordering", () => {

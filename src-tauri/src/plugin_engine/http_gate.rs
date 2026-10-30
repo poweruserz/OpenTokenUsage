@@ -2,8 +2,11 @@
 //! rate limit between probes; the host does it for them, keyed by (plugin id, URL without query).
 //! A request can name a `gateScope` to get a gate of its own on the same URL (Claude's hourly
 //! reset-grants check must not hold its plain usage poll).
+//! Gates are saved to `http-gates.json` and outlive a relaunch: Anthropic holds its 429 penalty for
+//! up to an hour on its side, so a restarted or updated app must not ask again inside it.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -18,6 +21,60 @@ type GateMap = HashMap<(String, String), Instant>;
 fn gates() -> &'static Mutex<GateMap> {
     static GATES: OnceLock<Mutex<GateMap>> = OnceLock::new();
     GATES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+static STORE: OnceLock<PathBuf> = OnceLock::new();
+
+/// Load the gates a previous run saved, and save every new one from now on.
+pub(crate) fn init(app_data_dir: &Path) {
+    let path = app_data_dir.join("http-gates.json");
+    let saved = load(&path, SystemTime::now(), Instant::now());
+    gates()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .extend(saved);
+    let _ = STORE.set(path);
+}
+
+fn unix_ms(at: SystemTime) -> u64 {
+    at.duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// Saved as `[plugin id, key, until in Unix ms]`: an `Instant` means nothing to the next process.
+fn load(path: &Path, wall: SystemTime, now: Instant) -> GateMap {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return GateMap::new();
+    };
+    let saved: Vec<(String, String, u64)> = serde_json::from_str(&text).unwrap_or_default();
+    let now_ms = unix_ms(wall);
+    saved
+        .into_iter()
+        .filter(|(_, _, until)| *until > now_ms)
+        // Capped: a clock set back since the save must not hold a provider for longer than a 429 can.
+        .map(|(plugin, key, until)| {
+            let left = Duration::from_millis(until - now_ms).min(MAX_WAIT);
+            ((plugin, key), now + left)
+        })
+        .collect()
+}
+
+fn save(path: &Path, gates: &GateMap, wall: SystemTime, now: Instant) {
+    let now_ms = unix_ms(wall);
+    let saved: Vec<(&str, &str, u64)> = gates
+        .iter()
+        .filter(|(_, until)| **until > now)
+        .map(|((plugin, key), until)| {
+            let left = (*until - now).as_millis() as u64;
+            (plugin.as_str(), key.as_str(), now_ms + left)
+        })
+        .collect();
+    let written = serde_json::to_string(&saved)
+        .map_err(|e| e.to_string())
+        .and_then(|json| std::fs::write(path, json).map_err(|e| e.to_string()));
+    if let Err(e) = written {
+        log::warn!("http gates not saved: {e}");
+    }
 }
 
 fn gate_key(plugin_id: &str, url: &str, scope: Option<&str>) -> (String, String) {
@@ -61,6 +118,10 @@ pub(crate) fn record_429(
         .min(MAX_WAIT);
     let mut gates = gates().lock().unwrap_or_else(|e| e.into_inner());
     gates.insert(gate_key(plugin_id, url, scope), now + wait);
+    // Under the lock, so two 429s at once can't save in the wrong order. Only after a 429: rare.
+    if let Some(path) = STORE.get() {
+        save(path, &gates, SystemTime::now(), now);
+    }
     wait
 }
 
@@ -146,6 +207,54 @@ mod tests {
         record_429("gate-scope", url, None, Some("60"), now);
         assert!(remaining("gate-scope", url, None, now).is_some());
         assert_eq!(remaining("gate-scope", grants, Some("other"), now), None);
+    }
+
+    #[test]
+    fn saved_gates_outlive_a_restart_and_expired_ones_drop() {
+        let path = std::env::temp_dir().join(format!("otu-http-gates-{}.json", std::process::id()));
+        let wall = UNIX_EPOCH + Duration::from_secs(1_776_160_800);
+        let now = Instant::now();
+        let mut map = GateMap::new();
+        map.insert(
+            ("claude".into(), "https://api.example.com/usage".into()),
+            now + Duration::from_secs(3000),
+        );
+        map.insert(("codex".into(), "https://api.example.com/old".into()), now);
+        save(&path, &map, wall, now);
+
+        // The next run starts ten minutes later.
+        let later_wall = wall + Duration::from_secs(600);
+        let later = Instant::now();
+        let loaded = load(&path, later_wall, later);
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(loaded.len(), 1);
+        let left = loaded[&(
+            "claude".to_string(),
+            "https://api.example.com/usage".to_string(),
+        )] - later;
+        assert_eq!(left.as_secs(), 2400);
+    }
+
+    #[test]
+    fn a_saved_gate_is_capped_and_a_bad_file_holds_nothing() {
+        let path =
+            std::env::temp_dir().join(format!("otu-http-gates-cap-{}.json", std::process::id()));
+        let wall = UNIX_EPOCH + Duration::from_secs(1_776_160_800);
+        // A clock set back a day since the save.
+        let until = unix_ms(wall) + 24 * 60 * 60 * 1000;
+        std::fs::write(&path, format!(r#"[["claude","u",{until}]]"#)).unwrap();
+        let now = Instant::now();
+        let loaded = load(&path, wall, now);
+        assert_eq!(
+            loaded[&("claude".to_string(), "u".to_string())] - now,
+            MAX_WAIT
+        );
+
+        std::fs::write(&path, "not json").unwrap();
+        assert!(load(&path, wall, now).is_empty());
+        let _ = std::fs::remove_file(&path);
+        assert!(load(&path, wall, now).is_empty());
     }
 
     #[test]

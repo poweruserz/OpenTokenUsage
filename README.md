@@ -54,9 +54,9 @@ Settings → **Tray icon** picks what sits next to the clock. Settings → **Tas
 
 ## Smart refresh
 
-Settings → **Auto refresh → Smart** adjusts each account independently. After a quota change, it checks every 2 minutes. Once results stay the same for a few checks, the wait grows to 5, 10 and finally 15 minutes. Any further quota change restarts the 2-minute checks. Existing fixed intervals and the default 15-minute setting stay available.
+Settings → **Auto refresh → Smart** adjusts each account independently. After a quota change, it checks every 2 minutes. Once results stay the same for a few checks, the wait grows to 5, 10 and finally 15 minutes. Any further quota change restarts the 2-minute checks. Claude cards wait at least 5 minutes between checks: Anthropic allows about 30 usage reads an hour per login, shared with Claude Code and other monitors. Existing fixed intervals and the default 15-minute setting stay available.
 
-Checks are scheduled after results arrive, so a slow account does not overlap itself or block another account. Failures use a separate 2/5/10/15-minute backoff, and the existing HTTP rate-limit gate still enforces server retry delays. Opening the panel refreshes data at least a minute old, without bypassing error backoff. At the 15-minute cadence, usage elsewhere can take up to 15 minutes to be detected.
+Checks are scheduled after results arrive, so a slow account does not overlap itself or block another account. Failures use a separate 2/5/10/15-minute backoff, and the existing HTTP rate-limit gate still enforces server retry delays, also after the app restarts. Opening the panel refreshes data at least a minute old, without bypassing error backoff. At the 15-minute cadence, usage elsewhere can take up to 15 minutes to be detected.
 
 Smart polls reuse successful local token-history scans for up to 15 minutes; manual refreshes and fixed intervals still scan fresh history. Quota checks remain live. Only raw progress values and limits determine activity, so countdown text and history charts cannot keep an idle account polling rapidly. No file watchers or burn-rate prediction are involved.
 
