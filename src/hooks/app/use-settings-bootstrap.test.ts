@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const {
@@ -271,9 +271,20 @@ describe("useSettingsBootstrap", () => {
     normalizePluginSettingsMock.mockReturnValueOnce(migratedSettings)
     arePluginSettingsEqualMock.mockReturnValueOnce(false)
     getEnabledPluginIdsMock.mockReturnValueOnce(["devin"])
+    // The star card tells a new install from an update by whether plugin settings exist yet, so the
+    // first save must wait until its state is created, not just started.
+    let finishStarPrompt: () => void = () => {}
+    initStarPromptMock.mockImplementationOnce(
+      () => new Promise((resolve) => { finishStarPrompt = () => resolve({ showAfter: 0, shown: false }) })
+    )
 
     renderHook(() => useSettingsBootstrap(args))
 
+    await waitFor(() => expect(initStarPromptMock).toHaveBeenCalled())
+    await act(() => Promise.resolve())
+    expect(savePluginSettingsMock).not.toHaveBeenCalled()
+
+    finishStarPrompt()
     await waitFor(() => {
       expect(normalizePluginSettingsMock).toHaveBeenCalledWith(
         migratedSettings,
@@ -283,9 +294,5 @@ describe("useSettingsBootstrap", () => {
       expect(args.setPluginSettings).toHaveBeenCalledWith(migratedSettings)
       expect(args.startBatch).toHaveBeenCalledWith(["devin"])
     })
-    // The star card tells a new install from an update by whether plugin settings exist yet.
-    expect(initStarPromptMock.mock.invocationCallOrder[0]).toBeLessThan(
-      savePluginSettingsMock.mock.invocationCallOrder[0]
-    )
   })
 })
