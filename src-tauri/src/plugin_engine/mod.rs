@@ -1,6 +1,6 @@
 pub mod host_api;
 mod ccusage_cache;
-mod http_gate;
+pub(crate) mod http_gate;
 pub mod manifest;
 pub mod runtime;
 mod sqlite;

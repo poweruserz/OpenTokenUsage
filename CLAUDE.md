@@ -18,8 +18,10 @@ This file holds the project facts that are easy to get wrong.
 - Response bodies are logged (first 500 chars) after `redact_body` in
   `src-tauri/src/plugin_engine/host_api.rs` — on any new endpoint, add identity fields
   (email, name, uuid, ids) to the redaction list with a test.
-- Host already handles: HTTP 429 backoff per plugin+URL (`plugin_engine/http_gate.rs`), probe
-  timeout (30 s), one probe per plugin at a time, panics → error result. Don't re-implement in JS.
+- Host already handles: HTTP 429 backoff per plugin+URL (`plugin_engine/http_gate.rs`, saved to
+  `http-gates.json` so it outlives a restart), probe timeout (30 s), one probe per plugin at a time,
+  panics → error result. Don't re-implement in JS. Anthropic's usage endpoint allows ~30 reads an hour
+  per login, shared with Claude Code: Smart refresh keeps Claude cards at ≥5 min (`smartFloorMinutes`).
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);

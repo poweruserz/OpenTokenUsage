@@ -636,6 +636,7 @@ pub fn run() {
             let _proxy = config::get_resolved_proxy();
 
             let app_data_dir = app.path().app_data_dir().expect("no app data dir");
+            plugin_engine::http_gate::init(&app_data_dir);
             let resource_dir = app.path().resource_dir().expect("no resource dir");
             let app_data_dir_tail = app_data_dir
                 .file_name()
