@@ -104,6 +104,24 @@ describe("StarPromptCard", () => {
     expect(markMock).toHaveBeenCalledTimes(1)
   })
 
+  it("doesn't show when the panel hides while the OS is still answering", async () => {
+    let answer!: (open: boolean) => void
+    isVisibleMock.mockReturnValue(new Promise<boolean>((resolve) => (answer = resolve)))
+    initMock.mockResolvedValue({ showAfter: Date.now() - 1, shown: false })
+    render(<StarPromptCard />)
+    await settle()
+
+    Object.defineProperty(document, "hidden", { configurable: true, value: true })
+    try {
+      answer(true)
+      await settle()
+      expect(screen.queryByRole("status")).toBeNull()
+      expect(markMock).not.toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(document, "hidden", { configurable: true, value: false })
+    }
+  })
+
   it("never shows again once shown", async () => {
     await mount({ showAfter: 0, shown: true })
     await advance(10 * MINUTE)

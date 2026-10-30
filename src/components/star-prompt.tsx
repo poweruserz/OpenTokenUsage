@@ -45,7 +45,8 @@ export function StarPromptCard() {
     let cancelled = false
     panelIsOpen()
       .then((isOpen) => {
-        if (cancelled || !isOpen) return
+        // A panel hidden while the OS answered isn't open any more (after the first show, `hidden` is true).
+        if (cancelled || !isOpen || document.hidden) return
         // Saved as shown the moment it appears: hiding the panel early doesn't bring it back.
         setPrompt({ ...prompt, shown: true })
         setOpen(true)
