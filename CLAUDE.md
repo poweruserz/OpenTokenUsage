@@ -106,7 +106,12 @@ This file holds the project facts that are easy to get wrong.
 - Support: the side-nav coffee cup (`BmcCup`, from Buy Me a Coffee's brand kit: outline `currentColor`, coffee
   `--support` yellow) opens `SupportDialog`; the About window and the tray menu open `SUPPORT_URL` (TS ↔ tray.rs,
   test-synced). A dialog taller than a short panel sets `data-panel-dialog`: app-shell's `has-[…]:min-h` grows the
-  panel while it's open (the window follows the content height).
+  panel while it's open (the window follows the content height). SupportDialog also asks for a GitHub star.
+  The star card (`star-prompt.tsx`) shows once, for a minute: 3 h after a new install, on the next panel open for an
+  existing one. "Existing" means plugin settings were already saved, so `initStarPrompt` must run before the
+  bootstrap's first `savePluginSettings` (test-checked), or every update would look like a new install.
+- Help (the side-nav ?) opens the in-app FAQ (`help-dialog.tsx`), with GitHub Issues as its last link. Its answers
+  take setting names as placeholders filled from the settings' own labels: rename a setting and the FAQ follows.
 - Progress bars hatch the usage spent since the open panel last showed them (`use-unseen-usage.ts`): it blinks
   3.5 s, then the fill grows over it. Seen values are in memory, per plugin + line and in used terms (switching
   used/left isn't spending). "Open" is asked from the OS (`isVisible`): the hidden panel's webview reports itself

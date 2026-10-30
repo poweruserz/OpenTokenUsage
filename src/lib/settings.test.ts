@@ -457,3 +457,49 @@ describe("settings", () => {
     await expect(loadStartOnLogin()).resolves.toBe(DEFAULT_START_ON_LOGIN)
   })
 })
+
+// Each case imports the module afresh: the state is created once per app start and kept in memory.
+describe("star prompt", () => {
+  const PLUGINS = { order: ["claude"], disabled: [] }
+
+  beforeEach(() => {
+    storeState.clear()
+    vi.resetModules()
+  })
+
+  it("is due at once for an existing install and 3 hours later for a new one", async () => {
+    storeState.set("plugins", PLUGINS)
+    const existing = await import("@/lib/settings")
+    await expect(existing.initStarPrompt(1000)).resolves.toEqual({ showAfter: 1000, shown: false })
+
+    storeState.clear()
+    vi.resetModules()
+    const fresh = await import("@/lib/settings")
+    const due = 1000 + fresh.STAR_PROMPT_DELAY_MS
+    await expect(fresh.initStarPrompt(1000)).resolves.toEqual({ showAfter: due, shown: false })
+
+    // The new install's first plugin-settings save comes after: the next start keeps its 3 hours.
+    storeState.set("plugins", PLUGINS)
+    vi.resetModules()
+    const restarted = await import("@/lib/settings")
+    await expect(restarted.initStarPrompt(5000)).resolves.toEqual({ showAfter: due, shown: false })
+  })
+
+  it("stays shown once shown, now and after a restart", async () => {
+    const settings = await import("@/lib/settings")
+    await settings.initStarPrompt(1000)
+    await settings.markStarPromptShown()
+    await expect(settings.initStarPrompt()).resolves.toMatchObject({ shown: true })
+
+    vi.resetModules()
+    const next = await import("@/lib/settings")
+    await expect(next.initStarPrompt()).resolves.toMatchObject({ shown: true })
+  })
+
+  it("starts over from a malformed saved value", async () => {
+    storeState.set("starPrompt", { showAfter: "soon", shown: 1 })
+    storeState.set("plugins", PLUGINS)
+    const settings = await import("@/lib/settings")
+    await expect(settings.initStarPrompt(7)).resolves.toEqual({ showAfter: 7, shown: false })
+  })
+})

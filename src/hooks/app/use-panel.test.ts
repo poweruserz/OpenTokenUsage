@@ -85,6 +85,27 @@ describe("usePanel", () => {
     expect(setShowAbout).toHaveBeenCalledWith(true)
   })
 
+  it("hides the panel on Escape, but leaves Escape to an open panel dialog", () => {
+    renderHook(() =>
+      usePanel({
+        activeView: "home",
+        setActiveView: vi.fn(),
+        showAbout: false,
+        setShowAbout: vi.fn(),
+        displayPlugins: [],
+      })
+    )
+    const dialog = document.createElement("div")
+    dialog.setAttribute("data-panel-dialog", "")
+    document.body.appendChild(dialog)
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    expect(invokeMock).not.toHaveBeenCalledWith("hide_panel")
+
+    dialog.remove()
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    expect(invokeMock).toHaveBeenCalledWith("hide_panel")
+  })
+
   it("cleans first listener if hook unmounts before setup resolves", async () => {
     const unlistenNavigate = vi.fn()
     let resolveNavigate: ((value: () => void) => void) | null = null

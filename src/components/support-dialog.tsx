@@ -1,8 +1,10 @@
 import { useEffect } from "react"
 import { openUrl } from "@tauri-apps/plugin-opener"
+import { Star } from "lucide-react"
 import { BmcCup } from "@/components/bmc-cup"
+import { Button } from "@/components/ui/button"
 import { t } from "@/lib/i18n"
-import { SUPPORT_URL } from "@/lib/support"
+import { REPO_URL, SUPPORT_URL } from "@/lib/support"
 
 /** The yellow Buy Me a Coffee button, with the address it opens written underneath. */
 export function BuyMeACoffeeButton({ autoFocus, onOpen }: { autoFocus?: boolean; onOpen?: () => void }) {
@@ -25,7 +27,7 @@ export function BuyMeACoffeeButton({ autoFocus, onOpen }: { autoFocus?: boolean;
   )
 }
 
-/** Opened from the coffee cup in the side nav: why a coffee helps, then the button. */
+/** Opened from the coffee cup in the side nav: why a coffee helps, the button, and a GitHub star. */
 export function SupportDialog({ onClose }: { onClose: () => void }) {
   // Same ways to close as the About dialog: Escape, a click outside, or the panel hiding.
   useEffect(() => {
@@ -67,6 +69,20 @@ export function SupportDialog({ onClose }: { onClose: () => void }) {
         <p className="text-sm text-muted-foreground mb-2 text-pretty">{t("support.body")}</p>
         <p className="text-sm text-foreground text-pretty">{t("support.ask")}</p>
         <BuyMeACoffeeButton autoFocus onOpen={onClose} />
+        <div className="mt-4 border-t pt-3 flex flex-col items-center gap-2">
+          <p className="text-sm text-muted-foreground text-pretty">{t("support.starAsk")}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              openUrl(REPO_URL).catch(console.error)
+              onClose()
+            }}
+          >
+            <Star aria-hidden className="text-support" fill="currentColor" strokeWidth={1.5} />
+            {t("star.button")}
+          </Button>
+        </div>
         <button
           type="button"
           onClick={onClose}
