@@ -5,6 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppContent, type AppContentActionProps } from "@/components/app/app-content"
 import { PanelFooter } from "@/components/panel-footer"
 import { SideNav, type NavPlugin, type PluginContextAction } from "@/components/side-nav"
+import { StarPromptCard } from "@/components/star-prompt"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
 import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import { useAppVersion } from "@/hooks/app/use-app-version"
@@ -166,6 +167,7 @@ export function AppShell({
               <div
                 className={`pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-card to-transparent transition-opacity duration-200 ${canScrollDown ? "opacity-100" : "opacity-0"}`}
               />
+              <StarPromptCard />
             </div>
             <PanelFooter
               refreshing={displayPlugins.some((plugin) => plugin.loading)}

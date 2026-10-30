@@ -72,7 +72,9 @@ export function usePanel({
     if (showAbout) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // An open panel dialog (Help, Support) takes Escape for itself; this listener runs before
+      // theirs, so their preventDefault() comes too late.
+      if (e.key === "Escape" && !document.querySelector("[data-panel-dialog]")) {
         invoke("hide_panel")
       }
     }

@@ -5,7 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener"
 import { invoke } from "@tauri-apps/api/core"
 
 import { SideNav } from "@/components/side-nav"
-import { SUPPORT_URL } from "@/lib/support"
+import { ISSUES_URL, REPO_URL, SUPPORT_URL } from "@/lib/support"
 
 const darkModeState = vi.hoisted(() => ({
   useDarkModeMock: vi.fn(() => false),
@@ -82,14 +82,25 @@ describe("SideNav", () => {
     expect(p2Style).toContain("rgb(255, 255, 255)")
   })
 
-  it("opens the issues page and hides the panel from Help", async () => {
-    const onViewChange = vi.fn()
-    render(<SideNav activeView="home" onViewChange={onViewChange} plugins={[]} />)
+  it("opens the FAQ in the panel from Help, with GitHub only as its last link", async () => {
+    vi.mocked(openUrl).mockClear()
+    vi.mocked(invoke).mockClear()
+    render(<SideNav activeView="home" onViewChange={vi.fn()} plugins={[]} />)
 
     await userEvent.click(screen.getByRole("button", { name: "Help" }))
+    expect(screen.getByRole("dialog", { name: "Frequently asked questions" })).toBeInTheDocument()
+    expect(openUrl).not.toHaveBeenCalled()
 
-    expect(openUrl).toHaveBeenCalledWith("https://github.com/PowerUserZ/OpenTokenUsage/issues")
-    expect(invoke).toHaveBeenCalledWith("hide_panel")
+    // Answers name settings by their own labels.
+    await userEvent.click(screen.getByText("Can I track a second Claude or Codex account?"))
+    expect(screen.getByText(/Settings → Extra accounts adds one/)).toBeVisible()
+
+    await userEvent.click(screen.getByRole("button", { name: "Didn't find your answer? Ask on GitHub" }))
+    expect(openUrl).toHaveBeenCalledWith(ISSUES_URL)
+    expect(invoke).not.toHaveBeenCalledWith("hide_panel")
+
+    await userEvent.keyboard("{Escape}")
+    expect(screen.queryByRole("dialog")).toBeNull()
   })
 
   it("opens the support dialog from the coffee cup instead of the site", async () => {
@@ -108,6 +119,16 @@ describe("SideNav", () => {
     await userEvent.click(screen.getByRole("button", { name: "Support OpenTokenUsage" }))
     await userEvent.click(screen.getByRole("button", { name: "Buy me a coffee" }))
     expect(openUrl).toHaveBeenCalledWith(SUPPORT_URL)
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  it("asks for a GitHub star in the support dialog", async () => {
+    vi.mocked(openUrl).mockClear()
+    render(<SideNav activeView="home" onViewChange={vi.fn()} plugins={[]} />)
+
+    await userEvent.click(screen.getByRole("button", { name: "Support OpenTokenUsage" }))
+    await userEvent.click(screen.getByRole("button", { name: "Star on GitHub" }))
+    expect(openUrl).toHaveBeenCalledWith(REPO_URL)
     expect(screen.queryByRole("dialog")).toBeNull()
   })
 

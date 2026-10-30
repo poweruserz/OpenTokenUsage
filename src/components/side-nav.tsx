@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react"
 import { CircleHelp, Settings } from "lucide-react"
-import { openUrl } from "@tauri-apps/plugin-opener"
 import { invoke } from "@tauri-apps/api/core"
 import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu"
 import {
@@ -24,6 +23,7 @@ import { getRelativeLuminance } from "@/lib/color"
 import { useDarkMode } from "@/hooks/use-dark-mode"
 import { t } from "@/lib/i18n"
 import { BmcCup } from "@/components/bmc-cup"
+import { HelpDialog } from "@/components/help-dialog"
 import { SupportDialog } from "@/components/support-dialog"
 
 type ActiveView = "home" | "settings" | string
@@ -147,6 +147,8 @@ export function SideNav({
   const isDark = useDarkMode()
   const [showSupport, setShowSupport] = useState(false)
   const closeSupport = useCallback(() => setShowSupport(false), [])
+  const [showHelp, setShowHelp] = useState(false)
+  const closeHelp = useCallback(() => setShowHelp(false), [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -259,17 +261,15 @@ export function SideNav({
       </NavButton>
       {showSupport && <SupportDialog onClose={closeSupport} />}
 
-      {/* Help */}
+      {/* Help: common questions in the panel; GitHub is one link at their end */}
       <NavButton
-        isActive={false}
-        onClick={() => {
-          openUrl("https://github.com/PowerUserZ/OpenTokenUsage/issues").catch(console.error)
-          invoke("hide_panel").catch(console.error)
-        }}
+        isActive={showHelp}
+        onClick={() => setShowHelp(true)}
         aria-label={t("nav.help")}
       >
         <CircleHelp className="size-5" strokeWidth={1.5} />
       </NavButton>
+      {showHelp && <HelpDialog onClose={closeHelp} />}
 
       {/* Settings */}
       <NavButton
