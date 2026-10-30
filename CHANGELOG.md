@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.7.12
+
+A notification tells you once when a new version is ready to install.
+
+### New Features
+- When an update has downloaded, a Windows notification says so once for that version, in every app language. Later checks and restarts don't repeat it, and a newer version notifies once again (#43)
+
 ## v0.7.11
 
 In-app updates install without the setup window and reopen the panel, the app finds new versions within 15 minutes, and Claude stays within Anthropic's limit on usage reads.
