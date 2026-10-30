@@ -150,6 +150,7 @@ export function PanelFooter({
             onClick={(event) => {
               event.currentTarget.blur()
               onRefreshAll()
+              onUpdateCheck()
             }}
             className="ml-auto min-w-0 truncate text-xs text-muted-foreground tabular-nums hover:text-foreground transition-colors cursor-pointer"
             title={updateShown ? `${countdownFull} · ${t("footer.refreshNow")}` : t("footer.refreshNow")}

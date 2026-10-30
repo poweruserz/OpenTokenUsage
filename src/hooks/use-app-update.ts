@@ -14,7 +14,7 @@ export type UpdateStatus =
   | { status: "ready" }
   | { status: "error"; message: string }
 
-const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000
 
 // The quiet installer (tauri.conf.json) shows no window and closes the app; the app it starts
 // opens the panel again, so the update doesn't look like a crash. A failed install leaves the old
@@ -122,7 +122,8 @@ export function useAppUpdate(): UseAppUpdateReturn {
     mountedRef.current = true
     void checkForUpdates()
 
-    // Every 6 hours: each check downloads latest.json from the release (and counts as a download).
+    // Each check downloads latest.json; the downloads badge (PowerUserZ/PowerUserZ profile-assets.yml)
+    // counts only the .exe and .msi assets, so checking often doesn't inflate it.
     const intervalId = setInterval(() => {
       void checkForUpdates()
     }, UPDATE_CHECK_INTERVAL_MS)
