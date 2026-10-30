@@ -55,7 +55,9 @@ fn to_json(value: ValueRef<'_>) -> Value {
     }
 }
 
-/// `file:` URI with immutable=1 (skips WAL/SHM locking). `%` is encoded first.
+/// `file:` URI with immutable=1 (skips WAL/SHM locking). `%` is encoded first. A UNC path
+/// (`\\wsl.localhost\<distro>\...`, where the locking open always fails) keeps its `//` after
+/// the empty authority, or SQLite reads it as a folder on the current drive.
 fn immutable_uri(path: &str) -> String {
     let encoded = path
         .replace('%', "%25")
@@ -63,6 +65,9 @@ fn immutable_uri(path: &str) -> String {
         .replace('#', "%23")
         .replace('?', "%3F")
         .replace('\\', "/");
+    if encoded.starts_with("//") {
+        return format!("file://{}?immutable=1", encoded);
+    }
     format!("file:///{}?immutable=1", encoded.trim_start_matches('/'))
 }
 
@@ -138,6 +143,20 @@ mod tests {
         let missing = temp_db("missing.vscdb");
         assert!(exec(&missing, "CREATE TABLE t (x)").is_err());
         assert!(!std::path::Path::new(&missing).exists());
+    }
+
+    // A WSL database (`\\wsl.localhost\...`) always answers "database is locked" to the plain
+    // open; its fallback URI used to drop the UNC `//` and point at C:\wsl.localhost.
+    #[test]
+    fn immutable_uri_keeps_unc_paths() {
+        assert_eq!(
+            immutable_uri(r"\\wsl.localhost\Ubuntu\home\me\.local\share\opencode\open code.db"),
+            "file:////wsl.localhost/Ubuntu/home/me/.local/share/opencode/open%20code.db?immutable=1"
+        );
+        assert_eq!(
+            immutable_uri(r"C:\Users\me\state.vscdb"),
+            "file:///C:/Users/me/state.vscdb?immutable=1"
+        );
     }
 
     #[test]

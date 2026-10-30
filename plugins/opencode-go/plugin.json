@@ -16,7 +16,13 @@
       "url": "https://opencode.ai/docs/go/"
     }
   ],
-  "wsl": { "login": ["~/.local/share/opencode/auth.json", "~/.local/share/opencode/opencode.db"] },
+  "wsl": {
+    "login": [
+      "~/.local/share/opencode/auth.json",
+      "~/.local/share/opencode/opencode.db",
+      "~/.local/share/opencode/opencode-next.db"
+    ]
+  },
   "lines": [
     {
       "type": "progress",

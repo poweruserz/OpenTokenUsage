@@ -28,16 +28,20 @@
     return Array.isArray(rows) ? rows : [];
   }
 
+  function unreadableError(file) {
+    return "Couldn't read OpenCode's " + file + ". Check its file permissions or log into OpenCode Go again.";
+  }
+
   // OpenCode 2's key; null once a database holds the logins but no Go key (a logout there, which
-  // auth.json must not revive); undefined when no database took the logins over yet.
+  // auth.json must not revive); undefined when no database took the logins over yet. Broken
+  // storage is never mistaken for either: an unlisted folder could hide the database of a logout.
   function loadDatabaseKey(ctx) {
     let names;
     try {
       names = ctx.host.fs.exists(DATA_DIR) ? ctx.host.fs.listDir(DATA_DIR) : [];
     } catch (e) {
-      // An unreadable folder fails loud below when auth.json can't be read either.
-      ctx.host.log.warn("opencode data dir list failed: " + String(e));
-      return undefined;
+      ctx.host.log.error("opencode data dir list failed: " + String(e));
+      throw unreadableError(DATA_DIR);
     }
     let imported = false;
     let unreadable = null;
@@ -50,15 +54,14 @@
         const key = row && typeof row.key === "string" ? row.key.trim() : "";
         if (key) return key;
       } catch (e) {
+        // Also what a WSL copy gets while the credential table sits only in the WAL: the share
+        // can't be locked, so the host reads the database without it.
         if (/no such table/i.test(String(e))) continue;
         ctx.host.log.error("opencode credential read failed (" + name + "): " + String(e));
         unreadable = unreadable || name;
       }
     }
-    // Broken storage is never mistaken for a logout.
-    if (unreadable) {
-      throw "Couldn't read OpenCode's " + unreadable + ". Check its file permissions or log into OpenCode Go again.";
-    }
+    if (unreadable) throw unreadableError(unreadable);
     return imported ? null : undefined;
   }
 

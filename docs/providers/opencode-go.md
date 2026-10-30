@@ -32,6 +32,8 @@ Percents are clamped to 0–100.
 
 A login inside a running WSL distro shows as its own `OpenCode Go · WSL` card when it's a different account than the ones already shown. A stopped distro is never started; its card keeps its last data.
 
+A database on the WSL share can't be locked from Windows, so it is read without its WAL (`immutable=1`): a login newer than OpenCode's last checkpoint shows once OpenCode checkpoints (or exits).
+
 A zero-percent rolling session can already be active. Its real reset remains visible; only a reset
 within two seconds of a full five-hour period at capture time is treated as an untouched placeholder.
 The HTTP Date header supplies the reference clock when valid. Weekly and monthly resets are preserved.

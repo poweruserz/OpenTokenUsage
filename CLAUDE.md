@@ -45,6 +45,8 @@ This file holds the project facts that are easy to get wrong.
   key isn't shown, one matching the usual login, an extra account or another WSL copy isn't either. Cards are
   saved in `wsl-accounts.json` after their first good probe; while the distro is stopped a card gets its
   cached data with `staleSince` (the UI shows that time). Logins are read and refreshed in place — never copy them.
+  SQLite on the share always answers "database is locked", so `sqlite::query_json` reads it through its
+  `immutable=1` fallback (UNC URI `file:////wsl.localhost/...`), which doesn't see the WAL.
 
 ## UI
 - Windows 11 Fluent look: colors are tokens in `src/index.css` (`--accent-base` = Windows accent

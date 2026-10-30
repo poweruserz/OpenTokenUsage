@@ -171,6 +171,20 @@ describe("opencode-go plugin", () => {
     expect(ctx.host.http.request).not.toHaveBeenCalled();
   });
 
+  it("fails loud when the data folder can't be listed instead of reading the old auth.json", async () => {
+    const ctx = makeCtx();
+    setAuth(ctx, "file-key");
+    ctx.host.fs.listDir = () => {
+      throw new Error("Access is denied.");
+    };
+
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow(
+      "Couldn't read OpenCode's ~/.local/share/opencode. Check its file permissions or log into OpenCode Go again.",
+    );
+    expect(ctx.host.http.request).not.toHaveBeenCalled();
+  });
+
   // Regression: meters used to be a local SQLite dollar estimate that only saw this machine
   // and drifted from the dashboard. They now come from the official usage API.
   it("maps the official usage API into Session/Weekly/Monthly percent meters", async () => {
