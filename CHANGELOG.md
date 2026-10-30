@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.7.11
+
+In-app updates install without the setup window and reopen the panel, the app finds new versions within 15 minutes, and Claude stays within Anthropic's limit on usage reads.
+
+### Changes
+- In-app updates install quietly, without the setup window, and the panel opens again once the new version starts. This begins with the update after 0.7.11, because the installed version decides how the setup runs (#38)
+- The app checks for new versions every 15 minutes instead of every 6 hours, and the refresh button in the footer checks too (#41)
+
+### Bug Fixes
+- Claude: Smart refresh asks at most every 5 minutes instead of 2. Anthropic allows about 30 usage reads an hour per login, shared with Claude Code, and answers more with "Rate limited by Anthropic" for up to an hour (#40)
+- A provider's wait after a rate limit now holds across a restart or an update, so the app doesn't ask again before it ends (#40)
+
 ## v0.7.10
 
 The app no longer signs Claude Code out by renewing its login at the same time, Claude's reset counts stop drawing rate limits, and Cursor Enterprise and Team seats show their plan and on-demand spend.
