@@ -227,6 +227,8 @@ export const en = {
   "alert.reset.body": "Your limit is available again.",
   "alert.pace.title": "{provider}: {label} is running out",
   "alert.pace.body": "At this pace you'll hit the limit in {time}, before it resets.",
+  "alert.update.title": "OpenTokenUsage {version} is ready",
+  "alert.update.body": "Open the panel and choose Restart to update.",
 
   "sparkline.peak": "peak {value}",
   "sparkline.summary": "{label}: {days} days, latest {latest} on {date}, peak {peak}.",

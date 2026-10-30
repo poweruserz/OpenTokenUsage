@@ -64,6 +64,7 @@ const GLOBAL_SHORTCUT_KEY = "globalShortcut";
 const START_ON_LOGIN_KEY = "startOnLogin";
 const LANGUAGE_KEY = "language";
 const UPDATE_RELAUNCH_KEY = "updateRelaunchVersion";
+const UPDATE_NOTIFIED_KEY = "updateNotifiedVersion";
 
 export const DEFAULT_AUTO_UPDATE_INTERVAL: AutoUpdateInterval = 15;
 export const DEFAULT_THEME_MODE: ThemeMode = "dark";
@@ -471,6 +472,17 @@ export async function loadUpdateRelaunchVersion(): Promise<string | null> {
 export async function saveUpdateRelaunchVersion(version: string | null): Promise<void> {
   if (version === null) await store.delete(UPDATE_RELAUNCH_KEY);
   else await store.set(UPDATE_RELAUNCH_KEY, version);
+  await store.save();
+}
+
+/** The last version whose "update ready" notification was shown: each version notifies once. */
+export async function loadUpdateNotifiedVersion(): Promise<string | null> {
+  const stored = await store.get<unknown>(UPDATE_NOTIFIED_KEY);
+  return typeof stored === "string" ? stored : null;
+}
+
+export async function saveUpdateNotifiedVersion(version: string): Promise<void> {
+  await store.set(UPDATE_NOTIFIED_KEY, version);
   await store.save();
 }
 

@@ -3,7 +3,14 @@ import { getVersion } from "@tauri-apps/api/app"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { check, type Update } from "@tauri-apps/plugin-updater"
 import { relaunch } from "@tauri-apps/plugin-process"
-import { loadUpdateRelaunchVersion, saveUpdateRelaunchVersion } from "@/lib/settings"
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
+import { t } from "@/lib/i18n"
+import {
+  loadUpdateNotifiedVersion,
+  loadUpdateRelaunchVersion,
+  saveUpdateNotifiedVersion,
+  saveUpdateRelaunchVersion,
+} from "@/lib/settings"
 
 export type UpdateStatus =
   | { status: "idle" }
@@ -24,6 +31,16 @@ async function reopenPanelAfterUpdate() {
   if (version === null) return
   await saveUpdateRelaunchVersion(null)
   if (version === (await getVersion())) await invoke("show_panel")
+}
+
+// Once per version, saved before it's sent: the 15-minute checks, a restart that downloads the same
+// update again, or a denied permission never bring it back.
+async function notifyUpdateReady(version: string) {
+  if ((await loadUpdateNotifiedVersion()) === version) return
+  await saveUpdateNotifiedVersion(version)
+  let granted = await isPermissionGranted()
+  if (!granted) granted = (await requestPermission()) === "granted"
+  if (granted) sendNotification({ title: t("alert.update.title", { version }), body: t("alert.update.body") })
 }
 
 interface UseAppUpdateReturn {
@@ -99,6 +116,7 @@ export function useAppUpdate(): UseAppUpdateReturn {
             }
           })
           setStatus({ status: "ready" })
+          notifyUpdateReady(update.version).catch(console.error)
         } catch (err) {
           console.error("Update download failed:", err)
           setStatus({ status: "error", message: "Download failed" })

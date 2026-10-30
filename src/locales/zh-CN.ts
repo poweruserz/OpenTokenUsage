@@ -227,6 +227,8 @@ export const zhCN: Messages = {
   "alert.reset.body": "你的额度已再次可用。",
   "alert.pace.title": "{provider}：{label} 即将用完",
   "alert.pace.body": "按当前速度，将在 {time} 后达到上限，早于重置时间。",
+  "alert.update.title": "OpenTokenUsage {version} 已就绪",
+  "alert.update.body": "打开面板，选择“重启以更新”。",
 
   "sparkline.peak": "峰值 {value}",
   "sparkline.summary": "{label}：{days}天，最新 {latest}（{date}），峰值 {peak}。",

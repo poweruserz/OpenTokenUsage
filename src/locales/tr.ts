@@ -227,6 +227,8 @@ export const tr: Messages = {
   "alert.reset.body": "Limitiniz yeniden kullanılabilir.",
   "alert.pace.title": "{provider}: {label} tükenmek üzere",
   "alert.pace.body": "Bu tempoyla limit, sıfırlanmadan önce {time} içinde dolacak.",
+  "alert.update.title": "OpenTokenUsage {version} hazır",
+  "alert.update.body": "Paneli açıp Güncelleştirmek için yeniden başlat butonuna basın.",
 
   "sparkline.peak": "en yüksek {value}",
   "sparkline.summary": "{label}: {days} gün, son değer {latest} ({date}), en yüksek {peak}.",

@@ -1,13 +1,27 @@
 import { renderHook, act } from "@testing-library/react"
 import { describe, expect, it, vi, beforeEach, afterAll } from "vitest"
 
-const { checkMock, relaunchMock, invokeMock, getVersionMock, loadRelaunchMock, saveRelaunchMock } = vi.hoisted(() => ({
+const {
+  checkMock, relaunchMock, invokeMock, getVersionMock, loadRelaunchMock, saveRelaunchMock,
+  loadNotifiedMock, saveNotifiedMock, grantedMock, requestPermissionMock, sendNotificationMock,
+} = vi.hoisted(() => ({
   checkMock: vi.fn(),
   relaunchMock: vi.fn(),
   invokeMock: vi.fn(),
   getVersionMock: vi.fn(),
   loadRelaunchMock: vi.fn(),
   saveRelaunchMock: vi.fn(),
+  loadNotifiedMock: vi.fn(),
+  saveNotifiedMock: vi.fn(),
+  grantedMock: vi.fn(),
+  requestPermissionMock: vi.fn(),
+  sendNotificationMock: vi.fn(),
+}))
+
+vi.mock("@tauri-apps/plugin-notification", () => ({
+  isPermissionGranted: grantedMock,
+  requestPermission: requestPermissionMock,
+  sendNotification: sendNotificationMock,
 }))
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
@@ -30,6 +44,8 @@ vi.mock("@tauri-apps/api/app", () => ({
 vi.mock("@/lib/settings", () => ({
   loadUpdateRelaunchVersion: loadRelaunchMock,
   saveUpdateRelaunchVersion: saveRelaunchMock,
+  loadUpdateNotifiedVersion: loadNotifiedMock,
+  saveUpdateNotifiedVersion: saveNotifiedMock,
 }))
 
 import { useAppUpdate } from "@/hooks/use-app-update"
@@ -49,6 +65,11 @@ describe("useAppUpdate", () => {
     getVersionMock.mockReset()
     loadRelaunchMock.mockReset().mockResolvedValue(null)
     saveRelaunchMock.mockReset().mockResolvedValue(undefined)
+    loadNotifiedMock.mockReset().mockResolvedValue(null)
+    saveNotifiedMock.mockReset().mockResolvedValue(undefined)
+    grantedMock.mockReset().mockResolvedValue(true)
+    requestPermissionMock.mockReset().mockResolvedValue("granted")
+    sendNotificationMock.mockReset()
     // `@tauri-apps/api/core` considers `globalThis.isTauri` the runtime flag.
     globalThis.isTauri = true
   })
@@ -258,6 +279,40 @@ describe("useAppUpdate", () => {
     expect(installMock).toHaveBeenCalled()
     expect(relaunchMock).toHaveBeenCalled()
     expect(result.current.updateStatus).toEqual({ status: "idle" })
+  })
+
+  it("notifies once when an update has downloaded, and never again for that version", async () => {
+    const downloadMock = vi.fn(async (onEvent: (event: any) => void) => {
+      onEvent({ event: "Finished", data: {} })
+    })
+    checkMock.mockResolvedValue({ version: "1.2.3", download: downloadMock, install: vi.fn() })
+
+    const first = renderHook(() => useAppUpdate())
+    await vi.waitFor(() => expect(sendNotificationMock).toHaveBeenCalledTimes(1))
+    expect(sendNotificationMock.mock.calls[0][0].title).toContain("1.2.3")
+    expect(saveNotifiedMock).toHaveBeenCalledWith("1.2.3")
+    first.unmount()
+
+    // The next start downloads the same update again: the saved version keeps it quiet.
+    loadNotifiedMock.mockResolvedValue("1.2.3")
+    renderHook(() => useAppUpdate())
+    await vi.waitFor(() => expect(loadNotifiedMock).toHaveBeenCalledTimes(2))
+    await act(() => Promise.resolve())
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("counts a denied notification permission as notified", async () => {
+    grantedMock.mockResolvedValue(false)
+    requestPermissionMock.mockResolvedValue("denied")
+    const downloadMock = vi.fn(async (onEvent: (event: any) => void) => {
+      onEvent({ event: "Finished", data: {} })
+    })
+    checkMock.mockResolvedValue({ version: "1.2.3", download: downloadMock, install: vi.fn() })
+
+    renderHook(() => useAppUpdate())
+    await vi.waitFor(() => expect(requestPermissionMock).toHaveBeenCalled())
+    expect(saveNotifiedMock).toHaveBeenCalledWith("1.2.3")
+    expect(sendNotificationMock).not.toHaveBeenCalled()
   })
 
   it("installs even when the relaunch mark can't be saved", async () => {

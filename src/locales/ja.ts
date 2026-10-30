@@ -227,6 +227,8 @@ export const ja: Messages = {
   "alert.reset.body": "上限が再び利用できます。",
   "alert.pace.title": "{provider}: {label} が不足しそうです",
   "alert.pace.body": "このペースでは、リセット前の {time} 後に上限に達します。",
+  "alert.update.title": "OpenTokenUsage {version} の準備ができました",
+  "alert.update.body": "パネルを開いて「再起動して更新」を選んでください。",
 
   "sparkline.peak": "ピーク {value}",
   "sparkline.summary": "{label}: {days}日間、最新は {date} の {latest}、ピークは {peak}。",
