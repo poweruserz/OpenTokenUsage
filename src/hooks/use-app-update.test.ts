@@ -68,6 +68,24 @@ describe("useAppUpdate", () => {
     expect(result.current.updateStatus).toEqual({ status: "checking" })
   })
 
+  it("checks again every 15 minutes", async () => {
+    vi.useFakeTimers()
+    checkMock.mockResolvedValue(null)
+    renderHook(() => useAppUpdate())
+    await act(() => Promise.resolve())
+    expect(checkMock).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(15 * 60 * 1000 - 1)
+    })
+    expect(checkMock).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(checkMock).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
+
   it("stays idle when not running in Tauri", async () => {
     globalThis.isTauri = false
 
