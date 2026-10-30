@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.7.13
+
+OpenCode Go finds your login again with OpenCode 2.
+
+### Bug Fixes
+- OpenCode Go: the key is read from OpenCode 2's databases, which took the logins over from `auth.json`, so an OpenCode 2 login no longer shows "OpenCode Go not detected". OpenCode 1 keeps using `auth.json`, and a Go logout in OpenCode 2 stays a logout (#45)
+- OpenCode Go · WSL: an OpenCode 2 login inside WSL is found too. Windows can't lock its database over the share, so it's read without the WAL, and a login newer than OpenCode's last checkpoint shows after the next one (#45)
+
 ## v0.7.12
 
 A notification tells you once when a new version is ready to install.
