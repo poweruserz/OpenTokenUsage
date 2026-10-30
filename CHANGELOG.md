@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.7.14
+
+The bars show what you used while the panel was closed, Help opens a FAQ inside the panel, and the update notification makes a sound.
+
+### New Features
+- When the panel opens, the part of each bar used up since you last looked blinks hatched for a few seconds, then the bar fills over it. A reset doesn't count as usage (#49)
+- Help (the ? in the side bar) opens a FAQ inside the panel, in every app language, instead of GitHub Issues in the browser. Its last line still lets you ask on GitHub (#48)
+- A small card asks once for a GitHub star and closes itself after a minute: 3 hours after a new install, or on the next panel open after an update. The support dialog keeps the same button (#48)
+
+### Bug Fixes
+- The "update ready" notification plays your alert sound, so it no longer goes unnoticed (#47)
+- Escape closes an open dialog in the panel (Help, Support) instead of hiding the whole panel (#48)
+
 ## v0.7.13
 
 OpenCode Go finds your login again with OpenCode 2.
