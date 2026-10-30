@@ -248,7 +248,21 @@ body,
 .animate-shimmer {
   animation: shimmer 1.5s ease-in-out infinite;
 }
+
+/* Usage spent while the panel was closed: hatched in the bar's color, blinking until it fills */
+.progress-unseen {
+  background-image: repeating-linear-gradient(-45deg, currentColor 0 2px, transparent 2px 4px);
+}
+@keyframes unseen-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+.animate-unseen {
+  animation: unseen-blink 0.875s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
+  .animate-unseen,
   .animate-shimmer,
   .update-border-beam::before {
     animation: none;

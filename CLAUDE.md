@@ -112,6 +112,10 @@ This file holds the project facts that are easy to get wrong.
   bootstrap's first `savePluginSettings` (test-checked), or every update would look like a new install.
 - Help (the side-nav ?) opens the in-app FAQ (`help-dialog.tsx`), with GitHub Issues as its last link. Its answers
   take setting names as placeholders filled from the settings' own labels: rename a setting and the FAQ follows.
+- Progress bars hatch the usage spent since the open panel last showed them (`use-unseen-usage.ts`): it blinks
+  3.5 s, then the fill grows over it. Seen values are in memory, per plugin + line and in used terms (switching
+  used/left isn't spending). "Open" is asked from the OS (`isVisible`): the hidden panel's webview reports itself
+  visible before its first show.
 - Ring logos are sized by `measureLogoExtent` (how far the logo's pixels reach) so square logos stay
   inside the ring and round ones grow.
 - Themes: `dark` (default, pure black: classes `.dark.oled`) | `light`. `useSettingsTheme` also sets the

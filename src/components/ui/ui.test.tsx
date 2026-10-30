@@ -110,6 +110,33 @@ describe("ui components", () => {
     expect(container.querySelector('[data-slot="progress-refreshing"]')).toBeNull()
   })
 
+  it("draws usage spent unseen hatched, then fills over it", () => {
+    const { container, rerender } = render(
+      <Progress value={30} indicatorColor="#f00" unseen={{ from: 10, settling: false }} />
+    )
+    const fill = () => container.querySelector<HTMLElement>('[role="progressbar"] > div')!
+    const hatch = () => container.querySelector<HTMLElement>('[data-slot="progress-unseen"]')
+    expect(fill().style.width).toBe("10%")
+    expect(hatch()?.style.left).toBe("10%")
+    expect(hatch()?.style.width).toBe("20%")
+    expect(hatch()).toHaveClass("animate-unseen")
+
+    rerender(<Progress value={30} indicatorColor="#f00" unseen={{ from: 10, settling: true }} />)
+    expect(fill().style.width).toBe("30%")
+    expect(hatch()).toHaveClass("opacity-0")
+    expect(hatch()).not.toHaveClass("animate-unseen")
+
+    // Showing what's left: the spent part is the piece the fill lost.
+    rerender(<Progress value={50} unseen={{ from: 70, settling: false }} />)
+    expect(fill().style.width).toBe("50%")
+    expect(hatch()?.style.left).toBe("50%")
+    expect(hatch()?.style.width).toBe("20%")
+
+    rerender(<Progress value={30} />)
+    expect(fill().style.width).toBe("30%")
+    expect(hatch()).toBeNull()
+  })
+
   it("renders separator orientations", () => {
     const { rerender } = render(<Separator />)
     expect(screen.getByRole("separator")).toBeInTheDocument()

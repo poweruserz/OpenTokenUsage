@@ -12,6 +12,7 @@ import { UsageSparkline } from "@/components/usage-sparkline"
 import { PluginError } from "@/components/plugin-error"
 import { ProviderStatusBadge } from "@/components/provider-status-badge"
 import { useNowTicker } from "@/hooks/use-now-ticker"
+import { useUnseenUsage } from "@/hooks/use-unseen-usage"
 import { REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerDisplayMode, type TimeFormatMode } from "@/lib/settings"
 import type { ManifestLine, MetricLine, PluginLink } from "@/lib/plugin-types"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
@@ -327,6 +328,7 @@ export function ProviderCard({
                       onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
                       now={now}
                       refreshing={isRefreshingWithData}
+                      pluginId={pluginId}
                     />
                   ))}
                 </div>
@@ -343,6 +345,7 @@ export function ProviderCard({
                       onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
                       now={now}
                       refreshing={isRefreshingWithData}
+                      pluginId={pluginId}
                     />
                   ))}
                 </Fragment>
@@ -366,6 +369,7 @@ function MetricLineRenderer({
   onResetTimerDisplayModeToggle,
   now,
   refreshing,
+  pluginId,
 }: {
   line: MetricLine
   usageUrl?: string
@@ -375,7 +379,14 @@ function MetricLineRenderer({
   onResetTimerDisplayModeToggle?: () => void
   now: number
   refreshing?: boolean
+  pluginId?: string
 }) {
+  const isProgress = line.type === "progress"
+  const unseen = useUnseenUsage(
+    isProgress && pluginId ? `${pluginId}|${line.label}` : null,
+    isProgress ? getDisplayedUsage(line.used, line.limit, "used").fraction * 100 : 0
+  )
+
   if (line.type === "text" && line.resetCredits) {
     return <ResetCredits credits={line.resetCredits} now={now} usageUrl={usageUrl} />
   }
@@ -439,6 +450,7 @@ function MetricLineRenderer({
     const hasTimeMarkerContext = hasPaceContext && periodDurationMs! > 0
     const { amount: shownAmount, fraction: shownFraction } = getDisplayedUsage(line.used, line.limit, displayMode)
     const percent = Math.round(shownFraction * 10000) / 100
+    const shownUnseen = unseen && displayMode === "left" ? { ...unseen, from: 100 - unseen.from } : unseen
     const amountText =
       line.format.kind === "percent"
         ? `${Math.round(shownAmount)}%`
@@ -529,6 +541,7 @@ function MetricLineRenderer({
                     value={percent}
                     indicatorColor={line.color}
                     markerValue={paceMarkerValue}
+                    unseen={shownUnseen}
                     refreshing={refreshing}
                   />
                 </div>
@@ -543,6 +556,7 @@ function MetricLineRenderer({
             value={percent}
             indicatorColor={line.color}
             markerValue={paceMarkerValue}
+            unseen={shownUnseen}
             refreshing={refreshing}
           />
         )}
