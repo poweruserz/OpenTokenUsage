@@ -227,6 +227,8 @@ export const ptBR: Messages = {
   "alert.reset.body": "Seu limite está disponível novamente.",
   "alert.pace.title": "{provider}: {label} está acabando",
   "alert.pace.body": "Nesse ritmo, você atingirá o limite em {time}, antes da redefinição.",
+  "alert.update.title": "OpenTokenUsage {version} está pronto",
+  "alert.update.body": "Abra o painel e escolha Reiniciar para atualizar.",
 
   "sparkline.peak": "pico {value}",
   "sparkline.summary": "{label}: {days} dias, último {latest} em {date}, pico {peak}.",

@@ -227,6 +227,8 @@ export const fr: Messages = {
   "alert.reset.body": "Votre limite est de nouveau disponible.",
   "alert.pace.title": "{provider} : {label} bientôt épuisé",
   "alert.pace.body": "À ce rythme, vous atteindrez la limite dans {time}, avant la réinitialisation.",
+  "alert.update.title": "OpenTokenUsage {version} est prêt",
+  "alert.update.body": "Ouvrez le panneau et choisissez Redémarrer pour mettre à jour.",
 
   "sparkline.peak": "pic {value}",
   "sparkline.summary": "{label} : {days} jours, dernière valeur {latest} le {date}, pic {peak}.",

@@ -227,6 +227,8 @@ export const es419: Messages = {
   "alert.reset.body": "Tu límite está disponible de nuevo.",
   "alert.pace.title": "{provider}: {label} se está agotando",
   "alert.pace.body": "A este ritmo alcanzarás el límite en {time}, antes de que se restablezca.",
+  "alert.update.title": "OpenTokenUsage {version} está listo",
+  "alert.update.body": "Abre el panel y elige Reiniciar para actualizar.",
 
   "sparkline.peak": "máximo {value}",
   "sparkline.summary": "{label}: {days} días, último {latest} el {date}, máximo {peak}.",

@@ -227,6 +227,8 @@ export const ko: Messages = {
   "alert.reset.body": "한도를 다시 사용할 수 있습니다.",
   "alert.pace.title": "{provider}: {label} 곧 소진",
   "alert.pace.body": "이 속도라면 초기화 전 {time} 후 한도에 도달합니다.",
+  "alert.update.title": "OpenTokenUsage {version} 준비 완료",
+  "alert.update.body": "패널을 열고 다시 시작하여 업데이트를 선택하세요.",
 
   "sparkline.peak": "최고 {value}",
   "sparkline.summary": "{label}: {days}일, 최근 {date} {latest}, 최고 {peak}.",
