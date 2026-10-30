@@ -65,6 +65,7 @@ const START_ON_LOGIN_KEY = "startOnLogin";
 const LANGUAGE_KEY = "language";
 const UPDATE_RELAUNCH_KEY = "updateRelaunchVersion";
 const UPDATE_NOTIFIED_KEY = "updateNotifiedVersion";
+const STAR_PROMPT_KEY = "starPrompt";
 
 export const DEFAULT_AUTO_UPDATE_INTERVAL: AutoUpdateInterval = 15;
 export const DEFAULT_THEME_MODE: ThemeMode = "dark";
@@ -483,6 +484,50 @@ export async function loadUpdateNotifiedVersion(): Promise<string | null> {
 
 export async function saveUpdateNotifiedVersion(version: string): Promise<void> {
   await store.set(UPDATE_NOTIFIED_KEY, version);
+  await store.save();
+}
+
+/** How long a new install waits for the one-time "star on GitHub" card. */
+export const STAR_PROMPT_DELAY_MS = 3 * 60 * 60 * 1000;
+
+export type StarPrompt = { showAfter: number; shown: boolean };
+
+function readStarPrompt(value: unknown): StarPrompt | null {
+  if (!value || typeof value !== "object") return null;
+  const { showAfter, shown } = value as Record<string, unknown>;
+  return typeof showAfter === "number" && Number.isFinite(showAfter) && typeof shown === "boolean"
+    ? { showAfter, shown }
+    : null;
+}
+
+let starPromptInit: Promise<StarPrompt> | null = null;
+
+/**
+ * The star card's state, created on the first start without one. The first start of any version
+ * saves the plugin settings, so an install that has them is an existing user (card on the next panel
+ * open) and one without is new (card after 3 hours). Settings bootstrap awaits this before that save,
+ * and every caller shares the one promise, so an update never looks like a new install.
+ */
+export function initStarPrompt(now = Date.now()): Promise<StarPrompt> {
+  starPromptInit ??= (async () => {
+    const stored = readStarPrompt(await store.get<unknown>(STAR_PROMPT_KEY));
+    if (stored) return stored;
+    const existing = (await store.get<unknown>(PLUGIN_SETTINGS_KEY)) != null;
+    const prompt = { showAfter: existing ? now : now + STAR_PROMPT_DELAY_MS, shown: false };
+    await store.set(STAR_PROMPT_KEY, prompt);
+    await store.save();
+    return prompt;
+  })().catch((error) => {
+    starPromptInit = null;
+    throw error;
+  });
+  return starPromptInit;
+}
+
+export async function markStarPromptShown(): Promise<void> {
+  const shown = { ...(await initStarPrompt()), shown: true };
+  starPromptInit = Promise.resolve(shown);
+  await store.set(STAR_PROMPT_KEY, shown);
   await store.save();
 }
 

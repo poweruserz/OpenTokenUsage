@@ -26,7 +26,9 @@ const {
   migrateWindsurfToDevinMock,
   normalizePluginSettingsMock,
   savePluginSettingsMock,
+  initStarPromptMock,
 } = vi.hoisted(() => ({
+  initStarPromptMock: vi.fn(async () => ({ showAfter: 0, shown: false })),
   invokeMock: vi.fn(),
   isTauriMock: vi.fn(),
   isAutostartEnabledMock: vi.fn(),
@@ -76,6 +78,7 @@ vi.mock("@/lib/settings", () => ({
   DEFAULT_THEME_MODE: "dark",
   DEFAULT_TIME_FORMAT_MODE: "auto",
   getEnabledPluginIds: getEnabledPluginIdsMock,
+  initStarPrompt: initStarPromptMock,
   loadAutoUpdateInterval: loadAutoUpdateIntervalMock,
   loadDisplayMode: loadDisplayModeMock,
   loadGlobalShortcut: loadGlobalShortcutMock,
@@ -280,5 +283,9 @@ describe("useSettingsBootstrap", () => {
       expect(args.setPluginSettings).toHaveBeenCalledWith(migratedSettings)
       expect(args.startBatch).toHaveBeenCalledWith(["devin"])
     })
+    // The star card tells a new install from an update by whether plugin settings exist yet.
+    expect(initStarPromptMock.mock.invocationCallOrder[0]).toBeLessThan(
+      savePluginSettingsMock.mock.invocationCallOrder[0]
+    )
   })
 })

@@ -8,6 +8,7 @@ import {
 import type { PluginMeta } from "@/lib/plugin-types"
 import {
   arePluginSettingsEqual,
+  initStarPrompt,
   DEFAULT_AUTO_UPDATE_INTERVAL,
   DEFAULT_DISPLAY_MODE,
   DEFAULT_GLOBAL_SHORTCUT,
@@ -180,6 +181,8 @@ export function useSettingsBootstrap({
         if (!isMounted) return
         setPluginsMeta(availablePlugins)
 
+        // Before the first save of the plugin settings, which would make a new install look like an update.
+        await initStarPrompt().catch((error) => console.error("Failed to set up the star prompt:", error))
         const storedSettings = await loadPluginSettings()
         const migratedSettings = migrateWindsurfToDevin(storedSettings)
         const normalized = normalizePluginSettings(migratedSettings, availablePlugins)
