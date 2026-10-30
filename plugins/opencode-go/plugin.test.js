@@ -20,6 +20,24 @@ function setAuth(ctx, value = "go-key") {
   );
 }
 
+const DB_PATH = "~/.local/share/opencode/opencode.db";
+const NEXT_DB_PATH = "~/.local/share/opencode/opencode-next.db";
+
+// OpenCode channel databases by path: `imported` = OpenCode 2 moved the logins in (false = an
+// OpenCode 1 database), `goKey` = its opencode-go row, `error` = the query fails.
+function setDatabases(ctx, databases) {
+  for (const path of Object.keys(databases)) ctx.host.fs.writeText(path, "");
+  ctx.host.sqlite.query.mockImplementation((path, sql) => {
+    const db = databases[path];
+    if (db.error) throw new Error(db.error);
+    if (sql.includes("FROM migration")) {
+      if (db.imported === undefined) throw new Error("no such table: migration");
+      return JSON.stringify(db.imported ? [{ imported: 1 }] : []);
+    }
+    return JSON.stringify(db.goKey ? [{ key: db.goKey }] : []);
+  });
+}
+
 function setResponse(ctx, status, body) {
   ctx.host.http.request.mockReturnValue({
     status,
@@ -86,6 +104,84 @@ describe("opencode-go plugin", () => {
     ctx.host.fs.writeText(AUTH_PATH, "{not json");
     const plugin = await loadPlugin();
     expect(() => plugin.probe(ctx)).toThrow("Couldn't read OpenCode's auth.json");
+    expect(ctx.host.http.request).not.toHaveBeenCalled();
+  });
+
+  // Issue #39: OpenCode 2 keeps the Go key in its databases, so auth.json alone missed the login.
+  it("reads OpenCode 2's Go key from its database ahead of the imported auth.json", async () => {
+    const ctx = makeCtx();
+    setAuth(ctx, "old-key");
+    setDatabases(ctx, { [DB_PATH]: { imported: true, goKey: "  db-key  " } });
+    setResponse(ctx, 200, USAGE_BODY);
+
+    const plugin = await loadPlugin();
+    plugin.probe(ctx);
+
+    expect(ctx.host.http.request.mock.calls[0][0].headers.Authorization).toBe("Bearer db-key");
+    expect(plugin.accountKey(ctx)).toBe("db-key");
+  });
+
+  it("doesn't revive a Go logout in OpenCode 2 from the imported auth.json", async () => {
+    const ctx = makeCtx();
+    setAuth(ctx, "old-key");
+    setDatabases(ctx, { [DB_PATH]: { imported: true, goKey: null } });
+
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow("OpenCode Go not detected");
+    expect(ctx.host.http.request).not.toHaveBeenCalled();
+  });
+
+  it("keeps reading auth.json while no database has taken the logins over", async () => {
+    const plugin = await loadPlugin();
+
+    for (const db of [{ imported: false, goKey: "unused" }, {}]) {
+      const ctx = makeCtx();
+      setAuth(ctx, "file-key");
+      setDatabases(ctx, { [DB_PATH]: db });
+      setResponse(ctx, 200, USAGE_BODY);
+      plugin.probe(ctx);
+      expect(ctx.host.http.request.mock.calls[0][0].headers.Authorization).toBe("Bearer file-key");
+    }
+  });
+
+  it("finds the Go key in any release channel's database", async () => {
+    const ctx = makeCtx();
+    // listDir sorts opencode-next.db first; its logout doesn't hide the stable channel's key.
+    setDatabases(ctx, {
+      [NEXT_DB_PATH]: { imported: true, goKey: null },
+      [DB_PATH]: { imported: true, goKey: "stable-key" },
+    });
+    setResponse(ctx, 200, USAGE_BODY);
+
+    const plugin = await loadPlugin();
+    plugin.probe(ctx);
+
+    expect(ctx.host.http.request.mock.calls[0][0].headers.Authorization).toBe("Bearer stable-key");
+  });
+
+  it("fails loud when a database can't be read instead of reading it as a logout", async () => {
+    const ctx = makeCtx();
+    setAuth(ctx, "file-key");
+    setDatabases(ctx, { [DB_PATH]: { error: "disk I/O error" } });
+
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow(
+      "Couldn't read OpenCode's opencode.db. Check its file permissions or log into OpenCode Go again.",
+    );
+    expect(ctx.host.http.request).not.toHaveBeenCalled();
+  });
+
+  it("fails loud when the data folder can't be listed instead of reading the old auth.json", async () => {
+    const ctx = makeCtx();
+    setAuth(ctx, "file-key");
+    ctx.host.fs.listDir = () => {
+      throw new Error("Access is denied.");
+    };
+
+    const plugin = await loadPlugin();
+    expect(() => plugin.probe(ctx)).toThrow(
+      "Couldn't read OpenCode's ~/.local/share/opencode. Check its file permissions or log into OpenCode Go again.",
+    );
     expect(ctx.host.http.request).not.toHaveBeenCalled();
   });
 

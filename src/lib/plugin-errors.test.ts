@@ -101,6 +101,14 @@ const FIXTURES: [string, PluginErrorKey][] = [
     "Couldn't read OpenCode's auth.json. Check its file permissions or log into OpenCode Go again.",
     "authFileUnreadable",
   ],
+  [
+    "Couldn't read OpenCode's opencode-next.db. Check its file permissions or log into OpenCode Go again.",
+    "authFileUnreadable",
+  ],
+  [
+    "Couldn't read OpenCode's ~/.local/share/opencode. Check its file permissions or log into OpenCode Go again.",
+    "authFileUnreadable",
+  ],
   ["OpenCode Go not detected. Log in with OpenCode Go first.", "notDetectedLogIn"],
   ["OpenCode Go key was rejected. Log into OpenCode Go again.", "keyRejected"],
   ["No OpenCode Go subscription on this key.", "noSubscriptionOnKey"],
