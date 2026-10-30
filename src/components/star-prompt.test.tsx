@@ -1,10 +1,11 @@
 import { act, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const { initMock, markMock, openUrlMock } = vi.hoisted(() => ({
+const { initMock, markMock, openUrlMock, isVisibleMock } = vi.hoisted(() => ({
   initMock: vi.fn(),
   markMock: vi.fn(),
   openUrlMock: vi.fn(() => Promise.resolve()),
+  isVisibleMock: vi.fn(),
 }))
 
 vi.mock("@/lib/settings", () => ({
@@ -16,10 +17,24 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: openUrlMock,
 }))
 
+vi.mock("@tauri-apps/api/core", () => ({
+  isTauri: () => true,
+}))
+
+vi.mock("@tauri-apps/api/window", () => ({
+  getCurrentWindow: () => ({ isVisible: isVisibleMock }),
+}))
+
 import { StarPromptCard } from "@/components/star-prompt"
 import { REPO_URL } from "@/lib/support"
 
 const MINUTE = 60_000
+
+// Lets the promise chain (load → ask the OS → show) settle.
+const settle = () =>
+  act(async () => {
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+  })
 
 describe("StarPromptCard", () => {
   beforeEach(() => {
@@ -27,6 +42,7 @@ describe("StarPromptCard", () => {
     initMock.mockReset()
     markMock.mockReset().mockResolvedValue(undefined)
     openUrlMock.mockClear()
+    isVisibleMock.mockReset().mockResolvedValue(true)
   })
 
   afterEach(() => {
@@ -36,7 +52,12 @@ describe("StarPromptCard", () => {
   async function mount(prompt: { showAfter: number; shown: boolean }) {
     initMock.mockResolvedValue(prompt)
     render(<StarPromptCard />)
-    await act(() => Promise.resolve())
+    await settle()
+  }
+
+  async function advance(ms: number) {
+    act(() => vi.advanceTimersByTime(ms))
+    await settle()
   }
 
   it("shows once its time has come, saves that at once, and closes itself after a minute", async () => {
@@ -45,9 +66,9 @@ describe("StarPromptCard", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Enjoying OpenTokenUsage?")
     expect(markMock).toHaveBeenCalledTimes(1)
 
-    act(() => vi.advanceTimersByTime(MINUTE - 1000))
+    await advance(MINUTE - 1000)
     expect(screen.getByRole("status")).toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(1000))
+    await advance(1000)
     expect(screen.queryByRole("status")).toBeNull()
     expect(markMock).toHaveBeenCalledTimes(1)
   })
@@ -56,17 +77,39 @@ describe("StarPromptCard", () => {
     await mount({ showAfter: Date.now() + 3 * 60 * MINUTE, shown: false })
     expect(screen.queryByRole("status")).toBeNull()
 
-    act(() => vi.advanceTimersByTime(3 * 60 * MINUTE - MINUTE))
+    await advance(3 * 60 * MINUTE - MINUTE)
     expect(screen.queryByRole("status")).toBeNull()
-    act(() => vi.advanceTimersByTime(MINUTE))
+    await advance(MINUTE)
     expect(screen.getByRole("status")).toBeInTheDocument()
+  })
+
+  // Seen in the app: before its first show the hidden panel's webview reported itself visible and
+  // focused, so the card came and went with the panel closed. The OS decides now.
+  it("waits for the panel to open instead of showing to a hidden panel", async () => {
+    isVisibleMock.mockResolvedValue(false)
+    await mount({ showAfter: Date.now() - 1, shown: false })
+    act(() => {
+      window.dispatchEvent(new Event("focus"))
+    })
+    await advance(5 * MINUTE)
+    expect(screen.queryByRole("status")).toBeNull()
+    expect(markMock).not.toHaveBeenCalled()
+
+    isVisibleMock.mockResolvedValue(true)
+    act(() => {
+      window.dispatchEvent(new Event("focus"))
+    })
+    await settle()
+    expect(screen.getByRole("status")).toBeInTheDocument()
+    expect(markMock).toHaveBeenCalledTimes(1)
   })
 
   it("never shows again once shown", async () => {
     await mount({ showAfter: 0, shown: true })
-    act(() => vi.advanceTimersByTime(10 * MINUTE))
+    await advance(10 * MINUTE)
     expect(screen.queryByRole("status")).toBeNull()
     expect(markMock).not.toHaveBeenCalled()
+    expect(isVisibleMock).not.toHaveBeenCalled()
   })
 
   it("opens the repository from its button and can be closed", async () => {

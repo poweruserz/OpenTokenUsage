@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react"
+import { isTauri } from "@tauri-apps/api/core"
+import { getCurrentWindow } from "@tauri-apps/api/window"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { Star, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,6 +11,12 @@ import { REPO_URL } from "@/lib/support"
 
 const VISIBLE_MS = 60_000
 
+// Asked from the OS: before its first show the hidden panel's webview reports itself visible and
+// focused (document.hidden, hasFocus), and the card came and went with the panel closed.
+async function panelIsOpen() {
+  return isTauri() && (await getCurrentWindow().isVisible())
+}
+
 /**
  * The one-time "star on GitHub" card at the bottom of the panel. It appears once its time has come
  * and the panel is open, closes itself after a minute, and never comes back.
@@ -16,8 +24,8 @@ const VISIBLE_MS = 60_000
 export function StarPromptCard() {
   const [prompt, setPrompt] = useState<StarPrompt | null>(null)
   const [open, setOpen] = useState(false)
-  // Paused while the panel is hidden; it ticks again the moment the panel opens.
-  const now = useNowTicker({ enabled: prompt !== null && !prompt.shown, intervalMs: 60_000 })
+  const [focusCount, setFocusCount] = useState(0)
+  const tick = useNowTicker({ enabled: prompt !== null && !prompt.shown, intervalMs: 60_000, pauseWhenHidden: false })
 
   useEffect(() => {
     initStarPrompt()
@@ -25,13 +33,29 @@ export function StarPromptCard() {
       .catch((error) => console.error("Failed to load the star prompt:", error))
   }, [])
 
+  // Opening the panel focuses it: look again then, not only once a minute.
   useEffect(() => {
-    if (!prompt || prompt.shown || document.hidden || now < prompt.showAfter) return
-    // Saved as shown the moment it appears: hiding the panel early doesn't bring it back.
-    setPrompt({ ...prompt, shown: true })
-    setOpen(true)
-    markStarPromptShown().catch((error) => console.error("Failed to save the star prompt:", error))
-  }, [prompt, now])
+    const recheck = () => setFocusCount((count) => count + 1)
+    window.addEventListener("focus", recheck)
+    return () => window.removeEventListener("focus", recheck)
+  }, [])
+
+  useEffect(() => {
+    if (!prompt || prompt.shown || Date.now() < prompt.showAfter) return
+    let cancelled = false
+    panelIsOpen()
+      .then((isOpen) => {
+        if (cancelled || !isOpen) return
+        // Saved as shown the moment it appears: hiding the panel early doesn't bring it back.
+        setPrompt({ ...prompt, shown: true })
+        setOpen(true)
+        return markStarPromptShown()
+      })
+      .catch((error) => console.error("Failed to show the star prompt:", error))
+    return () => {
+      cancelled = true
+    }
+  }, [prompt, focusCount, tick])
 
   useEffect(() => {
     if (!open) return
