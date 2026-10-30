@@ -4,7 +4,9 @@ import { describe, expect, it, vi, beforeEach, afterAll } from "vitest"
 const {
   checkMock, relaunchMock, invokeMock, getVersionMock, loadRelaunchMock, saveRelaunchMock,
   loadNotifiedMock, saveNotifiedMock, grantedMock, requestPermissionMock, sendNotificationMock,
+  loadAlertSettingsMock,
 } = vi.hoisted(() => ({
+  loadAlertSettingsMock: vi.fn(),
   checkMock: vi.fn(),
   relaunchMock: vi.fn(),
   invokeMock: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock("@tauri-apps/api/app", () => ({
 }))
 
 vi.mock("@/lib/settings", () => ({
+  loadAlertSettings: loadAlertSettingsMock,
   loadUpdateRelaunchVersion: loadRelaunchMock,
   saveUpdateRelaunchVersion: saveRelaunchMock,
   loadUpdateNotifiedVersion: loadNotifiedMock,
@@ -70,6 +73,7 @@ describe("useAppUpdate", () => {
     grantedMock.mockReset().mockResolvedValue(true)
     requestPermissionMock.mockReset().mockResolvedValue("granted")
     sendNotificationMock.mockReset()
+    loadAlertSettingsMock.mockReset().mockResolvedValue({ levels: [80, 95], sound: "windows", customSoundName: null })
     // `@tauri-apps/api/core` considers `globalThis.isTauri` the runtime flag.
     globalThis.isTauri = true
   })
@@ -311,8 +315,25 @@ describe("useAppUpdate", () => {
 
     renderHook(() => useAppUpdate())
     await vi.waitFor(() => expect(requestPermissionMock).toHaveBeenCalled())
+    await act(() => Promise.resolve())
     expect(saveNotifiedMock).toHaveBeenCalledWith("1.2.3")
     expect(sendNotificationMock).not.toHaveBeenCalled()
+    expect(invokeMock).not.toHaveBeenCalledWith("play_alert_sound", expect.anything())
+  })
+
+  // The toast itself is silent (seen 0.7.12 → 0.7.13: `<audio silent="true"/>`), so it went unnoticed.
+  it("plays the sound picked for usage alerts with the update notification", async () => {
+    loadAlertSettingsMock.mockResolvedValue({ levels: [80, 95], sound: "chime", customSoundName: null })
+    const downloadMock = vi.fn(async (onEvent: (event: any) => void) => {
+      onEvent({ event: "Finished", data: {} })
+    })
+    checkMock.mockResolvedValue({ version: "1.2.3", download: downloadMock, install: vi.fn() })
+
+    renderHook(() => useAppUpdate())
+    await vi.waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("play_alert_sound", { sound: "chime", preview: false })
+    )
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1)
   })
 
   it("installs even when the relaunch mark can't be saved", async () => {

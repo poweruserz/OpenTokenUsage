@@ -118,7 +118,7 @@ This file holds the project facts that are easy to get wrong.
   its own sound): `alert_sound.rs` plays the chosen sound with PlaySound (the `Notification.Default`
   alias, bundled `src-tauri/sounds/*.wav` from Kenney, CC0, ids test-synced with `ALERT_SOUNDS`, or
   the user's file, converted to 16-bit PCM WAV in `src/lib/alert-sound.ts`) and skips it during Do
-  Not Disturb.
+  Not Disturb. Every toast needs that call (`play_alert_sound`): the update-ready one went unnoticed without it.
 - Status badge: optional `statusPageUrl` in plugin.json (Atlassian Statuspage `/api/v2/status.json`
   only — verify the URL returns that JSON before adding one).
 - Local HTTP API (127.0.0.1:6736) is loopback-only: no CORS, Host/Origin must be loopback. Don't add
