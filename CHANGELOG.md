@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.15
+
+Claude runs into Anthropic's rate limit less often, and when it does, the app stops asking until the limit passes.
+
+### Bug Fixes
+- Claude: Anthropic allows about 30 usage reads an hour per account, shared with Claude Code and anything else on your login. The reset-grants check, the read Anthropic limits hardest, now goes out once a day for an account without grants instead of every hour (still hourly while you have grants or a limit is at 100%) (#52)
+- Claude: a rate limit on any of its reads now pauses all of them until it passes, instead of the other reads running into the limit and keeping it going (#52)
+- Rate limits (HTTP 429) are now written to the log at the default log level, so one can be traced afterwards (#52)
+
 ## v0.7.14
 
 The bars show what you used while the panel was closed, Help opens a FAQ inside the panel, and the update notification makes a sound.
