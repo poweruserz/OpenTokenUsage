@@ -1,7 +1,6 @@
 //! Shared HTTP 429 gate. Every probe runs in a fresh JS runtime, so plugins cannot remember a
 //! rate limit between probes; the host does it for them, keyed by (plugin id, URL without query).
-//! A request can name a `gateScope` to get a gate of its own on the same URL (Claude's hourly
-//! reset-grants check must not hold its plain usage poll).
+//! A request can name a `gateScope` to get a gate of its own on the same URL.
 //! Gates are saved to `http-gates.json` and outlive a relaunch: Anthropic holds its 429 penalty for
 //! up to an hour on its side, so a restarted or updated app must not ask again inside it.
 

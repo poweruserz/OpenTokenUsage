@@ -1102,7 +1102,8 @@ fn inject_http<'js>(
                         resp_headers.get("retry-after").map(String::as_str),
                         Instant::now(),
                     );
-                    log::info!(
+                    // An error, so the default log level keeps it: users report a 429 as an error.
+                    log::error!(
                         "[plugin:{}] HTTP 429 from {}; holding requests for {}s",
                         pid,
                         redacted_url,

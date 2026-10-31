@@ -520,12 +520,11 @@
     }
   }
 
-  function fetchUsage(ctx, accessToken, url, gateScope) {
+  function fetchUsage(ctx, accessToken, url) {
     const oauthConfig = getOauthConfig(ctx)
     return ctx.util.request({
       method: "GET",
       url: url || oauthConfig.usageUrl,
-      gateScope: gateScope,
       headers: {
         Authorization: "Bearer " + accessToken.trim(),
         Accept: "application/json",
@@ -612,10 +611,13 @@
   }
 
   // Claude Code reads plain /api/oauth/usage and asks for reset grants only now and then; sending
-  // the grants request on every refresh drew 429s with a ~50 min Retry-After (upstream #1367). So
-  // it goes out at most hourly per account, and a failed check keeps the last answer until the next
-  // hour. Grants past their deadline still drop off, when the row is built.
+  // the grants request on every refresh drew 429s with a ~50 min Retry-After (upstream #1367), and
+  // Anthropic limits this variant hard. So an eligible account is asked at most hourly, as is one at
+  // a limit (when Claude Code looks for a reset to offer); any other account once a day. A failed
+  // check keeps the last answer until the next one. Grants past their deadline still drop off, when
+  // the row is built.
   const RESET_GRANTS_INTERVAL_MS = 60 * 60 * 1000
+  const NO_GRANTS_INTERVAL_MS = 24 * 60 * 60 * 1000
 
   function resetGrantsPath(ctx) {
     return ctx.app.pluginDataDir + "/reset-grants.json"
@@ -623,7 +625,7 @@
 
   // The answer is kept per account; without `.claude.json`'s account id, per token pair (a new pair
   // asks again). Unable to tell logins apart, it could show another login's grants: skipped then.
-  function resolveResetGrants(ctx, accessToken, fingerprint) {
+  function resolveResetGrants(ctx, accessToken, fingerprint, atLimit) {
     const path = resetGrantsPath(ctx)
     let account
     try {
@@ -644,13 +646,15 @@
       ctx.host.log.warn("reset grants cache read failed: " + String(e))
     }
     const nowMs = Date.now()
-    if (cached && nowMs - cached.checkedAt < RESET_GRANTS_INTERVAL_MS) return cached.block
+    const eligible = !!(cached && cached.block && cached.block.eligible === true)
+    const interval = eligible || atLimit ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS
+    if (cached && nowMs - cached.checkedAt < interval) return cached.block
 
     let block = cached ? cached.block : null
     try {
-      // Its own 429 gate: the host's gate ignores the query, so a 429 here would hold the plain
-      // usage poll too.
-      const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl, "reset-grants")
+      // Shares the plain poll's 429 gate (the host's gate ignores the query): Anthropic's penalty
+      // covers the whole account, so after a 429 here nothing more goes out until it passes.
+      const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl)
       const data = resp.status >= 200 && resp.status < 300 ? ctx.util.tryParseJson(resp.bodyText) : null
       if (data) block = data.cedar_ember ?? null
       else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")
@@ -1210,7 +1214,11 @@
         }
       }
       // A refresh inside the usage request leaves the new token in creds.
-      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint))
+      // Per-model weekly limits (Fable, Sonnet) come in `limits[]` with a `percent`, not `utilization`.
+      const atLimit =
+        Object.values(data).some((w) => w && typeof w.utilization === "number" && w.utilization >= 100) ||
+        (Array.isArray(data.limits) && data.limits.some((l) => l && (parseNumber(l.percent) ?? 0) >= 100))
+      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint, atLimit))
     }
 
     const usageResult = queryTokenUsage(ctx, homePath)
