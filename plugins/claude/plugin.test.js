@@ -2318,12 +2318,42 @@ describe("claude plugin", () => {
         expect(grantsCheckCount(ctx)).toBe(2)
       })
 
-      it("gives the grants check its own 429 gate, apart from the plain usage poll", async () => {
+      it("shares the plain usage poll's 429 gate: Anthropic's penalty covers the whole account", async () => {
         const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
         await probe(ctx)
         const calls = ctx.host.http.request.mock.calls.map(([opts]) => opts)
-        expect(calls.find((opts) => isGrantsCheck(opts.url)).gateScope).toBe("reset-grants")
+        expect(calls.find((opts) => isGrantsCheck(opts.url)).gateScope).toBeUndefined()
         expect(calls.find((opts) => isUsagePoll(opts.url)).gateScope).toBeUndefined()
+      })
+
+      it("asks an account without grants once a day, and hourly while a limit is reached", async () => {
+        let session = 10
+        const ctx = makeCtx()
+        ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "token" } }))
+        ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-1" } }))
+        ctx.host.http.request.mockImplementation((opts) =>
+          isGrantsCheck(opts.url)
+            ? okUsageResponse({ cedar_ember: { eligible: false, ineligible_reason: "no_grant", grants: [] } })
+            : okUsageResponse({ five_hour: { utilization: session, resets_at: null } })
+        )
+        expect((await probe(ctx)).resets?.value).toBe("0 available")
+        ageCache(ctx, 23 * 60 * 60 * 1000)
+        expect((await probe(ctx)).resets?.value).toBe("0 available")
+        expect(grantsCheckCount(ctx)).toBe(1)
+
+        session = 100
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(2)
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(2)
+
+        session = 10
+        ageCache(ctx, 23 * 60 * 60 * 1000)
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(2)
+        ageCache(ctx, 60 * 60 * 1000)
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(3)
       })
 
       it("keeps the bars and skips grants when the account file can't be read", async () => {
