@@ -2356,6 +2356,24 @@ describe("claude plugin", () => {
         expect(grantsCheckCount(ctx)).toBe(3)
       })
 
+      it("counts a per-model weekly limit at 100% as a limit reached", async () => {
+        const ctx = makeCtx()
+        ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "token" } }))
+        ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-1" } }))
+        ctx.host.http.request.mockImplementation((opts) =>
+          isGrantsCheck(opts.url)
+            ? okUsageResponse({ cedar_ember: { eligible: false, ineligible_reason: "no_grant", grants: [] } })
+            : okUsageResponse({
+              five_hour: { utilization: 10, resets_at: null },
+              limits: [{ kind: "weekly_scoped", percent: "100", scope: { model: { display_name: "Fable" } } }],
+            })
+        )
+        await probe(ctx)
+        ageCache(ctx, 60 * 60 * 1000)
+        await probe(ctx)
+        expect(grantsCheckCount(ctx)).toBe(2)
+      })
+
       it("keeps the bars and skips grants when the account file can't be read", async () => {
         const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
         const readText = ctx.host.fs.readText

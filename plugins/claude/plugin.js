@@ -1214,7 +1214,10 @@
         }
       }
       // A refresh inside the usage request leaves the new token in creds.
-      const atLimit = Object.values(data).some((w) => w && typeof w.utilization === "number" && w.utilization >= 100)
+      // Per-model weekly limits (Fable, Sonnet) come in `limits[]` with a `percent`, not `utilization`.
+      const atLimit =
+        Object.values(data).some((w) => w && typeof w.utilization === "number" && w.utilization >= 100) ||
+        (Array.isArray(data.limits) && data.limits.some((l) => l && (parseNumber(l.percent) ?? 0) >= 100))
       pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint, atLimit))
     }
 
