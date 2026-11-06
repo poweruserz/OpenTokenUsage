@@ -10,7 +10,7 @@ import { useSettingsPluginList } from "@/hooks/app/use-settings-plugin-list"
 import { useSettingsSystemActions } from "@/hooks/app/use-settings-system-actions"
 import { useSettingsTheme } from "@/hooks/app/use-settings-theme"
 import { useTrayIcon } from "@/hooks/app/use-tray-icon"
-import { REFRESH_COOLDOWN_MS, savePluginSettings } from "@/lib/settings"
+import { REFRESH_COOLDOWN_MS, getEnabledPluginIds, savePluginSettings } from "@/lib/settings"
 import { listen } from "@tauri-apps/api/event"
 import type { PluginsChange } from "@/lib/accounts"
 import { type PluginContextAction } from "@/components/side-nav"
@@ -21,6 +21,7 @@ import { t, useLocaleStore } from "@/lib/i18n"
 import { invoke } from "@tauri-apps/api/core"
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { useUsageAlerts } from "@/hooks/app/use-usage-alerts"
+import { useLoginRecovery } from "@/hooks/app/use-login-recovery"
 import { useProviderTrayIcons } from "@/hooks/app/use-provider-tray-icons"
 import { useTaskbarStrip } from "@/hooks/app/use-taskbar-strip"
 
@@ -153,6 +154,17 @@ function App() {
   )
 
   useUsageAlerts({ pluginStates, pluginsMeta, pluginSettings, enabled: usageAlerts, settings: alertSettings, displayMode })
+  const enabledIds = useMemo(() => (pluginSettings ? getEnabledPluginIds(pluginSettings) : []), [pluginSettings])
+  useLoginRecovery({
+    pluginStates,
+    pluginsMeta,
+    enabledIds,
+    notify: usageAlerts,
+    alertSettings,
+    setLoadingForPlugins,
+    setErrorForPlugins,
+    startBatch,
+  })
 
   const { scheduleTrayIconUpdate, traySettingsPreview } = useTrayIcon({
     pluginsMeta,
