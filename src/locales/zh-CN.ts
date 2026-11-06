@@ -211,6 +211,13 @@ export const zhCN: Messages = {
   "card.valueLeft": "剩余 {value}",
   "card.percentCap": "上限 {value}%",
   "card.amountLimit": "上限 {value}",
+  "card.sessions.title": "运行中的会话",
+  "card.sessions.busy": "工作中",
+  "card.sessions.shell": "正在运行命令",
+  "card.sessions.idle": "空闲",
+  "card.sessions.waiting": "等待你操作",
+  "card.sessions.context": "上下文 {percent}%",
+  "card.sessions.compactSoon": "即将压缩",
 
   "pace.ahead": "余量充足",
   "pace.onTrack": "进度正常",

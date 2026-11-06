@@ -211,6 +211,13 @@ export const en = {
   "card.valueLeft": "{value} left",
   "card.percentCap": "{value}% cap",
   "card.amountLimit": "{value} limit",
+  "card.sessions.title": "Live sessions",
+  "card.sessions.busy": "Working",
+  "card.sessions.shell": "Running a command",
+  "card.sessions.idle": "Idle",
+  "card.sessions.waiting": "Waiting for you",
+  "card.sessions.context": "{percent}% context",
+  "card.sessions.compactSoon": "Compacts soon",
 
   "pace.ahead": "Plenty of room",
   "pace.onTrack": "Right on target",

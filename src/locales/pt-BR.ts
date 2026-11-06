@@ -211,6 +211,13 @@ export const ptBR: Messages = {
   "card.valueLeft": "{value} restante",
   "card.percentCap": "Limite de {value}%",
   "card.amountLimit": "Limite de {value}",
+  "card.sessions.title": "Sessões ativas",
+  "card.sessions.busy": "Trabalhando",
+  "card.sessions.shell": "Executando um comando",
+  "card.sessions.idle": "Ociosa",
+  "card.sessions.waiting": "Esperando você",
+  "card.sessions.context": "{percent}% do contexto",
+  "card.sessions.compactSoon": "Compacta em breve",
 
   "pace.ahead": "Folga de sobra",
   "pace.onTrack": "Dentro do previsto",

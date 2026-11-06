@@ -211,6 +211,13 @@ export const esES: Messages = {
   "card.valueLeft": "Quedan {value}",
   "card.percentCap": "Tope del {value}%",
   "card.amountLimit": "Límite de {value}",
+  "card.sessions.title": "Sesiones activas",
+  "card.sessions.busy": "Trabajando",
+  "card.sessions.shell": "Ejecutando un comando",
+  "card.sessions.idle": "Inactiva",
+  "card.sessions.waiting": "Te está esperando",
+  "card.sessions.context": "Contexto al {percent}%",
+  "card.sessions.compactSoon": "Se compactará pronto",
 
   "pace.ahead": "Margen de sobra",
   "pace.onTrack": "Al ritmo previsto",

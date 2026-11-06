@@ -211,6 +211,13 @@ export const ko: Messages = {
   "card.valueLeft": "{value} 남음",
   "card.percentCap": "{value}% 한도",
   "card.amountLimit": "{value} 한도",
+  "card.sessions.title": "실행 중인 세션",
+  "card.sessions.busy": "작업 중",
+  "card.sessions.shell": "명령 실행 중",
+  "card.sessions.idle": "유휴",
+  "card.sessions.waiting": "입력 대기 중",
+  "card.sessions.context": "컨텍스트 {percent}%",
+  "card.sessions.compactSoon": "곧 압축됨",
 
   "pace.ahead": "여유 있음",
   "pace.onTrack": "적정 속도",
