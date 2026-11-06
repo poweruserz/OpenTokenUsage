@@ -22,6 +22,13 @@ This file holds the project facts that are easy to get wrong.
   `http-gates.json` so it outlives a restart), probe timeout (30 s), one probe per plugin at a time,
   panics → error result. Don't re-implement in JS. Anthropic's usage endpoint allows ~30 reads an hour
   per login, shared with Claude Code: Smart refresh keeps Claude cards at ≥5 min (`smartFloorMinutes`).
+  A 429 waits Retry-After but at least 5/10/20/30 min per 429 in a row (reset by a 2xx).
+- Claude Code status-line bridge (`claude_statusline.rs`, Settings → Claude Code status line): writes a fixed
+  `curl.exe` command into Claude's `settings.json` (never over the user's own `statusLine`; the other top-level
+  entries keep their order and text) that posts Claude Code's statusLine JSON to `POST /v1/claude/statusline`.
+  Only `rate_limits.five_hour/seven_day` are kept (`plugins_data/claude/statusline.json`). The plugin lays a
+  snapshot under 5 min old over `last-usage.json` and then reads the API only every 30 min; a 429 shows the
+  snapshot instead of the error. The command lives in Rust: the webview can only switch it on or off.
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);
