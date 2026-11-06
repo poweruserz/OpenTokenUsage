@@ -134,6 +134,28 @@ describe("ProviderCard", () => {
     }
   })
 
+  it("shows costs in the chosen currency, dollar text included", () => {
+    const saved = useAppPreferencesStore.getState().currency
+    useAppPreferencesStore.setState({ currency: { code: "EUR", rate: 0.5 } })
+    try {
+      render(
+        <ProviderCard
+          name="Costs"
+          displayMode="used"
+          lines={[
+            { type: "text", label: "Today", value: "$3.00 · 1.2M tokens" },
+            { type: "progress", label: "Spend", used: 12, limit: 100, format: { kind: "dollars" } },
+          ]}
+        />
+      )
+      expect(screen.getByText("€1.50 · 1.2M tokens")).toBeInTheDocument()
+      expect(screen.getByText("€6.00")).toBeInTheDocument()
+      expect(screen.getByText("€50.00 limit")).toBeInTheDocument()
+    } finally {
+      useAppPreferencesStore.setState({ currency: saved })
+    }
+  })
+
   it("renders quick links and opens URL", async () => {
     render(
       <ProviderCard

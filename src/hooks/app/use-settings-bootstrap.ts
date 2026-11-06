@@ -27,6 +27,7 @@ import {
   loadTrayHiddenPlugins,
   loadUsageAlerts,
   loadAlertSettings,
+  loadCurrency,
   loadPanelPinned,
   loadRememberPanelPosition,
   loadTrayLogoColors,
@@ -58,6 +59,7 @@ import {
   type TrayProvider,
 } from "@/lib/settings"
 import { useLocaleStore } from "@/lib/i18n"
+import type { CurrencySetting } from "@/lib/currency"
 
 type UseSettingsBootstrapArgs = {
   setPluginSettings: (value: PluginSettings | null) => void
@@ -76,6 +78,7 @@ type UseSettingsBootstrapArgs = {
   setTrayHiddenPlugins: (value: string[]) => void
   setUsageAlerts: (value: boolean) => void
   setAlertSettings: (value: AlertSettings) => void
+  setCurrency: (value: CurrencySetting) => void
   setPanelPinned: (value: boolean) => void
   setRememberPanelPosition: (value: boolean) => void
   setTrayLogoColors: (value: boolean) => void
@@ -103,6 +106,7 @@ export function useSettingsBootstrap({
   setTrayHiddenPlugins,
   setUsageAlerts,
   setAlertSettings,
+  setCurrency,
   setPanelPinned,
   setRememberPanelPosition,
   setTrayLogoColors,
@@ -145,6 +149,12 @@ export function useSettingsBootstrap({
         }
       } catch (error) {
         console.error("Failed to load usage alerts setting:", error)
+      }
+      try {
+        const currency = await loadCurrency()
+        if (isMounted) setCurrency(currency)
+      } catch (error) {
+        console.error("Failed to load the currency setting:", error)
       }
       try {
         const [pinned, rememberPosition] = await Promise.all([loadPanelPinned(), loadRememberPanelPosition()])
@@ -317,6 +327,7 @@ export function useSettingsBootstrap({
     setTrayHiddenPlugins,
     setUsageAlerts,
     setAlertSettings,
+    setCurrency,
     setPanelPinned,
     setRememberPanelPosition,
     setTrayLogoColors,

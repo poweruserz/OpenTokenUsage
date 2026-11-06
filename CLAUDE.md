@@ -130,6 +130,9 @@ This file holds the project facts that are easy to get wrong.
   3.5 s, then the fill grows over it. Seen values are in memory, per plugin + line and in used terms (switching
   used/left isn't spending). "Open" is asked from the OS (`isVisible`): the hidden panel's webview reports itself
   visible before its first show.
+- Currency (`src/lib/currency.ts`, setting `currency`): providers report US dollars; the card shows `dollars`
+  lines via `formatMoney` and rewrites `$<number>` in plugin text via `convertUsdText`, at a rate the user
+  types (no exchange-rate service: CSP and privacy). USD renders exactly as before. Plugins and the local API stay in USD.
 - Ring logos are sized by `measureLogoExtent` (how far the logo's pixels reach) so square logos stay
   inside the ring and round ones grow.
 - Themes: `dark` (default, pure black: classes `.dark.oled`) | `light`. `useSettingsTheme` also sets the
