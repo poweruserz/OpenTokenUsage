@@ -94,6 +94,20 @@ describe("collectUsageAlerts", () => {
     })
     // 45% more at 22% a work day: Friday about 13:05.
     expect(alerts.map((alert) => alert.body)).toEqual([expect.stringContaining("2d 1h")])
+
+    // Monday 00:02, 60% used over the weekend: two minutes of work time is no rate (the card shows
+    // no pace yet either), so no alert that would use up the window's only pace alert.
+    const early = collectUsageAlerts({
+      pluginId: "claude",
+      providerName: "Claude",
+      lines: [{ ...weekly, used: 60 }],
+      sent: new Set(),
+      nowMs: new Date(2026, 10, 9, 0, 2).getTime(),
+      levels: [80, 95],
+      displayMode: "used",
+      workdays: true,
+    })
+    expect(early).toEqual([])
   })
 
   it("no pace alert when the window resets before it would run out", () => {

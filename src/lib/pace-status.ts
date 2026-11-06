@@ -72,6 +72,9 @@ export function timeToLimitMs(
   const startMs = resetsAtMs - periodDurationMs
   const spentMs = countsWorkdays(periodDurationMs, workdays) ? workdayMs(startMs, nowMs) : nowMs - startMs
   if (!(spentMs > 0)) return null
+  // Too early in a work-day week to tell (the card's 5% rule): a weekend's use over Monday's first
+  // minutes isn't a rate. Calendar windows keep alerting early, as before.
+  if (countsWorkdays(periodDurationMs, workdays) && spentMs < 0.05 * workdayMs(startMs, resetsAtMs)) return null
   const neededMs = ((limit - used) / used) * spentMs
   return countsWorkdays(periodDurationMs, workdays) ? addWorkdayMs(nowMs, neededMs) - nowMs : neededMs
 }
