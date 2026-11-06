@@ -241,7 +241,7 @@ fn read_env_from_registry(name: &str) -> Option<String> {
     })
 }
 
-fn resolve_env_value(name: &str) -> Option<String> {
+pub(crate) fn resolve_env_value(name: &str) -> Option<String> {
     // Prefer the current process env (fast + supports launchctl/terminal-launch).
     if let Some(value) = read_env_from_process(name) {
         return Some(value);
@@ -1109,6 +1109,8 @@ fn inject_http<'js>(
                         redacted_url,
                         wait.as_secs()
                     );
+                } else if (200..300).contains(&status) {
+                    super::http_gate::record_success(&pid, &req.url, gate_scope);
                 }
                 let body = read_body_capped(response)
                     .map_err(|e| Exception::throw_message(&ctx_inner, &e))?;
@@ -5269,7 +5271,7 @@ wait
     fn http_request_returns_synthetic_429_while_gated_without_network() {
         // Port 9 on loopback is closed: a real request would throw instead of returning 429.
         let url = "http://127.0.0.1:9/gated-usage";
-        super::super::http_gate::record_429("gate-js", url, None, Some("90"), Instant::now());
+        super::super::http_gate::record_429("gate-js", url, None, Some("900"), Instant::now());
         let rt = Runtime::new().expect("runtime");
         let ctx = Context::full(&rt).expect("context");
         ctx.with(|ctx| {
@@ -5289,7 +5291,7 @@ wait
                 .expect("retry-after header")
                 .parse()
                 .expect("retry-after seconds");
-            assert!((89..=90).contains(&secs), "retry-after was {}", secs);
+            assert!((899..=900).contains(&secs), "retry-after was {}", secs);
         });
     }
 

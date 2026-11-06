@@ -21,6 +21,12 @@ Returns rate limit windows and optional extra credits. Every refresh reads this 
 
 Reset grants (`cedar_ember`) come from Claude Code's own request, `GET /api/oauth/usage?cedar_ember=1&skip_spend=1`, per account (per token pair when `.claude.json` has no account id) at most once an hour while the last answer was `eligible` or a limit is at 100%, otherwise once a day; asking for them on every refresh drew 429s with a Retry-After of about 50 minutes, and Anthropic limits this variant hard. The last answer is kept in `reset-grants.json` in the plugin's data folder and shown in between. A failed check (a 429 or an outage) keeps it, leaves the bars alone, and is retried when the next one is due. The check shares the plain usage poll's 429 gate: Anthropic budgets the usage endpoint per account (about 30 reads an hour, shared with Claude Code and any other monitor on the login) and its penalty covers the whole account, so after a 429 on either nothing goes out until it passes. When `.claude.json` (which tells accounts apart) exists but can't be read, the check is skipped.
 
+#### Claude Code's status line
+
+With **Settings → Claude Code status line** on, Claude Code posts its status-line JSON to the local API (see `docs/local-http-api.md`). Its `rate_limits` carry the 5-hour and weekly windows from Claude Code's own API answers, so they cost no read of this endpoint. While that snapshot is under 5 minutes old, a probe lays its windows over the last usage answer (`last-usage.json`, kept per account) and reads the endpoint only when that answer is 30 minutes old, for the rows the status line lacks (model limits, extra usage). A 429 then shows the status line instead of the rate-limit error. A window the status line leaves out has reset. The bridge is written to the `settings.json` of `CLAUDE_CONFIG_DIR` (or `~/.claude`), never over a status line of the user's own, and only the usual login gets it: extra accounts have their own folders and plugin ids.
+
+After a 429 the host waits what Retry-After asks, but at least 5, 10, 20, then 30 minutes for each 429 in a row, until a read succeeds (`http_gate.rs`).
+
 #### Headers
 
 | Header | Required | Value |

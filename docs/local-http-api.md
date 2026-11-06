@@ -1,6 +1,6 @@
 # Local HTTP API
 
-OpenUsage exposes a read-only HTTP API on the loopback interface so other local apps can consume the same usage data shown in the menu bar.
+OpenUsage exposes an HTTP API on the loopback interface so other local apps can consume the same usage data shown in the menu bar. Its only write is the Claude Code status-line bridge below.
 
 **Base URL:** `http://127.0.0.1:6736`
 
@@ -22,9 +22,16 @@ Returns a single cached usage snapshot for the given provider.
 - **204 No Content** — Provider is known but has no cached snapshot yet.
 - **404 Not Found** — Provider ID is unknown.
 
+### `POST /v1/claude/statusline`
+
+Claude Code's status-line command posts its stdin JSON here when **Settings → Claude Code status line** is on (`claude_statusline.rs` writes `curl.exe -s -m 2 --data-binary @- http://127.0.0.1:6736/v1/claude/statusline` into Claude's `settings.json`). Only `rate_limits.five_hour` and `rate_limits.seven_day` are kept, in `plugins_data/claude/statusline.json`; the rest of the object (session, paths, model) is dropped. The body is read up to 64 KiB.
+
+- **204 No Content** — saved (an unchanged answer is rewritten at most once a minute). The empty answer leaves Claude Code's status line blank.
+- **400 Bad Request** — the body has no usage windows (an API-key session, or before Claude Code's first answer).
+
 ### Unsupported methods
 
-Any method other than `GET` on the above routes returns **405 Method Not Allowed**.
+Any other method on the above routes returns **405 Method Not Allowed**.
 
 Unknown routes return **404 Not Found**.
 

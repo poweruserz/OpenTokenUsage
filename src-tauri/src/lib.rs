@@ -1,6 +1,7 @@
 mod accounts;
 mod alert_sound;
 mod autostart;
+mod claude_statusline;
 mod config;
 mod data_dirs;
 mod local_http_api;
@@ -607,6 +608,8 @@ pub fn run() {
             accounts::add_account,
             accounts::remove_account,
             accounts::start_account_login,
+            claude_statusline::claude_statusline_state,
+            claude_statusline::set_claude_statusline,
             alert_sound::play_alert_sound,
             alert_sound::save_custom_alert_sound
         ])

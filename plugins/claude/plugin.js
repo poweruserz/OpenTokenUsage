@@ -669,6 +669,92 @@
     return block
   }
 
+  // Claude Code's status line, posted by the app's bridge (src-tauri/src/claude_statusline.rs),
+  // carries the 5-hour and weekly windows from Claude Code's own API answers. While it is fresh
+  // the usage endpoint (about 30 reads an hour per account, shared with Claude Code) is read at
+  // most every 30 minutes, for the rows the status line lacks (model limits, extra usage).
+  const STATUS_LINE_FRESH_MS = 5 * 60 * 1000
+  const LIVE_API_INTERVAL_MS = 30 * 60 * 1000
+
+  function liveWindow(w) {
+    return w && typeof w.usedPercent === "number" && typeof w.resetsAtMs === "number" ? w : null
+  }
+
+  function loadLiveLimits(ctx, nowMs) {
+    const path = ctx.app.pluginDataDir + "/statusline.json"
+    try {
+      if (!ctx.host.fs.exists(path)) return null
+      const saved = ctx.util.tryParseJson(ctx.host.fs.readText(path))
+      if (!saved || typeof saved.capturedAt !== "number") return null
+      const age = nowMs - saved.capturedAt
+      if (age < -60 * 1000 || age >= STATUS_LINE_FRESH_MS) return null
+      const fiveHour = liveWindow(saved.fiveHour)
+      const sevenDay = liveWindow(saved.sevenDay)
+      return fiveHour || sevenDay ? { fiveHour: fiveHour, sevenDay: sevenDay } : null
+    } catch (e) {
+      ctx.host.log.warn("status line snapshot read failed: " + String(e))
+      return null
+    }
+  }
+
+  // The last usage answer is kept per account (per token pair without `.claude.json`'s id), so a
+  // status line is never laid over another login's model limits.
+  function usageAccount(ctx, creds) {
+    try {
+      const key = accountKey(ctx)
+      if (key) return key
+    } catch (e) {
+      ctx.host.log.warn("usage cache: account lookup failed: " + String(e))
+    }
+    const fingerprint = credentialFingerprint(ctx, creds)
+    return fingerprint ? "login:" + fingerprint : null
+  }
+
+  function loadLastUsage(ctx, creds) {
+    const account = usageAccount(ctx, creds)
+    const path = ctx.app.pluginDataDir + "/last-usage.json"
+    if (!account || !ctx.host.fs.exists(path)) return null
+    try {
+      const saved = ctx.util.tryParseJson(ctx.host.fs.readText(path))
+      const ok = saved && saved.account === account && typeof saved.at === "number"
+      return ok && saved.data && typeof saved.data === "object" ? saved : null
+    } catch (e) {
+      ctx.host.log.warn("usage cache read failed: " + String(e))
+      return null
+    }
+  }
+
+  function saveLastUsage(ctx, creds, nowMs, data) {
+    const account = usageAccount(ctx, creds)
+    if (!account) return
+    try {
+      const path = ctx.app.pluginDataDir + "/last-usage.json"
+      ctx.host.fs.writeText(path, JSON.stringify({ account: account, at: nowMs, data: data }))
+    } catch (e) {
+      ctx.host.log.warn("usage cache write failed: " + String(e))
+    }
+  }
+
+  // The last usage answer with the status line's windows laid over it. A window the status line
+  // leaves out has reset (Claude Code drops a window once its reset time passes).
+  function withLiveLimits(base, live, nowMs) {
+    const data = Object.assign({}, base)
+    const windows = [["five_hour", live.fiveHour], ["seven_day", live.sevenDay]]
+    for (let i = 0; i < windows.length; i++) {
+      const key = windows[i][0]
+      const w = windows[i][1]
+      if (w) {
+        data[key] = Object.assign({}, base[key], {
+          utilization: Math.round(w.usedPercent),
+          resets_at: new Date(w.resetsAtMs).toISOString(),
+        })
+      } else if (base[key] && Date.parse(base[key].resets_at) <= nowMs) {
+        data[key] = Object.assign({}, base[key], { utilization: 0, resets_at: null })
+      }
+    }
+    return data
+  }
+
   function parseRetryAfterSeconds(headers) {
     if (!headers) return null
     const raw = headers["retry-after"] ?? headers["Retry-After"]
@@ -1082,66 +1168,77 @@
     let lines = []
     let usageFetched = false
     if (canFetchLiveUsage) {
-      // Proactively refresh if token is expired or about to expire
-      if (needsRefresh(ctx, creds.oauth, nowMs)) {
-        ctx.host.log.info("token needs refresh (expired or expiring soon)")
-        const refreshed = refreshToken(ctx, creds)
-        if (refreshed) {
-          accessToken = refreshed
+      const live = loadLiveLimits(ctx, nowMs)
+      const last = live ? loadLastUsage(ctx, creds) : null
+      if (live && last && nowMs - last.at < LIVE_API_INTERVAL_MS) {
+        ctx.host.log.info("usage from Claude Code's status line")
+        data = withLiveLimits(last.data, live, nowMs)
+      } else {
+        // Proactively refresh if token is expired or about to expire
+        if (needsRefresh(ctx, creds.oauth, nowMs)) {
+          ctx.host.log.info("token needs refresh (expired or expiring soon)")
+          const refreshed = refreshToken(ctx, creds)
+          if (refreshed) {
+            accessToken = refreshed
+          } else {
+            ctx.host.log.warn("proactive refresh failed, trying with existing token")
+          }
+        }
+
+        let resp
+        let didRefresh = false
+        try {
+          resp = ctx.util.retryOnceOnAuth({
+            request: (token) => {
+              try {
+                return fetchUsage(ctx, token || accessToken)
+              } catch (e) {
+                ctx.host.log.error("usage request exception: " + String(e))
+                if (didRefresh) {
+                  throw "Usage request failed after refresh. Try again."
+                }
+                throw "Usage request failed. Check your connection."
+              }
+            },
+            refresh: () => {
+              ctx.host.log.info("usage returned 401, attempting refresh")
+              didRefresh = true
+              return refreshToken(ctx, creds)
+            },
+          })
+        } catch (e) {
+          if (typeof e === "string") throw e
+          ctx.host.log.error("usage request failed: " + String(e))
+          throw "Usage request failed. Check your connection."
+        }
+
+        if (ctx.util.isAuthStatus(resp.status)) {
+          ctx.host.log.error("usage returned auth error after all retries: status=" + resp.status)
+          throw "Token expired. Run `claude` to log in again."
+        }
+
+        if (resp.status === 429) {
+          // Throw so the app keeps showing the last good bars under this message. The host holds
+          // further requests to this URL until Retry-After passes (synthetic 429, no network).
+          const message = rateLimitedMessage(parseRetryAfterSeconds(resp.headers))
+          ctx.host.log.warn("usage rate limited (429): " + message)
+          if (!live || !last) throw message
+          ctx.host.log.info("showing Claude Code's status line while rate limited")
+          data = withLiveLimits(last.data, live, nowMs)
         } else {
-          ctx.host.log.warn("proactive refresh failed, trying with existing token")
+          if (resp.status < 200 || resp.status >= 300) {
+            ctx.host.log.error("usage returned error: status=" + resp.status)
+            throw "Usage request failed (HTTP " + String(resp.status) + "). Try again later."
+          }
+          ctx.host.log.info("usage fetch succeeded")
+          data = ctx.util.tryParseJson(resp.bodyText)
+          if (data === null) {
+            throw "Usage response invalid. Try again later."
+          }
+          usageFetched = true
+          saveLastUsage(ctx, creds, nowMs, data)
         }
       }
-
-      let resp
-      let didRefresh = false
-      try {
-        resp = ctx.util.retryOnceOnAuth({
-          request: (token) => {
-            try {
-              return fetchUsage(ctx, token || accessToken)
-            } catch (e) {
-              ctx.host.log.error("usage request exception: " + String(e))
-              if (didRefresh) {
-                throw "Usage request failed after refresh. Try again."
-              }
-              throw "Usage request failed. Check your connection."
-            }
-          },
-          refresh: () => {
-            ctx.host.log.info("usage returned 401, attempting refresh")
-            didRefresh = true
-            return refreshToken(ctx, creds)
-          },
-        })
-      } catch (e) {
-        if (typeof e === "string") throw e
-        ctx.host.log.error("usage request failed: " + String(e))
-        throw "Usage request failed. Check your connection."
-      }
-
-      if (ctx.util.isAuthStatus(resp.status)) {
-        ctx.host.log.error("usage returned auth error after all retries: status=" + resp.status)
-        throw "Token expired. Run `claude` to log in again."
-      }
-
-      if (resp.status === 429) {
-        // Throw so the app keeps showing the last good bars under this message. The host holds
-        // further requests to this URL until Retry-After passes (synthetic 429, no network).
-        const message = rateLimitedMessage(parseRetryAfterSeconds(resp.headers))
-        ctx.host.log.warn("usage rate limited (429): " + message)
-        throw message
-      }
-      if (resp.status < 200 || resp.status >= 300) {
-        ctx.host.log.error("usage returned error: status=" + resp.status)
-        throw "Usage request failed (HTTP " + String(resp.status) + "). Try again later."
-      }
-      ctx.host.log.info("usage fetch succeeded")
-      data = ctx.util.tryParseJson(resp.bodyText)
-      if (data === null) {
-        throw "Usage response invalid. Try again later."
-      }
-      usageFetched = true
     } else {
       ctx.host.log.info("skipping live usage fetch for inference-only token")
     }

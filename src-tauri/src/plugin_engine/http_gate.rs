@@ -11,6 +11,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_WAIT: Duration = Duration::from_secs(5 * 60);
 const MAX_WAIT: Duration = Duration::from_secs(60 * 60);
+const MAX_RAMP: Duration = Duration::from_secs(30 * 60);
 const MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
@@ -103,7 +104,23 @@ pub(crate) fn remaining(
     None
 }
 
-/// Close the gate after an HTTP 429. Returns how long it stays closed.
+/// 429s in a row per gate, until a request through it succeeds. In memory only: a relaunch starts
+/// the count over, and the saved gate still holds the wait it set.
+fn strikes() -> &'static Mutex<HashMap<(String, String), u32>> {
+    static STRIKES: OnceLock<Mutex<HashMap<(String, String), u32>>> = OnceLock::new();
+    STRIKES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// A request through this gate got a good answer: the next 429 waits the base time again.
+pub(crate) fn record_success(plugin_id: &str, url: &str, scope: Option<&str>) {
+    if let Ok(mut strikes) = strikes().lock() {
+        strikes.remove(&gate_key(plugin_id, url, scope));
+    }
+}
+
+/// Close the gate after an HTTP 429. Returns how long it stays closed: what Retry-After asks, but
+/// at least 5, 10, 20, then 30 minutes for each 429 in a row, so a provider that keeps refusing
+/// isn't asked again every 5 minutes.
 pub(crate) fn record_429(
     plugin_id: &str,
     url: &str,
@@ -111,12 +128,21 @@ pub(crate) fn record_429(
     retry_after: Option<&str>,
     now: Instant,
 ) -> Duration {
+    let key = gate_key(plugin_id, url, scope);
+    let strike = {
+        let mut strikes = strikes().lock().unwrap_or_else(|e| e.into_inner());
+        let count = strikes.entry(key.clone()).or_insert(0);
+        *count = count.saturating_add(1);
+        *count
+    };
+    let ramp = (DEFAULT_WAIT * 2u32.saturating_pow(strike.min(8) - 1)).min(MAX_RAMP);
     let wait = retry_after
         .and_then(|value| parse_retry_after(value, SystemTime::now()))
         .unwrap_or(DEFAULT_WAIT)
+        .max(ramp)
         .min(MAX_WAIT);
     let mut gates = gates().lock().unwrap_or_else(|e| e.into_inner());
-    gates.insert(gate_key(plugin_id, url, scope), now + wait);
+    gates.insert(key, now + wait);
     // Under the lock, so two 429s at once can't save in the wrong order. Only after a 429: rare.
     if let Some(path) = STORE.get() {
         save(path, &gates, SystemTime::now(), now);
@@ -171,8 +197,8 @@ mod tests {
         let url = "https://api.example.com/usage?x=1";
         assert_eq!(remaining("gate-test", url, None, now), None);
 
-        let wait = record_429("gate-test", url, None, Some("120"), now);
-        assert_eq!(wait, Duration::from_secs(120));
+        let wait = record_429("gate-test", url, None, Some("900"), now);
+        assert_eq!(wait, Duration::from_secs(900));
 
         let later = now + Duration::from_secs(20);
         assert_eq!(
@@ -182,7 +208,7 @@ mod tests {
                 None,
                 later
             ),
-            Some(Duration::from_secs(100))
+            Some(Duration::from_secs(880))
         );
         assert_eq!(remaining("other-plugin", url, None, later), None);
         assert_eq!(
@@ -191,6 +217,34 @@ mod tests {
         );
 
         assert_eq!(remaining("gate-test", url, None, now + wait), None);
+    }
+
+    #[test]
+    fn waits_longer_for_each_429_in_a_row_until_a_success() {
+        let now = Instant::now();
+        let url = "https://api.example.com/ramp";
+        let minutes = |m: u64| Duration::from_secs(m * 60);
+        let waits: Vec<Duration> = (0..5)
+            .map(|_| record_429("gate-ramp", url, None, Some("60"), now))
+            .collect();
+        assert_eq!(
+            waits,
+            [
+                minutes(5),
+                minutes(10),
+                minutes(20),
+                minutes(30),
+                minutes(30)
+            ]
+        );
+        assert_eq!(
+            record_429("gate-ramp", url, None, Some("3600"), now),
+            minutes(60),
+            "a longer Retry-After still wins"
+        );
+
+        record_success("gate-ramp", url, None);
+        assert_eq!(record_429("gate-ramp", url, None, None, now), minutes(5));
     }
 
     #[test]

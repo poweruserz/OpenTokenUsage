@@ -41,6 +41,7 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
     autoRefresh: t("settings.autoRefresh.title"),
     smart: t("settings.autoRefresh.smart"),
     accounts: t("settings.accounts.title"),
+    claudeCode: t("settings.claudeCode.title"),
     tray: t("settings.tray.title"),
     strip: t("settings.strip.title"),
     alerts: t("settings.alerts.title"),
