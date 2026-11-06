@@ -140,6 +140,8 @@ export const en = {
   "settings.tray.metric": "Metric",
   "settings.tray.color": "Color",
   "settings.tray.colorTitle": "Tray percent text color",
+  "settings.tray.paceColor": "Color by pace",
+  "settings.tray.paceColorHint": "Green: plenty of room. Yellow: right on target. Red: will run out before the reset.",
   "settings.tray.auto": "Auto",
   "settings.tray.tightest": "Most used",
   "settings.theme.title": "Theme",

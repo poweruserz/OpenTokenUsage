@@ -7,7 +7,12 @@ import type { PluginMeta } from "@/lib/plugin-types"
 import type { DisplayMode, MenubarIconStyle, PluginSettings } from "@/lib/settings"
 import { getEnabledPluginIds, isPerProviderTrayStyle } from "@/lib/settings"
 import { getTrayIconSizePx, renderTrayBarsIcon } from "@/lib/tray-bars-icon"
-import { findTightestLimit, getTrayPrimaryBars, type TrayPrimaryBar } from "@/lib/tray-primary-progress"
+import {
+  findTightestLimit,
+  getTrayPrimaryBars,
+  trayPercentTextColor,
+  type TrayPrimaryBar,
+} from "@/lib/tray-primary-progress"
 import { formatTrayPercentText, formatTrayTooltip } from "@/lib/tray-tooltip"
 import type { PluginState } from "@/hooks/app/types"
 import { isAppTrayIconHidden } from "@/hooks/app/use-provider-tray-icons"
@@ -355,7 +360,7 @@ export function useTrayIcon({
         style: "percent",
         percentText: percentNumber,
         iconColor: trayIconColor,
-        textColor: trayPercentColorRef.current,
+        textColor: trayPercentTextColor(trayPercentColorRef.current, providerBars[0]?.pace),
       })
         .then(async (img) => {
           await tray.setIcon(img)

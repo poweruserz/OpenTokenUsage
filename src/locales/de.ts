@@ -140,6 +140,8 @@ export const de: Messages = {
   "settings.tray.metric": "Metrik",
   "settings.tray.color": "Farbe",
   "settings.tray.colorTitle": "Textfarbe der Prozentanzeige",
+  "settings.tray.paceColor": "Nach Tempo färben",
+  "settings.tray.paceColorHint": "Grün: viel Spielraum. Gelb: genau im Plan. Rot: reicht nicht bis zum Zurücksetzen.",
   "settings.tray.auto": "Automatisch",
   "settings.tray.tightest": "Am stärksten genutzt",
   "settings.theme.title": "Design",

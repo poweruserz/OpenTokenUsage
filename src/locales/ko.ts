@@ -140,6 +140,8 @@ export const ko: Messages = {
   "settings.tray.metric": "지표",
   "settings.tray.color": "색",
   "settings.tray.colorTitle": "트레이 백분율 텍스트 색",
+  "settings.tray.paceColor": "속도에 따라 색상 표시",
+  "settings.tray.paceColorHint": "녹색: 여유 있음. 노란색: 적정 속도. 빨간색: 초기화 전에 소진 예상.",
   "settings.tray.auto": "자동",
   "settings.tray.tightest": "가장 많이 사용",
   "settings.theme.title": "테마",

@@ -140,6 +140,8 @@ export const ja: Messages = {
   "settings.tray.metric": "指標",
   "settings.tray.color": "色",
   "settings.tray.colorTitle": "トレイのパーセント表示の文字色",
+  "settings.tray.paceColor": "ペースで色分け",
+  "settings.tray.paceColorHint": "緑: 余裕あり。黄: ペースどおり。赤: リセット前に使い切る見込み。",
   "settings.tray.auto": "自動",
   "settings.tray.tightest": "最も使用中",
   "settings.theme.title": "テーマ",
