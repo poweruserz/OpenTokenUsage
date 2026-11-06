@@ -152,6 +152,28 @@ describe("SettingsPage", () => {
     vi.mocked(console.error).mockRestore()
   })
 
+  it("picks a currency and takes the rate the user types", async () => {
+    const saved = useAppPreferencesStore.getState().currency
+    const currency = () => useAppPreferencesStore.getState().currency
+    try {
+      render(<SettingsPage {...defaultProps} />)
+      expect(screen.queryByText("1 USD in TRY")).not.toBeInTheDocument()
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Currency" }), "TRY")
+      expect(currency()).toEqual({ code: "TRY", rate: 1 })
+      const rate = screen.getByLabelText("1 USD in TRY")
+      await userEvent.clear(rate)
+      await userEvent.type(rate, "40.5")
+      expect(currency()).toEqual({ code: "TRY", rate: 40.5 })
+      // A cleared field isn't applied, and shows the rate in use again once left.
+      await userEvent.clear(rate)
+      await userEvent.tab()
+      expect(currency()).toEqual({ code: "TRY", rate: 40.5 })
+      expect(rate).toHaveValue(40.5)
+    } finally {
+      useAppPreferencesStore.setState({ currency: saved })
+    }
+  })
+
   it("lists enabled providers first, keeping their order", () => {
     render(
       <SettingsPage

@@ -138,6 +138,9 @@ This file holds the project facts that are easy to get wrong.
   accounts, logins, panel position, sent alerts, update/star state); `settings_backup.rs` writes it to Downloads and
   reveals it (no dialog plugin, no webview reveal permission). Import writes those keys raw, then `relaunch()`: every
   loader checks its value at startup. A new preference key belongs in `BACKUP_KEYS` too.
+- Currency (`src/lib/currency.ts`, setting `currency`): providers report US dollars; the card shows `dollars`
+  lines via `formatMoney` and rewrites `$<number>` in plugin text via `convertUsdText`, at a rate the user
+  types (no exchange-rate service: CSP and privacy). USD renders exactly as before. Plugins and the local API stay in USD.
 - Ring logos are sized by `measureLogoExtent` (how far the logo's pixels reach) so square logos stay
   inside the ring and round ones grow.
 - Themes: `dark` (default, pure black: classes `.dark.oled`) | `light`. `useSettingsTheme` also sets the
