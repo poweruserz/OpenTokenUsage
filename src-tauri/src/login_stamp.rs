@@ -26,34 +26,39 @@ const LOGIN_FILES: [(&str, &str, &[&str], &str); 2] = [
     ),
 ];
 
-/// The files a plugin's login can be in. None for a WSL copy: reading its `\\wsl.localhost` share
-/// can start a stopped distro, which the app never does (it signs in at the next refresh).
-fn login_files(plugin: &LoadedPlugin) -> Vec<PathBuf> {
+/// The folders a plugin's CLI keeps its login in (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, or the defaults),
+/// with the base plugin id and the login file's name. None for a WSL copy: reading its
+/// `\\wsl.localhost` share can start a stopped distro, which the app never does.
+pub(crate) fn cli_dirs(
+    plugin: &LoadedPlugin,
+) -> Option<(&'static str, Vec<PathBuf>, &'static str)> {
     let account = plugin.account.as_ref();
     if account.is_some_and(|a| a.home.is_some()) {
-        return Vec::new();
+        return None;
     }
     let base_id = account.map_or(plugin.manifest.id.as_str(), |a| a.base_id.as_str());
-    let Some((_, var, default_dirs, file)) = LOGIN_FILES.iter().find(|(id, ..)| *id == base_id)
-    else {
-        return Vec::new();
-    };
+    let (id, var, default_dirs, file) = LOGIN_FILES.iter().find(|(id, ..)| *id == base_id)?;
     // An extra account names its folder in the variable.
     let configured = match account.and_then(|a| a.env.iter().find(|(name, _)| name == var)) {
         Some((_, value)) => value.clone(),
         None => crate::plugin_engine::host_api::resolve_env_value(var),
     };
-    let Some(home) = dirs::home_dir() else {
-        return Vec::new();
-    };
-    let dirs: Vec<PathBuf> = match configured {
+    let home = dirs::home_dir()?;
+    let dirs = match configured {
         Some(dir) => vec![match dir.strip_prefix('~') {
             Some(rest) => home.join(rest.trim_start_matches(['/', '\\'])),
             None => PathBuf::from(dir),
         }],
         None => default_dirs.iter().map(|dir| home.join(dir)).collect(),
     };
-    dirs.into_iter().map(|dir| dir.join(file)).collect()
+    Some((id, dirs, file))
+}
+
+/// The files a plugin's login can be in (none for a WSL copy, see `cli_dirs`).
+fn login_files(plugin: &LoadedPlugin) -> Vec<PathBuf> {
+    cli_dirs(plugin).map_or_else(Vec::new, |(_, dirs, file)| {
+        dirs.into_iter().map(|dir| dir.join(file)).collect()
+    })
 }
 
 /// Unix ms of the latest write to one of the plugin's login files; `None` when it has none or none

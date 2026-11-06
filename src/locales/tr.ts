@@ -217,6 +217,13 @@ export const tr: Messages = {
   "card.valueLeft": "{value} kaldı",
   "card.percentCap": "Sınır: %{value}",
   "card.amountLimit": "Sınır: {value}",
+  "card.sessions.title": "Canlı oturumlar",
+  "card.sessions.busy": "Çalışıyor",
+  "card.sessions.shell": "Komut çalıştırıyor",
+  "card.sessions.idle": "Boşta",
+  "card.sessions.waiting": "Seni bekliyor",
+  "card.sessions.context": "Bağlam %{percent}",
+  "card.sessions.compactSoon": "Yakında sıkıştırılacak",
 
   "pace.ahead": "Bol pay var",
   "pace.onTrack": "Tam hedefte",

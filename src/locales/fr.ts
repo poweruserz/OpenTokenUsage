@@ -217,6 +217,13 @@ export const fr: Messages = {
   "card.valueLeft": "Reste {value}",
   "card.percentCap": "Plafond de {value} %",
   "card.amountLimit": "Limite de {value}",
+  "card.sessions.title": "Sessions en cours",
+  "card.sessions.busy": "Au travail",
+  "card.sessions.shell": "Exécute une commande",
+  "card.sessions.idle": "Inactive",
+  "card.sessions.waiting": "Vous attend",
+  "card.sessions.context": "Contexte {percent} %",
+  "card.sessions.compactSoon": "Compactage imminent",
 
   "pace.ahead": "Marge confortable",
   "pace.onTrack": "Dans les temps",

@@ -217,6 +217,13 @@ export const de: Messages = {
   "card.valueLeft": "{value} übrig",
   "card.percentCap": "Limit {value} %",
   "card.amountLimit": "Limit {value}",
+  "card.sessions.title": "Laufende Sitzungen",
+  "card.sessions.busy": "Arbeitet",
+  "card.sessions.shell": "Führt einen Befehl aus",
+  "card.sessions.idle": "Inaktiv",
+  "card.sessions.waiting": "Wartet auf Sie",
+  "card.sessions.context": "Kontext {percent} %",
+  "card.sessions.compactSoon": "Wird bald komprimiert",
 
   "pace.ahead": "Viel Spielraum",
   "pace.onTrack": "Genau im Plan",

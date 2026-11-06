@@ -24,10 +24,10 @@ Returns a single cached usage snapshot for the given provider.
 
 ### `POST /v1/claude/statusline`
 
-Claude Code's status-line command posts its stdin JSON here when **Settings → Claude Code status line** is on (`claude_statusline.rs` writes `curl.exe -s -m 2 --noproxy 127.0.0.1 --data-binary @- http://127.0.0.1:6736/v1/claude/statusline` into Claude's `settings.json`). Only `rate_limits.five_hour` and `rate_limits.seven_day` are kept, in `plugins_data/claude/statusline.json`; the rest of the object (session, paths, model) is dropped. The body is read up to 64 KiB.
+Claude Code's status-line command posts its stdin JSON here when **Settings → Claude Code status line** is on (`claude_statusline.rs` writes `curl.exe -s -m 2 --noproxy 127.0.0.1 --data-binary @- http://127.0.0.1:6736/v1/claude/statusline` into Claude's `settings.json`). Only `rate_limits.five_hour` and `rate_limits.seven_day` are kept, in `plugins_data/claude/statusline.json`, and `context_window.used_percentage` by `session_id`, in memory for the card's live sessions; the rest of the object (paths, model) is dropped. The body is read up to 64 KiB.
 
 - **204 No Content** — saved (an unchanged answer is rewritten at most once a minute). The empty answer leaves Claude Code's status line blank.
-- **400 Bad Request** — the body has no usage windows (an API-key session, or before Claude Code's first answer).
+- **400 Bad Request** — the body has neither usage windows nor a context fill (before Claude Code's first answer).
 
 ### Unsupported methods
 

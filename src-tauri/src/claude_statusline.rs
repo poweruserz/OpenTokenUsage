@@ -7,9 +7,10 @@
 use serde::de::{Deserializer, MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) const ROUTE: &str = "/v1/claude/statusline";
@@ -85,6 +86,68 @@ fn parse_limits(body: &[u8]) -> Option<Limits> {
     (limits.five_hour.is_some() || limits.seven_day.is_some()).then_some(limits)
 }
 
+#[derive(Deserialize)]
+struct ContextInput {
+    session_id: Option<String>,
+    context_window: Option<InputContext>,
+}
+
+#[derive(Deserialize)]
+struct InputContext {
+    used_percentage: Option<f64>,
+}
+
+/// How full each session's context window is, by session id, as its latest post said. In memory
+/// only: Claude Code posts again after every message, and a session ends with its process.
+type Contexts = HashMap<String, (f64, Instant)>;
+const CONTEXT_KEPT: Duration = Duration::from_secs(24 * 60 * 60);
+const MAX_CONTEXTS: usize = 256;
+
+fn contexts() -> &'static Mutex<Contexts> {
+    static CONTEXTS: OnceLock<Mutex<Contexts>> = OnceLock::new();
+    CONTEXTS.get_or_init(Default::default)
+}
+
+/// Keeps the context fill a statusLine object reports; false when it has none (no message yet).
+fn remember_context(body: &[u8]) -> bool {
+    let Ok(input) = serde_json::from_slice::<ContextInput>(body) else {
+        return false;
+    };
+    let (Some(id), Some(used)) = (
+        input
+            .session_id
+            .filter(|id| !id.is_empty() && id.len() <= 128),
+        input
+            .context_window
+            .and_then(|c| c.used_percentage)
+            .filter(|v| v.is_finite() && *v >= 0.0),
+    ) else {
+        return false;
+    };
+    let mut contexts = contexts().lock().unwrap_or_else(|e| e.into_inner());
+    contexts.retain(|_, (_, at)| at.elapsed() < CONTEXT_KEPT);
+    if contexts.len() >= MAX_CONTEXTS && !contexts.contains_key(&id) {
+        return false;
+    }
+    contexts.insert(id, (used.min(100.0), Instant::now()));
+    true
+}
+
+/// The context fill (0-100) Claude Code last reported for a session, with the bridge on.
+pub(crate) fn context_percent(session_id: &str) -> Option<f64> {
+    context_percent_at(session_id, Instant::now())
+}
+
+/// `context_percent` as of `now`; tests pass a later `now` (an `Instant` before boot can't exist on Windows).
+fn context_percent_at(session_id: &str, now: Instant) -> Option<f64> {
+    let contexts = contexts().lock().unwrap_or_else(|e| e.into_inner());
+    // Also on reads: a session that stopped posting (bridge switched off) mustn't keep its warning.
+    contexts
+        .get(session_id)
+        .filter(|(_, at)| now.saturating_duration_since(*at) < CONTEXT_KEPT)
+        .map(|(used, _)| *used)
+}
+
 fn last_written() -> &'static Mutex<Option<(Limits, Instant)>> {
     static LAST: Mutex<Option<(Limits, Instant)>> = Mutex::new(None);
     &LAST
@@ -96,10 +159,12 @@ fn unix_ms(at: SystemTime) -> u64 {
 }
 
 /// Saves the windows from a posted statusLine object where the Claude plugin reads them
-/// (`plugins_data/claude/statusline.json`). Returns false when the body has no usage windows.
+/// (`plugins_data/claude/statusline.json`), and the session's context fill. Returns false when the
+/// body has neither.
 pub(crate) fn record(body: &[u8], app_data_dir: &Path) -> bool {
+    let has_context = remember_context(body);
     let Some(limits) = parse_limits(body) else {
-        return false;
+        return has_context;
     };
     let mut last = last_written().lock().unwrap_or_else(|e| e.into_inner());
     if last
@@ -355,6 +420,30 @@ mod tests {
         assert!(record(changed.as_bytes(), &dir));
         assert!(path.exists());
         assert!(!record(b"{}", &dir));
+    }
+
+    #[test]
+    fn keeps_each_sessions_context_fill_even_without_usage_windows() {
+        let dir = temp_dir("context");
+        // An API-key session has no rate_limits, but its context fill still counts.
+        let body = r#"{"session_id":"ctx-a","context_window":{"used_percentage":87.5}}"#;
+        assert!(record(body.as_bytes(), &dir));
+        assert_eq!(context_percent("ctx-a"), Some(87.5));
+        assert!(
+            !dir.join("plugins_data").exists(),
+            "no usage snapshot without windows"
+        );
+
+        let cleared = r#"{"session_id":"ctx-b","context_window":{"used_percentage":null}}"#;
+        assert!(!record(cleared.as_bytes(), &dir));
+        assert_eq!(context_percent("ctx-b"), None);
+        assert_eq!(context_percent("ctx-a"), Some(87.5));
+
+        // A day without a post: gone on read too, not only when the next post prunes. Read from a
+        // day ahead: an Instant a day back doesn't exist on a Windows host up less than a day.
+        let day_later = Instant::now() + CONTEXT_KEPT;
+        assert_eq!(context_percent_at("ctx-a", day_later), None);
+        assert_eq!(context_percent("ctx-a"), Some(87.5));
     }
 
     #[test]

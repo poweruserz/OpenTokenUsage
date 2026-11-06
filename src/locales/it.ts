@@ -217,6 +217,13 @@ export const it: Messages = {
   "card.valueLeft": "{value} rimanenti",
   "card.percentCap": "Limite del {value}%",
   "card.amountLimit": "Limite di {value}",
+  "card.sessions.title": "Sessioni attive",
+  "card.sessions.busy": "Al lavoro",
+  "card.sessions.shell": "Esegue un comando",
+  "card.sessions.idle": "Inattiva",
+  "card.sessions.waiting": "Ti sta aspettando",
+  "card.sessions.context": "Contesto al {percent}%",
+  "card.sessions.compactSoon": "Compattazione a breve",
 
   "pace.ahead": "Ampio margine",
   "pace.onTrack": "In linea",

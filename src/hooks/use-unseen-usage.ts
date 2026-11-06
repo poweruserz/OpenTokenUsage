@@ -47,13 +47,18 @@ function subscribePanel(listener: () => void) {
   }
 }
 
+/** Whether the panel window is shown, asked from the OS (`document.hidden` is wrong before the first show). */
+export function usePanelOpen() {
+  return useSyncExternalStore(subscribePanel, () => panelOpen)
+}
+
 /**
  * The usage `key`'s bar gained since the open panel last showed it. It is drawn while the panel is
  * hidden too, so opening the panel doesn't first show the new fill and then take it back; once the
  * panel is open it blinks, then the fill grows over it and it counts as seen.
  */
 export function useUnseenUsage(key: string | null, used: number): UnseenUsage | null {
-  const open = useSyncExternalStore(subscribePanel, () => panelOpen)
+  const open = usePanelOpen()
   const [settling, setSettling] = useState(false)
   // `seenUsed` lives outside React: re-render when it changes, even if `settling` ends where it began.
   const [, markSeen] = useReducer((count: number) => count + 1, 0)

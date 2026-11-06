@@ -217,6 +217,13 @@ export const ja: Messages = {
   "card.valueLeft": "残り {value}",
   "card.percentCap": "上限 {value}%",
   "card.amountLimit": "上限 {value}",
+  "card.sessions.title": "実行中のセッション",
+  "card.sessions.busy": "作業中",
+  "card.sessions.shell": "コマンド実行中",
+  "card.sessions.idle": "待機中",
+  "card.sessions.waiting": "入力待ち",
+  "card.sessions.context": "コンテキスト {percent}%",
+  "card.sessions.compactSoon": "まもなく圧縮",
 
   "pace.ahead": "余裕あり",
   "pace.onTrack": "ペースどおり",

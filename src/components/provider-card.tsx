@@ -1,4 +1,5 @@
 import { ResetCredits } from "@/components/reset-credits"
+import { ClaudeSessions, isClaudeLogin } from "@/components/claude-sessions"
 import { Fragment, useMemo } from "react"
 import { AlertCircle, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -364,6 +365,7 @@ export function ProviderCard({
           </div>
         )}
 
+        {pluginId && isClaudeLogin(pluginId) && <ClaudeSessions pluginId={pluginId} />}
       </div>
       {showSeparator && <Separator />}
     </div>

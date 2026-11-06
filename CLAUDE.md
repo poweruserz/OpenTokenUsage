@@ -29,6 +29,10 @@ This file holds the project facts that are easy to get wrong.
   Only `rate_limits.five_hour/seven_day` are kept (`plugins_data/claude/statusline.json`). The plugin lays a
   snapshot under 5 min old over `last-usage.json` and then reads the API only every 30 min; a 429 shows the
   snapshot instead of the error. The command lives in Rust: the webview can only switch it on or off.
+  Each post's `context_window.used_percentage` is kept in memory per `session_id` for the live sessions list.
+- Live Claude sessions (`claude_sessions.rs`, `claude-sessions.tsx`): Claude cards list `<config dir>/sessions/*.json`
+  whose pid still runs with the file's `procStart` (FILETIME; guards against a reused pid), polled every 5 s while
+  shown. The config dir comes from `login_stamp::cli_dirs` (extra accounts use their own; never a WSL copy).
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);
