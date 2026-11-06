@@ -134,6 +134,10 @@ This file holds the project facts that are easy to get wrong.
   3.5 s, then the fill grows over it. Seen values are in memory, per plugin + line and in used terms (switching
   used/left isn't spending). "Open" is asked from the OS (`isVisible`): the hidden panel's webview reports itself
   visible before its first show.
+- Settings backup (Settings → Settings backup): `buildSettingsBackup` takes only `BACKUP_KEYS` from the store (no
+  accounts, logins, panel position, sent alerts, update/star state); `settings_backup.rs` writes it to Downloads and
+  reveals it (no dialog plugin, no webview reveal permission). Import writes those keys raw, then `relaunch()`: every
+  loader checks its value at startup. A new preference key belongs in `BACKUP_KEYS` too.
 - Ring logos are sized by `measureLogoExtent` (how far the logo's pixels reach) so square logos stay
   inside the ring and round ones grow.
 - Themes: `dark` (default, pure black: classes `.dark.oled`) | `light`. `useSettingsTheme` also sets the

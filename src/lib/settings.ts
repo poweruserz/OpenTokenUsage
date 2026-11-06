@@ -832,3 +832,69 @@ export async function saveLanguage(value: LanguagePreference): Promise<void> {
   await store.set(LANGUAGE_KEY, value);
   await store.save();
 }
+
+/**
+ * The preferences a settings backup carries (store keys). Left out: accounts and logins (never in
+ * this store), the panel's position, sent-notification keys, and update and star-prompt state,
+ * which belong to one machine or one moment.
+ */
+export const BACKUP_KEYS = [
+  "alertSettings",
+  "autoUpdateInterval",
+  "currency",
+  "displayMode",
+  "globalShortcut",
+  "language",
+  "menubarIconStyle",
+  "paceWorkdays",
+  "panelPinned",
+  "plugins",
+  "rememberPanelPosition",
+  "resetTimerDisplayMode",
+  "startOnLogin",
+  "taskbarStrip",
+  "taskbarStripStyle",
+  "themeMode",
+  "timeFormatMode",
+  "trayHiddenPlugins",
+  "trayLogoColors",
+  "trayMetric",
+  "trayPercentColor",
+  "trayProvider",
+  "usageAlerts",
+] as const;
+
+const BACKUP_APP = "OpenTokenUsage";
+
+export async function buildSettingsBackup(): Promise<string> {
+  const settings: Record<string, unknown> = {};
+  for (const key of BACKUP_KEYS) {
+    const value = await store.get<unknown>(key);
+    if (value !== undefined) settings[key] = value;
+  }
+  return JSON.stringify({ app: BACKUP_APP, version: 1, settings });
+}
+
+export class SettingsBackupError extends Error {}
+
+/**
+ * Writes a backup's preferences to the store and returns how many. Each is checked by its loader
+ * when the app starts again, as any stored value is; unknown keys are ignored.
+ */
+export async function restoreSettingsBackup(text: string): Promise<number> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new SettingsBackupError("not JSON");
+  }
+  const raw = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  const settings = raw.settings;
+  if (raw.app !== BACKUP_APP || !settings || typeof settings !== "object" || Array.isArray(settings)) {
+    throw new SettingsBackupError("not an OpenTokenUsage settings backup");
+  }
+  const keys = BACKUP_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(settings, key));
+  for (const key of keys) await store.set(key, (settings as Record<string, unknown>)[key]);
+  await store.save();
+  return keys.length;
+}

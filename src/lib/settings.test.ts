@@ -11,7 +11,10 @@ import {
   DEFAULT_TIME_FORMAT_MODE,
   alertLevelsFor,
   arePluginSettingsEqual,
+  buildSettingsBackup,
   normalizeAlertSettings,
+  restoreSettingsBackup,
+  SettingsBackupError,
   getEnabledPluginIds,
   loadAutoUpdateInterval,
   loadDisplayMode,
@@ -473,6 +476,36 @@ describe("alert settings", () => {
     expect(alertLevelsFor(settings, "cursor")).toEqual([])
     expect(alertLevelsFor(settings, "codex")).toEqual([80, 95])
     expect(normalizeAlertSettings(undefined).providerLevels).toEqual({})
+  })
+})
+
+describe("settings backup", () => {
+  beforeEach(() => storeState.clear())
+
+  it("carries the preferences and leaves out what belongs to one machine", async () => {
+    storeState.set("themeMode", "light")
+    storeState.set("plugins", { order: ["claude"], disabled: [] })
+    storeState.set("panelPosition", { x: 10, y: 20 })
+    storeState.set("sentUsageAlerts", ["claude|Session|t80"])
+    const backup = JSON.parse(await buildSettingsBackup())
+    expect(backup.app).toBe("OpenTokenUsage")
+    expect(backup.settings).toEqual({ themeMode: "light", plugins: { order: ["claude"], disabled: [] } })
+  })
+
+  it("restores only known preferences and refuses anything that isn't a backup", async () => {
+    const text = JSON.stringify({
+      app: "OpenTokenUsage",
+      version: 1,
+      settings: { themeMode: "light", panelPosition: { x: 1, y: 2 }, unknown: true },
+    })
+    expect(await restoreSettingsBackup(text)).toBe(1)
+    expect(storeState.get("themeMode")).toBe("light")
+    expect(storeState.has("panelPosition")).toBe(false)
+    expect(storeState.has("unknown")).toBe(false)
+
+    for (const bad of ["not json", "[]", JSON.stringify({ app: "Other", settings: {} }), JSON.stringify({ app: "OpenTokenUsage", settings: [] })]) {
+      await expect(restoreSettingsBackup(bad)).rejects.toBeInstanceOf(SettingsBackupError)
+    }
   })
 })
 

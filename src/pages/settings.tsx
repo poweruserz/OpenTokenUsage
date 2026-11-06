@@ -30,11 +30,13 @@ import { TRAY_PACE_COLOR } from "@/lib/tray-primary-progress";
 import {
   ALERT_SOUNDS,
   AUTO_UPDATE_OPTIONS,
+  buildSettingsBackup,
   DEFAULT_TRAY_PERCENT_COLOR,
   DISPLAY_MODE_OPTIONS,
   isPerProviderTrayStyle,
   MENUBAR_ICON_STYLE_OPTIONS,
   RESET_TIMER_DISPLAY_OPTIONS,
+  restoreSettingsBackup,
   saveAlertSettings,
   saveLanguage,
   saveRememberPanelPosition,
@@ -42,6 +44,7 @@ import {
   saveTrayLogoColors,
   saveTaskbarStrip,
   saveUsageAlerts,
+  SettingsBackupError,
   THEME_OPTIONS,
   TIME_FORMAT_OPTIONS,
   USAGE_ALERT_LEVELS,
@@ -56,7 +59,8 @@ import {
   type TimeFormatMode,
 } from "@/lib/settings";
 import { getTimeFormatter } from "@/lib/reset-tooltip";
-import { LANGUAGES, resolveLanguage, t, useLocaleStore, type LanguagePreference } from "@/lib/i18n";
+import { LANGUAGES, resolveLanguage, t, useLocaleStore, type LanguagePreference, type MessageKey } from "@/lib/i18n";
+import { relaunch } from "@tauri-apps/plugin-process";
 import type { TraySettingsPreview } from "@/hooks/app/use-tray-icon";
 import { cn } from "@/lib/utils";
 import type { AccountsChange } from "@/lib/accounts";
@@ -844,6 +848,63 @@ export function SettingsPage({
           {t("settings.startOnLogin.label")}
         </label>
       </SettingsSection>
+
+      <SettingsBackupSection />
     </div>
+  );
+}
+
+/** Preferences to a file in Downloads and back (`settings_backup.rs`); logins and accounts stay out. */
+function SettingsBackupSection() {
+  const [status, setStatus] = useState<{ saved: string } | { error: MessageKey } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const exportSettings = async () => {
+    setStatus(null);
+    try {
+      setStatus({ saved: await invoke<string>("export_settings", { json: await buildSettingsBackup() }) });
+    } catch (error) {
+      console.error("Failed to export settings:", error);
+      setStatus({ error: "settings.backup.exportError" });
+    }
+  };
+  const importSettings = async (file: File) => {
+    setStatus(null);
+    try {
+      await restoreSettingsBackup(await file.text());
+      // Every setting is checked and applied as the app starts.
+      await relaunch();
+    } catch (error) {
+      console.error("Failed to import settings:", error);
+      setStatus({ error: error instanceof SettingsBackupError ? "settings.backup.notBackup" : "settings.backup.importError" });
+    }
+  };
+  return (
+    <SettingsSection title={t("settings.backup.title")} description={t("settings.backup.desc")}>
+      <div className="flex gap-2">
+        <button type="button" className="fluent-control px-3" onClick={() => void exportSettings()}>
+          {t("settings.backup.export")}
+        </button>
+        <button type="button" className="fluent-control px-3" onClick={() => fileInput.current?.click()}>
+          {t("settings.backup.import")}
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          aria-label={t("settings.backup.import")}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void importSettings(file);
+          }}
+        />
+      </div>
+      {status && (
+        <p className={cn("mt-1.5 break-all text-xs", "error" in status ? "text-destructive" : "text-muted-foreground")}>
+          {"error" in status ? t(status.error) : t("settings.backup.saved", { path: status.saved })}
+        </p>
+      )}
+    </SettingsSection>
   );
 }
