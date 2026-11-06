@@ -62,6 +62,15 @@ describe("settings backup", () => {
     expect(await loadAlertSettings()).toMatchObject({ levels: [80], sound: "custom", customSoundName: "mine.wav" })
   })
 
+  it("never brings over the other PC's custom file name, even with a built-in sound chosen", async () => {
+    await restoreSettingsBackup(backup({ alertSettings: { levels: [80], sound: "chime", customSoundName: "ding.mp3" } }))
+    expect(await loadAlertSettings()).toMatchObject({ sound: "chime", customSoundName: null })
+
+    storeState.set("alertSettings", { levels: [95], sound: "glass", customSoundName: "mine.wav" })
+    await restoreSettingsBackup(backup({ alertSettings: { levels: [80], sound: "chime", customSoundName: null } }))
+    expect(await loadAlertSettings()).toMatchObject({ sound: "chime", customSoundName: "mine.wav" })
+  })
+
   it("keeps this PC's account and WSL cards, on or off, in the imported order", async () => {
     storeState.set("plugins", {
       order: ["codex", "claude", "claude-1a2b3c4d", "claude-wsl-0011aabb"],

@@ -58,11 +58,19 @@ function backupSettings(text: string): Record<string, unknown> | null {
   return settings as Record<string, unknown>
 }
 
-/** A custom sound is a file in this PC's app data, which the backup doesn't carry: keep this PC's own sound. */
+/**
+ * A custom sound is a file in this PC's app data, which the backup doesn't carry: the custom
+ * file's name always stays this PC's, and so does the sound when the backup's is "custom".
+ */
 async function withLocalSound(imported: unknown): Promise<unknown> {
-  if (!imported || typeof imported !== "object" || (imported as Record<string, unknown>).sound !== "custom") return imported
+  if (!imported || typeof imported !== "object") return imported
+  const raw = imported as Record<string, unknown>
   const local = normalizeAlertSettings(await backupStore.get("alertSettings"))
-  return { ...imported, sound: local.sound, customSoundName: local.customSoundName }
+  return {
+    ...raw,
+    sound: raw.sound === "custom" ? local.sound : raw.sound,
+    customSoundName: local.customSoundName,
+  }
 }
 
 const isLocalCard = (id: string) => isAccountId(id) || isWslId(id)
