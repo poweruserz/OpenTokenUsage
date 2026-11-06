@@ -316,8 +316,93 @@ function playAlertSound(sound: AlertSound) {
   invoke("play_alert_sound", { sound, preview: true }).catch((error) => console.error("play_alert_sound failed:", error));
 }
 
+function toggleLevel(levels: number[], level: number) {
+  return levels.includes(level) ? levels.filter((value) => value !== level) : [...levels, level].sort((a, b) => a - b);
+}
+
+/** Like SegmentedControl, but any number of levels can be on. */
+function LevelButtons({ levels, onToggle, label }: { levels: number[]; onToggle: (level: number) => void; label: string }) {
+  return (
+    <div className="flex gap-0.5 rounded-md border bg-secondary p-0.5" role="group" aria-label={label}>
+      {USAGE_ALERT_LEVELS.map((level) => {
+        const on = levels.includes(level);
+        return (
+          <button
+            key={level}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onToggle(level)}
+            className={cn(
+              "h-7 min-w-0 flex-1 rounded-[3px] text-[13px] tabular-nums whitespace-nowrap transition-colors",
+              on ? "bg-primary text-primary-foreground font-medium" : "text-foreground hover:bg-accent active:bg-accent/60"
+            )}
+          >
+            {level}%
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** One provider's own levels in place of everyone's. */
+function ProviderAlertLevels({
+  plugins,
+  settings,
+  update,
+}: {
+  plugins: PluginConfig[];
+  settings: AlertSettings;
+  update: (next: AlertSettings) => void;
+}) {
+  const enabled = plugins.filter((plugin) => plugin.enabled);
+  const [selected, setSelected] = useState<string | null>(null);
+  if (enabled.length === 0) return null;
+  const id = enabled.some((plugin) => plugin.id === selected) ? selected! : enabled[0].id;
+  const own = settings.providerLevels?.[id];
+  const name = enabled.find((plugin) => plugin.id === id)!.name;
+  const setOwn = (levels: number[] | undefined) => {
+    const providerLevels = { ...settings.providerLevels };
+    if (levels) providerLevels[id] = levels;
+    else delete providerLevels[id];
+    update({ ...settings, providerLevels });
+  };
+  const describe = (levels: number[]) => (levels.length ? levels.map((level) => `${level}%`).join(", ") : t("settings.alerts.none"));
+
+  return (
+    <div>
+      <label className="mb-1 block text-xs text-muted-foreground" htmlFor="alert-provider">
+        {t("settings.alerts.perProvider")}
+      </label>
+      <select id="alert-provider" value={id} onChange={(e) => setSelected(e.target.value)} className="fluent-control w-full">
+        {enabled.map((plugin) => {
+          const levels = settings.providerLevels?.[plugin.id];
+          return (
+            <option key={plugin.id} value={plugin.id}>
+              {levels ? `${plugin.name} · ${describe(levels)}` : plugin.name}
+            </option>
+          );
+        })}
+      </select>
+      <label className="mt-1.5 flex items-center gap-2 text-[13px] select-none text-foreground">
+        <Checkbox
+          key={`alert-same-${id}-${!own}`}
+          checked={!own}
+          onCheckedChange={(checked) => setOwn(checked === true ? undefined : [...settings.levels])}
+        />
+        {t("settings.alerts.sameAsAll")}
+      </label>
+      {own && (
+        <div className="mt-1.5">
+          <LevelButtons levels={own} onToggle={(level) => setOwn(toggleLevel(own, level))} label={name} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Which usage levels notify, and the sound (bundled, Windows', or the user's own file). */
-function AlertOptions() {
+function AlertOptions({ plugins }: { plugins: PluginConfig[] }) {
   const settings = useAppPreferencesStore((state) => state.alertSettings);
   const setSettings = useAppPreferencesStore((state) => state.setAlertSettings);
   const [fileError, setFileError] = useState<"tooLarge" | "unreadable" | null>(null);
@@ -327,13 +412,6 @@ function AlertOptions() {
     setSettings(next);
     void saveAlertSettings(next).catch((error) => console.error("Failed to save alert settings:", error));
   };
-  const toggleLevel = (level: number) =>
-    update({
-      ...settings,
-      levels: settings.levels.includes(level)
-        ? settings.levels.filter((value) => value !== level)
-        : [...settings.levels, level].sort((a, b) => a - b),
-    });
   const chooseSound = (sound: AlertSound) => {
     update({ ...settings, sound });
     playAlertSound(sound);
@@ -355,29 +433,15 @@ function AlertOptions() {
     <div className="mt-3 space-y-3">
       <div>
         <div className="mb-1 text-xs text-muted-foreground">{t("settings.alerts.levels")}</div>
-        {/* Like SegmentedControl, but any number of levels can be on. */}
-        <div className="flex gap-0.5 rounded-md border bg-secondary p-0.5" role="group" aria-label={t("settings.alerts.levels")}>
-          {USAGE_ALERT_LEVELS.map((level) => {
-            const on = settings.levels.includes(level);
-            return (
-              <button
-                key={level}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleLevel(level)}
-                className={cn(
-                  "h-7 min-w-0 flex-1 rounded-[3px] text-[13px] tabular-nums whitespace-nowrap transition-colors",
-                  on
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "text-foreground hover:bg-accent active:bg-accent/60"
-                )}
-              >
-                {level}%
-              </button>
-            );
-          })}
-        </div>
+        <LevelButtons
+          levels={settings.levels}
+          onToggle={(level) => update({ ...settings, levels: toggleLevel(settings.levels, level) })}
+          label={t("settings.alerts.levels")}
+        />
+        <p className="mt-1 text-xs text-muted-foreground">{t("settings.alerts.ticksHint")}</p>
       </div>
+
+      <ProviderAlertLevels plugins={plugins} settings={settings} update={update} />
 
       <div>
         <label className="mb-1 block text-xs text-muted-foreground" htmlFor="alert-sound">
@@ -468,7 +532,7 @@ function PanelSection() {
   );
 }
 
-function NotificationsSection() {
+function NotificationsSection({ plugins }: { plugins: PluginConfig[] }) {
   const usageAlerts = useAppPreferencesStore((state) => state.usageAlerts);
   const setUsageAlerts = useAppPreferencesStore((state) => state.setUsageAlerts);
   return (
@@ -487,7 +551,7 @@ function NotificationsSection() {
         />
         {t("settings.alerts.label")}
       </label>
-      {usageAlerts && <AlertOptions />}
+      {usageAlerts && <AlertOptions plugins={plugins} />}
     </SettingsSection>
   );
 }
@@ -793,7 +857,7 @@ export function SettingsPage({
 
       <PanelSection />
 
-      <NotificationsSection />
+      <NotificationsSection plugins={plugins} />
 
       <SettingsSection title={t("settings.startOnLogin.title")} description={t("settings.startOnLogin.desc")}>
         <label className="flex items-center gap-2 text-[13px] select-none text-foreground">

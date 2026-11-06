@@ -5,6 +5,7 @@ import { isPermissionGranted, requestPermission, sendNotification } from "@tauri
 import type { PluginState } from "@/hooks/app/types"
 import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
 import {
+  alertLevelsFor,
   getEnabledPluginIds,
   loadSentUsageAlerts,
   saveSentUsageAlerts,
@@ -95,7 +96,7 @@ export function useUsageAlerts({
           previousLines: previous?.lines,
           sent,
           nowMs: Date.now(),
-          levels: settings.levels,
+          levels: alertLevelsFor(settings, id),
           displayMode,
           workdays: paceWorkdays
         })

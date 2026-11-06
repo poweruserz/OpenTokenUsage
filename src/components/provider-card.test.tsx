@@ -7,7 +7,8 @@ import { openUrl } from "@tauri-apps/plugin-opener"
 import { ProviderCard } from "@/components/provider-card"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
 import { formatResetTooltipText } from "@/lib/reset-tooltip"
-import { REFRESH_COOLDOWN_MS } from "@/lib/settings"
+import { DEFAULT_ALERT_SETTINGS, REFRESH_COOLDOWN_MS } from "@/lib/settings"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { formatFixedPrecisionNumber } from "@/lib/utils"
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
@@ -109,6 +110,28 @@ describe("ProviderCard", () => {
     expect(screen.getByText("32%")).toBeInTheDocument()
     expect(screen.getByText("$12.34")).toBeInTheDocument()
     expect(screen.getByText("342 credits")).toBeInTheDocument()
+  })
+
+  it("marks the provider's alert levels on its bars, from the other end when showing what's left", () => {
+    const store = useAppPreferencesStore.getState()
+    useAppPreferencesStore.setState({
+      usageAlerts: true,
+      alertSettings: { ...DEFAULT_ALERT_SETTINGS, providerLevels: { cursor: [70, 90] } },
+    })
+    const ticks = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-slot="progress-tick"]')].map((tick) => tick.style.left)
+    const line = { type: "progress" as const, label: "Session", used: 40, limit: 100, format: { kind: "percent" as const } }
+    try {
+      const { rerender } = render(<ProviderCard name="Cursor" pluginId="cursor" displayMode="used" lines={[line]} />)
+      expect(ticks()).toEqual(["70%", "90%"])
+      rerender(<ProviderCard name="Cursor" pluginId="cursor" displayMode="left" lines={[line]} />)
+      expect(ticks()).toEqual(["30%", "10%"])
+      useAppPreferencesStore.setState({ usageAlerts: false })
+      rerender(<ProviderCard name="Cursor" pluginId="cursor" displayMode="used" lines={[line]} />)
+      expect(ticks()).toEqual([])
+    } finally {
+      useAppPreferencesStore.setState({ usageAlerts: store.usageAlerts, alertSettings: store.alertSettings })
+    }
   })
 
   it("renders quick links and opens URL", async () => {

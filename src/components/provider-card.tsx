@@ -13,7 +13,7 @@ import { PluginError } from "@/components/plugin-error"
 import { ProviderStatusBadge } from "@/components/provider-status-badge"
 import { useNowTicker } from "@/hooks/use-now-ticker"
 import { useUnseenUsage } from "@/hooks/use-unseen-usage"
-import { REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerDisplayMode, type TimeFormatMode } from "@/lib/settings"
+import { alertLevelsFor, REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerDisplayMode, type TimeFormatMode } from "@/lib/settings"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import type { ManifestLine, MetricLine, PluginLink } from "@/lib/plugin-types"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
@@ -92,6 +92,8 @@ function PaceIndicator({
   )
 }
 
+const NO_LEVELS: number[] = []
+
 function formatRelativeTime(diffMs: number): string {
   const seconds = Math.floor(Math.max(0, diffMs) / 1000)
   if (seconds < 60) return t("card.justNow")
@@ -140,6 +142,11 @@ export function ProviderCard({
   const filteredLines = scopeFilter === "all"
     ? lines
     : lines.filter(line => overviewLabels.has(line.label))
+
+  // The usage levels that notify for this provider, marked on its bars.
+  const usageAlerts = useAppPreferencesStore((state) => state.usageAlerts)
+  const alertSettings = useAppPreferencesStore((state) => state.alertSettings)
+  const alertLevels = usageAlerts && pluginId ? alertLevelsFor(alertSettings, pluginId) : NO_LEVELS
 
   const hasResetCountdown = filteredLines.some(
     (line) => (line.type === "progress" && Boolean(line.resetsAt)) || (line.type === "text" && Boolean(line.resetCredits?.length))
@@ -330,6 +337,7 @@ export function ProviderCard({
                       now={now}
                       refreshing={isRefreshingWithData}
                       pluginId={pluginId}
+                      alertLevels={alertLevels}
                     />
                   ))}
                 </div>
@@ -347,6 +355,7 @@ export function ProviderCard({
                       now={now}
                       refreshing={isRefreshingWithData}
                       pluginId={pluginId}
+                      alertLevels={alertLevels}
                     />
                   ))}
                 </Fragment>
@@ -371,6 +380,7 @@ function MetricLineRenderer({
   now,
   refreshing,
   pluginId,
+  alertLevels = NO_LEVELS,
 }: {
   line: MetricLine
   usageUrl?: string
@@ -381,6 +391,8 @@ function MetricLineRenderer({
   now: number
   refreshing?: boolean
   pluginId?: string
+  /** Usage levels (percent used) that notify; marked on the bar. */
+  alertLevels?: readonly number[]
 }) {
   const paceWorkdays = useAppPreferencesStore((state) => state.paceWorkdays)
   const isProgress = line.type === "progress"
@@ -453,6 +465,7 @@ function MetricLineRenderer({
     const { amount: shownAmount, fraction: shownFraction } = getDisplayedUsage(line.used, line.limit, displayMode)
     const percent = Math.round(shownFraction * 10000) / 100
     const shownUnseen = unseen && displayMode === "left" ? { ...unseen, from: 100 - unseen.from } : unseen
+    const alertTicks = displayMode === "left" ? alertLevels.map((level) => 100 - level) : alertLevels
     const amountText =
       line.format.kind === "percent"
         ? `${Math.round(shownAmount)}%`
@@ -543,6 +556,7 @@ function MetricLineRenderer({
                     value={percent}
                     indicatorColor={line.color}
                     markerValue={paceMarkerValue}
+                    ticks={alertTicks}
                     unseen={shownUnseen}
                     refreshing={refreshing}
                   />
@@ -558,6 +572,7 @@ function MetricLineRenderer({
             value={percent}
             indicatorColor={line.color}
             markerValue={paceMarkerValue}
+            ticks={alertTicks}
             unseen={shownUnseen}
             refreshing={refreshing}
           />
