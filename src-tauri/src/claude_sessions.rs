@@ -45,17 +45,23 @@ fn read_sessions(dir: &Path, is_running: impl Fn(u32, Option<f64>) -> bool) -> V
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
-    let mut sessions: Vec<(f64, LiveSession)> = entries
+    // Newest first, then capped: a running session rewrites its file, so files a crash left
+    // behind sort last and can't crowd the live ones out of the cap.
+    let mut files: Vec<(std::time::SystemTime, std::path::PathBuf)> = entries
         .filter_map(Result::ok)
         .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
-        .take(MAX_FILES)
-        .filter(|entry| {
-            entry
-                .metadata()
-                .is_ok_and(|meta| meta.is_file() && meta.len() <= MAX_FILE_BYTES)
-        })
         .filter_map(|entry| {
-            serde_json::from_slice::<SessionFile>(&std::fs::read(entry.path()).ok()?).ok()
+            let meta = entry.metadata().ok()?;
+            (meta.is_file() && meta.len() <= MAX_FILE_BYTES)
+                .then(|| Some((meta.modified().ok()?, entry.path())))?
+        })
+        .collect();
+    files.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut sessions: Vec<(f64, LiveSession)> = files
+        .into_iter()
+        .take(MAX_FILES)
+        .filter_map(|(_, path)| {
+            serde_json::from_slice::<SessionFile>(&std::fs::read(path).ok()?).ok()
         })
         // A daemon supervises background sessions; it isn't one itself.
         .filter(|file| !matches!(file.kind.as_deref(), Some("daemon" | "daemon-worker")))
@@ -205,6 +211,38 @@ mod tests {
             ]
         );
         assert!(read_sessions(&dir.join("missing"), |_, _| true).is_empty());
+    }
+
+    #[test]
+    fn files_a_crash_left_behind_never_crowd_out_a_live_session() {
+        let dir = temp_dir("crowd");
+        let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        // More leftovers than the cap, each named to come before the live one.
+        for i in 0..MAX_FILES + 6 {
+            let path = dir.join(format!("{i:04}.json"));
+            std::fs::write(
+                &path,
+                serde_json::json!({ "pid": 3, "sessionId": format!("old-{i}") }).to_string(),
+            )
+            .unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(hour_ago)
+                .unwrap();
+        }
+        write(
+            &dir,
+            "9999.json",
+            serde_json::json!({ "pid": 1, "sessionId": "live", "cwd": "C:\\work\\app" }),
+        );
+
+        let sessions = read_sessions(&dir, |pid, _| pid == 1);
+        assert_eq!(
+            sessions.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(),
+            ["live"]
+        );
     }
 
     #[test]
