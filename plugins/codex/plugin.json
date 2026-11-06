@@ -23,6 +23,7 @@
     { "type": "text", "label": "Today", "scope": "detail" },
     { "type": "text", "label": "Yesterday", "scope": "detail" },
     { "type": "text", "label": "Last 30 Days", "scope": "detail" },
+    { "type": "text", "label": "Cache Hit Rate", "scope": "detail" },
     { "type": "barChart", "label": "Usage Trend", "scope": "detail" }
   ]
 }

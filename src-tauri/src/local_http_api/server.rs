@@ -103,20 +103,58 @@ fn handle_connection(mut stream: TcpStream, _permit: ConnectionPermit) {
     let _ = stream.set_read_timeout(Some(CONNECTION_TIMEOUT));
     let _ = stream.set_write_timeout(Some(CONNECTION_TIMEOUT));
 
-    // Read request (up to 4 KB is plenty for a request line + headers)
-    let mut buf = [0u8; 4096];
-    let n = match stream.read(&mut buf) {
-        Ok(n) => n,
-        Err(_) => return,
+    let Some(request) = read_request(&mut stream) else {
+        return;
     };
-    let request = String::from_utf8_lossy(&buf[..n]);
-
     let response = handle_request(&request);
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.flush();
 }
 
-fn handle_request(request: &str) -> String {
+const MAX_HEADER_BYTES: usize = 8 * 1024;
+
+fn header_end(data: &[u8]) -> Option<usize> {
+    data.windows(4).position(|w| w == b"\r\n\r\n")
+}
+
+fn content_length(head: &str) -> usize {
+    head.lines()
+        .filter_map(|line| line.split_once(':'))
+        .find(|(name, _)| name.trim().eq_ignore_ascii_case("content-length"))
+        .and_then(|(_, value)| value.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+/// Headers, then as much body as `Content-Length` announces (a statusLine post carries one), up to
+/// `MAX_BODY_BYTES`. A longer body is cut there and fails its JSON parse.
+fn read_request(stream: &mut impl Read) -> Option<Vec<u8>> {
+    let mut data = Vec::new();
+    let mut buf = [0u8; 4096];
+    loop {
+        if let Some(end) = header_end(&data) {
+            let wanted = content_length(&String::from_utf8_lossy(&data[..end]))
+                .min(crate::claude_statusline::MAX_BODY_BYTES);
+            if data.len() >= end + 4 + wanted {
+                return Some(data);
+            }
+        } else if data.len() > MAX_HEADER_BYTES {
+            return Some(data);
+        }
+        match stream.read(&mut buf) {
+            Ok(0) => return (!data.is_empty()).then_some(data),
+            Ok(n) => data.extend_from_slice(&buf[..n]),
+            Err(_) => return (!data.is_empty()).then_some(data),
+        }
+    }
+}
+
+fn handle_request(raw: &[u8]) -> String {
+    let (head, body) = match header_end(raw) {
+        Some(end) => (&raw[..end], &raw[end + 4..]),
+        None => (raw, &[][..]),
+    };
+    let request = String::from_utf8_lossy(head);
+    let body = &body[..body.len().min(content_length(&request))];
     // Parse request line: "METHOD /path HTTP/1.x\r\n..."
     let mut lines = request.lines();
     let first_line = lines.next().unwrap_or("");
@@ -152,7 +190,7 @@ fn handle_request(request: &str) -> String {
         path
     };
 
-    route(method, path)
+    route(method, path, body)
 }
 
 /// `127.0.0.1`, `localhost` or `[::1]`, optionally with this server's port.
@@ -163,8 +201,15 @@ fn is_loopback_host(value: &str) -> bool {
     matches!(host, "127.0.0.1" | "localhost" | "[::1]")
 }
 
-fn route(method: &str, path: &str) -> String {
+fn route(method: &str, path: &str, body: &[u8]) -> String {
     // Match routes
+    if path == crate::claude_statusline::ROUTE {
+        return match method {
+            "POST" => handle_post_claude_statusline(body),
+            _ => response_method_not_allowed(),
+        };
+    }
+
     if path == "/v1/usage" {
         return match method {
             "GET" => handle_get_usage_collection(),
@@ -191,6 +236,22 @@ fn handle_get_usage_collection() -> String {
     };
     let body = serde_json::to_string(&snapshots).unwrap_or_else(|_| "[]".to_string());
     response_json(200, "OK", &body)
+}
+
+/// Claude Code's status-line command posts its stdin here (see `claude_statusline.rs`). The empty
+/// answer leaves Claude Code's status line blank.
+fn handle_post_claude_statusline(body: &[u8]) -> String {
+    let app_data_dir = cache_state()
+        .lock()
+        .map(|state| state.app_data_dir.clone())
+        .unwrap_or_default();
+    if app_data_dir.as_os_str().is_empty() || !crate::claude_statusline::record(body, &app_data_dir)
+    {
+        // No body: curl prints whatever comes back, and Claude Code shows it as its status line.
+        return "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
+            .to_string();
+    }
+    response_no_content()
 }
 
 fn handle_get_usage_single(provider_id: &str) -> String {
@@ -267,24 +328,24 @@ mod tests {
 
     #[test]
     fn route_get_usage_returns_200() {
-        let resp = route("GET", "/v1/usage");
+        let resp = route("GET", "/v1/usage", b"");
         assert!(resp.starts_with("HTTP/1.1 200"));
     }
 
     #[test]
     fn route_unknown_path_returns_404() {
-        let resp = route("GET", "/v2/something");
+        let resp = route("GET", "/v2/something", b"");
         assert!(resp.starts_with("HTTP/1.1 404"));
     }
 
     #[test]
     fn route_post_returns_405() {
-        let resp = route("POST", "/v1/usage");
+        let resp = route("POST", "/v1/usage", b"");
         assert!(resp.starts_with("HTTP/1.1 405"));
     }
 
     fn request(headers: &str) -> String {
-        handle_request(&format!("GET /v1/usage HTTP/1.1\r\n{headers}\r\n"))
+        handle_request(format!("GET /v1/usage HTTP/1.1\r\n{headers}\r\n").as_bytes())
     }
 
     #[test]
@@ -333,7 +394,7 @@ mod tests {
 
     #[test]
     fn options_preflight_is_not_granted() {
-        let resp = handle_request("OPTIONS /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:6736\r\n\r\n");
+        let resp = handle_request(b"OPTIONS /v1/usage HTTP/1.1\r\nHost: 127.0.0.1:6736\r\n\r\n");
         assert!(resp.starts_with("HTTP/1.1 405"), "{resp}");
         assert!(!resp.contains("Access-Control-Allow"));
     }
@@ -347,7 +408,7 @@ mod tests {
             state.snapshots.clear();
         }
 
-        let resp = route("GET", "/v1/usage/nonexistent");
+        let resp = route("GET", "/v1/usage/nonexistent", b"");
         assert!(resp.starts_with("HTTP/1.1 404"));
         assert!(resp.contains("provider_not_found"));
     }
@@ -361,7 +422,7 @@ mod tests {
             state.snapshots.clear();
         }
 
-        let resp = route("GET", "/v1/usage/claude");
+        let resp = route("GET", "/v1/usage/claude", b"");
         assert!(resp.starts_with("HTTP/1.1 204"));
     }
 
@@ -376,7 +437,7 @@ mod tests {
                 .insert("claude".to_string(), make_snapshot("claude", "Claude"));
         }
 
-        let resp = route("GET", "/v1/usage/claude");
+        let resp = route("GET", "/v1/usage/claude", b"");
         assert!(resp.starts_with("HTTP/1.1 200"));
         assert!(resp.contains("fetchedAt"));
     }
@@ -413,5 +474,72 @@ mod tests {
 
         assert!(resp.starts_with("HTTP/1.1 503"));
         assert!(resp.contains(r#""error":"server_busy""#));
+    }
+
+    /// Hands out one chunk per read, the way a socket delivers a request in pieces.
+    struct Chunks(Vec<Vec<u8>>);
+
+    impl Read for Chunks {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.0.is_empty() {
+                return Ok(0);
+            }
+            let chunk = self.0.remove(0);
+            buf[..chunk.len()].copy_from_slice(&chunk);
+            Ok(chunk.len())
+        }
+    }
+
+    #[test]
+    fn reads_a_body_that_arrives_after_the_headers() {
+        let body = r#"{"rate_limits":{}}"#;
+        let head = format!(
+            "POST /v1/claude/statusline HTTP/1.1\r\nHost: 127.0.0.1:6736\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        );
+        let mut stream = Chunks(vec![
+            head.into_bytes(),
+            body[..5].as_bytes().to_vec(),
+            body[5..].as_bytes().to_vec(),
+        ]);
+        let request = read_request(&mut stream).unwrap();
+        assert!(request.ends_with(body.as_bytes()));
+        assert!(stream.0.is_empty());
+    }
+
+    #[test]
+    #[serial]
+    fn a_statusline_post_saves_the_claude_snapshot() {
+        let dir =
+            std::env::temp_dir().join(format!("openusage-http-statusline-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        cache_state().lock().unwrap().app_data_dir = dir.clone();
+
+        let body = r#"{"rate_limits":{"five_hour":{"used_percentage":42,"resets_at":1793500000}}}"#;
+        let post = |headers: &str| {
+            handle_request(
+                format!(
+                    "POST /v1/claude/statusline HTTP/1.1\r\n{headers}Content-Length: {}\r\n\r\n{body}",
+                    body.len()
+                )
+                .as_bytes(),
+            )
+        };
+        assert!(post("Origin: https://evil.com\r\nHost: 127.0.0.1:6736\r\n")
+            .starts_with("HTTP/1.1 403"));
+        assert!(!dir.exists(), "a cross-site post writes nothing");
+
+        let resp = post("Host: 127.0.0.1:6736\r\n");
+        assert!(resp.starts_with("HTTP/1.1 204"), "{resp}");
+        let saved =
+            std::fs::read_to_string(dir.join("plugins_data/claude/statusline.json")).unwrap();
+        assert!(saved.contains(r#""usedPercent":42.0"#), "{saved}");
+
+        assert!(route("GET", "/v1/claude/statusline", b"").starts_with("HTTP/1.1 405"));
+        // Before Claude Code's first answer the post has no windows: nothing may reach its status line.
+        let empty = route("POST", "/v1/claude/statusline", b"{}");
+        assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
+        assert!(empty.ends_with("\r\n\r\n"), "{empty}");
+        assert!(resp.ends_with("\r\n\r\n"), "{resp}");
     }
 }

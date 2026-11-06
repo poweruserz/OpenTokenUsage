@@ -59,6 +59,7 @@ import type { TraySettingsPreview } from "@/hooks/app/use-tray-icon";
 import { cn } from "@/lib/utils";
 import type { AccountsChange } from "@/lib/accounts";
 import { AccountsSection } from "@/components/accounts-section";
+import { ClaudeCodeSection } from "@/components/claude-code-section";
 import { useAppPreferencesStore } from "@/stores/app-preferences-store";
 
 interface PluginConfig {
@@ -740,6 +741,8 @@ export function SettingsPage({
       </SettingsSection>
 
       <AccountsSection onAccountsChanged={onAccountsChanged} />
+
+      <ClaudeCodeSection />
 
       <LanguageSection />
 
