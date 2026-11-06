@@ -141,6 +141,16 @@ describe("useLoginRecovery", () => {
     expect(sendNotification).toHaveBeenCalledTimes(2)
   })
 
+  it("keeps one toast while a stopped distro shows its cached data in between", async () => {
+    const { rerender } = mount({ claude: state(null) })
+    rerender({ pluginStates: { claude: state(EXPIRED) } })
+    await settle()
+    rerender({ pluginStates: { claude: state(null, { ...DATA, staleSince: "2026-11-06T00:00:00Z" } as PluginOutput) } })
+    rerender({ pluginStates: { claude: state(EXPIRED) } })
+    await settle()
+    expect(sendNotification).toHaveBeenCalledTimes(1)
+  })
+
   it("doesn't toast for a card that was signed out when the app started, or with alerts off", async () => {
     mount({ claude: state(EXPIRED, null) })
     await settle()

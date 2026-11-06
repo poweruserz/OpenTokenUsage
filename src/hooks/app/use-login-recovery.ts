@@ -118,8 +118,11 @@ export function useLoginRecovery({
     for (const [id, state] of Object.entries(pluginStates)) {
       if (!state || state.loading) continue
       if (!state.error) {
-        if (state.data && state.data.staleSince == null) workedRef.current.add(id)
-        toastedRef.current.delete(id)
+        // Only live data ends an episode: a stopped WSL distro's cached data isn't a recovery.
+        if (state.data && state.data.staleSince == null) {
+          workedRef.current.add(id)
+          toastedRef.current.delete(id)
+        }
         continue
       }
       if (!needsSignIn(state) || !workedRef.current.has(id) || toastedRef.current.has(id)) continue
