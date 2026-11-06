@@ -68,7 +68,9 @@ This file holds the project facts that are easy to get wrong.
   the registry, so a key added while the app is running works on the next refresh. While a card shows a
   sign-in error (its fix is a login command), `use-login-recovery.ts` checks the CLI's login file time every
   5 s (`login_stamp.rs`: Claude and Codex in the folders their plugins read, and their extra accounts; never
-  a WSL copy, whose share can start a stopped distro) and probes the card the moment it changes; a card that
+  a WSL copy, whose share can start a stopped distro) and probes the card the moment it changes. The plugins
+  rewrite that file when they refresh a token, so the time is taken afresh after each probe (else a refresh
+  that still ends in 401 chains probes, each rotating the login). A card that
   worked in this run (not cached data) and loses its sign-in gets one toast per episode. Disabled cards are left alone.
 - Tray metric: one setting, `trayMetric` (auto | Session | Weekly), drives bars, percent and tooltip.
   Tray provider `tightest` = "Most used" line across providers. `trayHiddenPlugins` keeps a provider

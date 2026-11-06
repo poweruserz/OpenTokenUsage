@@ -88,19 +88,19 @@ describe("useLoginRecovery", () => {
     expect(startBatch).toHaveBeenCalledTimes(1)
   })
 
-  it("still catches a sign-in that lands while the probe it started runs", async () => {
+  it("doesn't take the login file a probe rewrote itself for a sign-in", async () => {
     const { rerender, startBatch } = mount({ claude: state(EXPIRED) })
     await settle()
-    stamp = 200
-    await act(async () => vi.advanceTimersByTime(LOGIN_CHECK_MS))
-    await settle()
-    expect(startBatch).toHaveBeenCalledTimes(1)
-
-    rerender({ pluginStates: { claude: { ...state(null), loading: true } } })
-    stamp = 300 // signed in again, but the probe already read the old login
-    rerender({ pluginStates: { claude: state(EXPIRED) } })
-    await settle()
-    expect(startBatch).toHaveBeenCalledTimes(2)
+    // A token refresh writes the file, yet usage still answers 401: the card waits again.
+    for (let i = 0; i < 3; i++) {
+      rerender({ pluginStates: { claude: { ...state(null), loading: true } } })
+      stamp! += 100
+      rerender({ pluginStates: { claude: state(EXPIRED) } })
+      await settle()
+      await act(async () => vi.advanceTimersByTime(LOGIN_CHECK_MS))
+      await settle()
+    }
+    expect(startBatch).not.toHaveBeenCalled()
   })
 
   it("puts the error back when the probe can't start", async () => {

@@ -50,8 +50,11 @@ export function useLoginRecovery({
     .filter((id) => needsSignIn(pluginStates[id]))
     .sort()
     .join(",")
-  // The login file's time when the card started waiting; a later write is a new sign-in. Kept while
-  // the probe it started runs: a sign-in that lands meanwhile still differs once the card waits again.
+  // The login file's time when the card started waiting; a later write is a new sign-in. Dropped
+  // while a probe runs: the plugins rewrite this file themselves when they refresh a token, and a
+  // probe that ends in the same sign-in error must not count its own write as a sign-in (that
+  // chained probes, each rotating the login). A sign-in that lands during the probe waits for the
+  // next refresh.
   const stampsRef = useRef(new Map<string, number | null>())
   const failedRef = useRef(new Set<string>())
   const probeRef = useRef<(id: string) => void>(() => {})
@@ -68,7 +71,7 @@ export function useLoginRecovery({
   useEffect(() => {
     for (const id of stampsRef.current.keys()) {
       const state = pluginStates[id]
-      if (!enabledIds.includes(id) || (!state?.loading && !needsSignIn(state))) stampsRef.current.delete(id)
+      if (!enabledIds.includes(id) || !needsSignIn(state)) stampsRef.current.delete(id)
     }
   }, [pluginStates, enabledIds])
 
