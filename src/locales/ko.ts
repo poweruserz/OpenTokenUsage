@@ -57,6 +57,8 @@ export const ko: Messages = {
   "settings.usageMode.desc": "남은 양 또는 사용한 양 표시",
   "settings.usageMode.left": "남음",
   "settings.usageMode.used": "사용됨",
+  "settings.usageMode.workdays": "주간 속도를 평일 기준으로",
+  "settings.usageMode.workdaysHint": "월요일부터 금요일까지만 계산하므로 조용한 주말이 여유처럼 보이지 않습니다.",
   "settings.currency.title": "통화",
   "settings.currency.desc": "입력한 환율로 비용을 다른 통화로 표시합니다",
   "settings.currency.rate": "1 USD당 {code}",

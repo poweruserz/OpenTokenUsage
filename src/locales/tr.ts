@@ -57,6 +57,8 @@ export const tr: Messages = {
   "settings.usageMode.desc": "Kalan veya kullanılan miktarı göster",
   "settings.usageMode.left": "Kalan",
   "settings.usageMode.used": "Kullanılan",
+  "settings.usageMode.workdays": "Haftalık tempo iş günlerine göre",
+  "settings.usageMode.workdaysHint": "Yalnızca pazartesiden cumaya sayılır; sakin bir hafta sonu fazladan pay gibi görünmez.",
   "settings.currency.title": "Para birimi",
   "settings.currency.desc": "Maliyetleri girdiğiniz kurla başka bir para biriminde gösterir",
   "settings.currency.rate": "1 USD kaç {code}",

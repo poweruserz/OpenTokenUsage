@@ -1,3 +1,4 @@
+import { timeToLimitMs } from "@/lib/pace-status"
 import { liveResetCredits, RESET_WARNING_MS } from "@/lib/reset-credits"
 import { t, tLabel } from "@/lib/i18n"
 import type { MetricLine } from "@/lib/plugin-types"
@@ -57,6 +58,8 @@ export function collectUsageAlerts(args: {
   /** Usage levels (percent) that notify, from the settings. */
   levels: readonly number[]
   displayMode: DisplayMode
+  /** Weekly pace counts Monday to Friday only. */
+  workdays?: boolean
 }): UsageAlert[] {
   const { pluginId, providerName, lines, previousLines, sent, nowMs, displayMode } = args
   const levels = [...args.levels].sort((a, b) => b - a)
@@ -104,11 +107,11 @@ export function collectUsageAlerts(args: {
     // Pace: on track to hit the limit before this window resets.
     const periodMs = line.periodDurationMs
     if (!periodMs || !Number.isFinite(resetsAtMs) || fraction < PACE_MIN_FRACTION) continue
-    const elapsedMs = nowMs - (resetsAtMs - periodMs)
-    if (elapsedMs <= 0 || nowMs >= resetsAtMs) continue
-    const etaMs = (line.limit - line.used) / (line.used / elapsedMs)
+    if (nowMs >= resetsAtMs) continue
+    // The card's "Runs out in" uses the same time (work days skip weekends).
+    const etaMs = timeToLimitMs(line.used, line.limit, resetsAtMs, periodMs, nowMs, args.workdays)
     const paceKey = `${base}|pace`
-    if (etaMs > 0 && etaMs < resetsAtMs - nowMs && !wasSent(sent, prefix, window, "|pace")) {
+    if (etaMs !== null && etaMs < resetsAtMs - nowMs && !wasSent(sent, prefix, window, "|pace")) {
       alerts.push({
         title: t("alert.pace.title", { provider: providerName, label }),
         body: t("alert.pace.body", { time: formatCompactDuration(etaMs) ?? "" }),

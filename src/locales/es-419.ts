@@ -57,6 +57,8 @@ export const es419: Messages = {
   "settings.usageMode.desc": "Mostrar lo que queda o lo que usaste",
   "settings.usageMode.left": "Restante",
   "settings.usageMode.used": "Usado",
+  "settings.usageMode.workdays": "Ritmo semanal en días laborables",
+  "settings.usageMode.workdaysHint": "Cuenta solo de lunes a viernes, para que un fin de semana tranquilo no parezca margen de sobra.",
   "settings.currency.title": "Moneda",
   "settings.currency.desc": "Mostrar los costos en otra moneda con el tipo de cambio que ingreses",
   "settings.currency.rate": "1 USD en {code}",
