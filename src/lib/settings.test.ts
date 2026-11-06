@@ -9,7 +9,9 @@ import {
   DEFAULT_START_ON_LOGIN,
   DEFAULT_THEME_MODE,
   DEFAULT_TIME_FORMAT_MODE,
+  alertLevelsFor,
   arePluginSettingsEqual,
+  normalizeAlertSettings,
   getEnabledPluginIds,
   loadAutoUpdateInterval,
   loadDisplayMode,
@@ -459,6 +461,21 @@ describe("settings", () => {
 })
 
 // Each case imports the module afresh: the state is created once per app start and kept in memory.
+describe("alert settings", () => {
+  it("keeps each provider's own known levels and drops the rest", () => {
+    const settings = normalizeAlertSettings({
+      levels: [80, 95],
+      providerLevels: { claude: [70, 33, 90], cursor: [], "Bad Id": [80], codex: "80" },
+      sound: "chime",
+    })
+    expect(settings.providerLevels).toEqual({ claude: [70, 90], cursor: [] })
+    expect(alertLevelsFor(settings, "claude")).toEqual([70, 90])
+    expect(alertLevelsFor(settings, "cursor")).toEqual([])
+    expect(alertLevelsFor(settings, "codex")).toEqual([80, 95])
+    expect(normalizeAlertSettings(undefined).providerLevels).toEqual({})
+  })
+})
+
 describe("star prompt", () => {
   const PLUGINS = { order: ["claude"], disabled: [] }
 

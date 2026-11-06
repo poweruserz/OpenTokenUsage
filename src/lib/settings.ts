@@ -410,6 +410,8 @@ export type AlertSound = (typeof ALERT_SOUNDS)[number];
 export type AlertSettings = {
   /** Usage levels (percent) that send a notification, ascending. */
   levels: number[];
+  /** A provider's own levels by plugin id, in place of `levels` (empty: no level alerts for it). */
+  providerLevels?: Record<string, number[]>;
   sound: AlertSound;
   /** Name of the user's file; the converted sound lives in the app data folder. */
   customSoundName: string | null;
@@ -417,17 +419,30 @@ export type AlertSettings = {
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettings = { levels: [80, 95], sound: "windows", customSoundName: null };
 
+function knownLevels(value: unknown[]): number[] {
+  return USAGE_ALERT_LEVELS.filter((level) => value.includes(level));
+}
+
 /** Stored alert settings with every unknown or broken field replaced by its default. */
 export function normalizeAlertSettings(value: unknown): AlertSettings {
   const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const levels = Array.isArray(raw.levels)
-    ? USAGE_ALERT_LEVELS.filter((level) => (raw.levels as unknown[]).includes(level))
-    : DEFAULT_ALERT_SETTINGS.levels;
+  const levels = Array.isArray(raw.levels) ? knownLevels(raw.levels) : DEFAULT_ALERT_SETTINGS.levels;
   const customSoundName =
     typeof raw.customSoundName === "string" && raw.customSoundName.length > 0 ? raw.customSoundName : null;
   const known = (ALERT_SOUNDS as readonly unknown[]).includes(raw.sound);
   const sound = known && (raw.sound !== "custom" || customSoundName) ? (raw.sound as AlertSound) : DEFAULT_ALERT_SETTINGS.sound;
-  return { levels, sound, customSoundName };
+  const providerLevels: Record<string, number[]> = {};
+  if (raw.providerLevels && typeof raw.providerLevels === "object") {
+    for (const [id, own] of Object.entries(raw.providerLevels)) {
+      if (/^[a-z0-9-]+$/.test(id) && Array.isArray(own)) providerLevels[id] = knownLevels(own);
+    }
+  }
+  return { levels, providerLevels, sound, customSoundName };
+}
+
+/** The usage levels that notify for one provider: its own, or everyone's. */
+export function alertLevelsFor(settings: AlertSettings, pluginId: string): number[] {
+  return settings.providerLevels?.[pluginId] ?? settings.levels;
 }
 
 export async function loadAlertSettings(): Promise<AlertSettings> {

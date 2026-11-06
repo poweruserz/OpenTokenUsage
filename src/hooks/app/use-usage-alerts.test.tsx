@@ -97,6 +97,41 @@ it("warns when the 24-hour boundary passes without a new probe, including while 
   await waitFor(() => expect(sendNotification).toHaveBeenCalledTimes(2))
   Object.defineProperty(document, "hidden", { configurable: true, value: false })
 })
+it("uses a provider's own levels in place of everyone's", async () => {
+  const at85 = (): PluginState => ({
+    ...state(48),
+    data: {
+      providerId: "codex",
+      displayName: "Codex",
+      iconUrl: "",
+      lines: [{ type: "progress", label: "Session", used: 85, limit: 100, format: { kind: "percent" } }]
+    }
+  })
+  const props = (providerLevels: Record<string, number[]>) => ({
+    pluginStates: { codex: at85() },
+    pluginsMeta: [],
+    pluginSettings: CODEX_ONLY,
+    enabled: true,
+    settings: { ...DEFAULT_ALERT_SETTINGS, providerLevels },
+    displayMode: "used" as const
+  })
+  // Everyone's 80% would notify; Codex's own 90% doesn't yet.
+  const quiet = renderHook(() => useUsageAlerts(props({ codex: [90] })))
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  expect(sendNotification).not.toHaveBeenCalled()
+  quiet.unmount()
+
+  renderHook(() => useUsageAlerts(props({ codex: [70] })))
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  await waitFor(() => expect(sendNotification).toHaveBeenCalledTimes(1))
+  expect(vi.mocked(sendNotification).mock.calls[0][0].title).toContain("85%")
+})
 it("stays quiet when disabled, stale or errored", async () => {
   const stale = state(12)
   stale.data!.staleSince = NOW - HOUR

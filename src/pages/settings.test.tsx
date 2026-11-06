@@ -42,6 +42,8 @@ vi.mock("@dnd-kit/utilities", () => ({
 }))
 
 import { SettingsPage } from "@/pages/settings"
+import { DEFAULT_ALERT_SETTINGS } from "@/lib/settings"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 const defaultProps = {
   plugins: [{ id: "a", name: "Alpha", enabled: true }],
@@ -114,6 +116,33 @@ describe("SettingsPage", () => {
     expect(onReorder).toHaveBeenCalledWith(["b", "a"])
   })
 
+  it("gives one provider its own alert levels and takes them back", async () => {
+    const saved = useAppPreferencesStore.getState()
+    useAppPreferencesStore.setState({ usageAlerts: true, alertSettings: { ...DEFAULT_ALERT_SETTINGS, providerLevels: {} } })
+    const own = () => useAppPreferencesStore.getState().alertSettings.providerLevels
+    try {
+      render(
+        <SettingsPage
+          {...defaultProps}
+          plugins={[
+            { id: "claude", name: "Claude", enabled: true },
+            { id: "cursor", name: "Cursor", enabled: true },
+          ]}
+        />
+      )
+      await userEvent.selectOptions(screen.getByLabelText("Per provider"), "cursor")
+      await userEvent.click(screen.getByRole("checkbox", { name: "Same as all providers" }))
+      expect(own()).toEqual({ cursor: [80, 95] })
+      await userEvent.click(within(screen.getByRole("group", { name: "Cursor" })).getByRole("button", { name: "80%" }))
+      expect(own()).toEqual({ cursor: [95] })
+      expect(screen.getByRole("option", { name: "Cursor · 95%" })).toBeInTheDocument()
+      await userEvent.click(screen.getByRole("checkbox", { name: "Same as all providers" }))
+      expect(own()).toEqual({})
+    } finally {
+      useAppPreferencesStore.setState({ usageAlerts: saved.usageAlerts, alertSettings: saved.alertSettings })
+    }
+  })
+
   it("lists enabled providers first, keeping their order", () => {
     render(
       <SettingsPage
@@ -126,7 +155,10 @@ describe("SettingsPage", () => {
         ]}
       />
     )
-    const names = screen.getAllByText(/^(Alpha|Beta|Gamma|Delta)$/).map((el) => el.textContent)
+    // Not the per-provider alert picker's options.
+    const names = screen
+      .getAllByText(/^(Alpha|Beta|Gamma|Delta)$/, { ignore: "option, script, style" })
+      .map((el) => el.textContent)
     expect(names).toEqual(["Beta", "Delta", "Alpha", "Gamma"])
   })
 

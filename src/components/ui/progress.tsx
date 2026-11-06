@@ -6,13 +6,15 @@ interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
   value?: number
   indicatorColor?: string
   markerValue?: number
+  /** Thin notches at these positions (percent), e.g. the usage levels that notify. */
+  ticks?: readonly number[]
   refreshing?: boolean
   /** Usage spent unseen, `from` in this bar's own terms (100 - used when it shows what's left). */
   unseen?: { from: number; settling: boolean } | null
 }
 
 const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
-  ({ className, value = 0, indicatorColor, markerValue, refreshing, unseen, ...props }, ref) => {
+  ({ className, value = 0, indicatorColor, markerValue, ticks, refreshing, unseen, ...props }, ref) => {
     const clamped = Math.min(100, Math.max(0, value))
     const unseenFrom = unseen ? Math.min(100, Math.max(0, unseen.from)) : clamped
     const hatchStart = Math.min(unseenFrom, clamped)
@@ -67,6 +69,18 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
             style={{ left: `${hatchStart}%`, width: `${hatchWidth}%`, color: indicatorColor }}
           />
         )}
+        {ticks
+          ?.filter((tick) => tick > 0 && tick < 100)
+          .map((tick) => (
+            <div
+              key={tick}
+              data-slot="progress-tick"
+              aria-hidden="true"
+              // Not --background: the Mica/Acrylic backdrop makes it transparent.
+              className="absolute inset-y-0 w-px -translate-x-1/2 pointer-events-none bg-foreground/35"
+              style={{ left: `${tick}%` }}
+            />
+          ))}
         {showMarker && (
           <div
             data-slot="progress-marker"
