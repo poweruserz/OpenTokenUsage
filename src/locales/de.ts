@@ -236,6 +236,8 @@ export const de: Messages = {
   "alert.pace.body": "Bei diesem Tempo ist das Limit in {time} erreicht – vor dem Zurücksetzen.",
   "alert.update.title": "OpenTokenUsage {version} ist bereit",
   "alert.update.body": "Öffnen Sie den Bereich und wählen Sie „Zum Aktualisieren neu starten“.",
+  "alert.signIn.title": "{provider}: erneut anmelden",
+  "alert.signIn.body": "Die Nutzung wird erst wieder aktualisiert, wenn Sie sich erneut anmelden.",
 
   "sparkline.peak": "Höchstwert {value}",
   "sparkline.summary": "{label}: {days} Tage, zuletzt {latest} am {date}, Höchstwert {peak}.",

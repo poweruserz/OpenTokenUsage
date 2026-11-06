@@ -116,7 +116,7 @@ export const PLUGIN_ERROR_PATTERNS: readonly { pattern: RegExp; key: PluginError
   { pattern: /^Couldn't update data\. Try again\?$/, key: "updateFailed" },
 ]
 
-function matchPluginError(message: string) {
+export function matchPluginError(message: string) {
   for (const { pattern, key } of PLUGIN_ERROR_PATTERNS) {
     const match = pattern.exec(message)
     if (match) return { key, vars: match.groups ?? {} }
