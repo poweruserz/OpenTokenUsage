@@ -76,7 +76,8 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
               key={tick}
               data-slot="progress-tick"
               aria-hidden="true"
-              className="absolute inset-y-0 w-px -translate-x-1/2 pointer-events-none bg-background/80"
+              // Not --background: the Mica/Acrylic backdrop makes it transparent.
+              className="absolute inset-y-0 w-px -translate-x-1/2 pointer-events-none bg-foreground/35"
               style={{ left: `${tick}%` }}
             />
           ))}
