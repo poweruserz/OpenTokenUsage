@@ -240,6 +240,8 @@ export const ko: Messages = {
   "alert.pace.body": "이 속도라면 초기화 전 {time} 후 한도에 도달합니다.",
   "alert.update.title": "OpenTokenUsage {version} 준비 완료",
   "alert.update.body": "패널을 열고 다시 시작하여 업데이트를 선택하세요.",
+  "alert.signIn.title": "{provider}: 다시 로그인하세요",
+  "alert.signIn.body": "다시 로그인할 때까지 사용량이 업데이트되지 않습니다.",
 
   "sparkline.peak": "최고 {value}",
   "sparkline.summary": "{label}: {days}일, 최근 {date} {latest}, 최고 {peak}.",

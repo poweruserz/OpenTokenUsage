@@ -240,6 +240,8 @@ export const tr: Messages = {
   "alert.pace.body": "Bu tempoyla limit, sıfırlanmadan önce {time} içinde dolacak.",
   "alert.update.title": "OpenTokenUsage {version} hazır",
   "alert.update.body": "Paneli açıp Güncelleştirmek için yeniden başlat butonuna basın.",
+  "alert.signIn.title": "{provider}: yeniden giriş yapın",
+  "alert.signIn.body": "Yeniden giriş yapana kadar kullanımı güncellenmez.",
 
   "sparkline.peak": "en yüksek {value}",
   "sparkline.summary": "{label}: {days} gün, son değer {latest} ({date}), en yüksek {peak}.",
