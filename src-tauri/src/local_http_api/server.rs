@@ -247,7 +247,9 @@ fn handle_post_claude_statusline(body: &[u8]) -> String {
         .unwrap_or_default();
     if app_data_dir.as_os_str().is_empty() || !crate::claude_statusline::record(body, &app_data_dir)
     {
-        return response_json(400, "Bad Request", r#"{"error":"no_rate_limits"}"#);
+        // No body: curl prints whatever comes back, and Claude Code shows it as its status line.
+        return "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
+            .to_string();
     }
     response_no_content()
 }
@@ -534,6 +536,10 @@ mod tests {
         assert!(saved.contains(r#""usedPercent":42.0"#), "{saved}");
 
         assert!(route("GET", "/v1/claude/statusline", b"").starts_with("HTTP/1.1 405"));
-        assert!(route("POST", "/v1/claude/statusline", b"{}").starts_with("HTTP/1.1 400"));
+        // Before Claude Code's first answer the post has no windows: nothing may reach its status line.
+        let empty = route("POST", "/v1/claude/statusline", b"{}");
+        assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
+        assert!(empty.ends_with("\r\n\r\n"), "{empty}");
+        assert!(resp.ends_with("\r\n\r\n"), "{resp}");
     }
 }

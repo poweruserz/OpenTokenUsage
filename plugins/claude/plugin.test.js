@@ -2476,8 +2476,12 @@ describe("claude plugin", () => {
       expect(usageRequestCount(ctx)).toBe(1)
       return ctx
     }
-    const postStatusLine = (ctx, ageMs, windows = LIVE) =>
+    // A snapshot counts only once the probe has seen the current login (account-seen.json).
+    const postStatusLine = (ctx, ageMs, windows = LIVE) => {
+      const seen = JSON.parse(ctx.host.fs.readText(DIR + "/account-seen.json"))
+      ctx.host.fs.writeText(DIR + "/account-seen.json", JSON.stringify({ ...seen, since: Date.now() - 10 * 60_000 }))
       ctx.host.fs.writeText(DIR + "/statusline.json", JSON.stringify({ capturedAt: Date.now() - ageMs, ...windows }))
+    }
     const ageLastAnswer = (ctx, ms) => {
       const saved = JSON.parse(ctx.host.fs.readText(DIR + "/last-usage.json"))
       ctx.host.fs.writeText(DIR + "/last-usage.json", JSON.stringify({ ...saved, at: saved.at - ms }))
@@ -2516,6 +2520,26 @@ describe("claude plugin", () => {
       ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-2" } }))
       expect((await probe(ctx)).session).toBe(5)
       expect(usageRequestCount(ctx)).toBe(3)
+    })
+
+    it("never lays the previous account's snapshot over a new login", async () => {
+      const ctx = await setup()
+      postStatusLine(ctx, 60_000, { fiveHour: { usedPercent: 90, resetsAtMs: Date.parse(RESETS) } })
+      ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-2" } }))
+      expect((await probe(ctx)).session).toBe(5)
+      expect((await probe(ctx)).session).toBe(5)
+      expect(usageRequestCount(ctx)).toBe(3)
+    })
+
+    it("shows its two rows on a 429 even before any answer was kept", async () => {
+      const ctx = makeCtx()
+      ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "token" } }))
+      ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-1" } }))
+      ctx.host.http.request.mockImplementation(() => ({ status: 429, bodyText: "", headers: { "retry-after": "3600" } }))
+      await expect(probe(ctx)).rejects.toThrow("Rate limited")
+
+      postStatusLine(ctx, 60_000)
+      expect(await probe(ctx)).toEqual({ session: 17, weekly: 19, fable: undefined })
     })
 
     it("counts a window it leaves out as reset once the last answer's reset has passed", async () => {

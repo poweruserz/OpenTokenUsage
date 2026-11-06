@@ -680,12 +680,26 @@
     return w && typeof w.usedPercent === "number" && typeof w.resetsAtMs === "number" ? w : null
   }
 
-  function loadLiveLimits(ctx, nowMs) {
+  // The status line carries no account, so one posted before this probe first saw the current
+  // login may be another account's: only a snapshot captured since then counts.
+  function accountSince(ctx, account, nowMs) {
+    const path = ctx.app.pluginDataDir + "/account-seen.json"
+    try {
+      const saved = ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
+      if (saved && saved.account === account && typeof saved.since === "number") return saved.since
+      ctx.host.fs.writeText(path, JSON.stringify({ account: account, since: nowMs }))
+    } catch (e) {
+      ctx.host.log.warn("account change check failed: " + String(e))
+    }
+    return nowMs
+  }
+
+  function loadLiveLimits(ctx, nowMs, since) {
     const path = ctx.app.pluginDataDir + "/statusline.json"
     try {
       if (!ctx.host.fs.exists(path)) return null
       const saved = ctx.util.tryParseJson(ctx.host.fs.readText(path))
-      if (!saved || typeof saved.capturedAt !== "number") return null
+      if (!saved || typeof saved.capturedAt !== "number" || saved.capturedAt < since) return null
       const age = nowMs - saved.capturedAt
       if (age < -60 * 1000 || age >= STATUS_LINE_FRESH_MS) return null
       const fiveHour = liveWindow(saved.fiveHour)
@@ -710,8 +724,7 @@
     return fingerprint ? "login:" + fingerprint : null
   }
 
-  function loadLastUsage(ctx, creds) {
-    const account = usageAccount(ctx, creds)
+  function loadLastUsage(ctx, account) {
     const path = ctx.app.pluginDataDir + "/last-usage.json"
     if (!account || !ctx.host.fs.exists(path)) return null
     try {
@@ -724,8 +737,7 @@
     }
   }
 
-  function saveLastUsage(ctx, creds, nowMs, data) {
-    const account = usageAccount(ctx, creds)
+  function saveLastUsage(ctx, account, nowMs, data) {
     if (!account) return
     try {
       const path = ctx.app.pluginDataDir + "/last-usage.json"
@@ -1168,8 +1180,9 @@
     let lines = []
     let usageFetched = false
     if (canFetchLiveUsage) {
-      const live = loadLiveLimits(ctx, nowMs)
-      const last = live ? loadLastUsage(ctx, creds) : null
+      const account = usageAccount(ctx, creds)
+      const live = account ? loadLiveLimits(ctx, nowMs, accountSince(ctx, account, nowMs)) : null
+      const last = live ? loadLastUsage(ctx, account) : null
       if (live && last && nowMs - last.at < LIVE_API_INTERVAL_MS) {
         ctx.host.log.info("usage from Claude Code's status line")
         data = withLiveLimits(last.data, live, nowMs)
@@ -1222,9 +1235,10 @@
           // further requests to this URL until Retry-After passes (synthetic 429, no network).
           const message = rateLimitedMessage(parseRetryAfterSeconds(resp.headers))
           ctx.host.log.warn("usage rate limited (429): " + message)
-          if (!live || !last) throw message
+          if (!live) throw message
+          // Without an earlier answer the status line still gives the 5-hour and weekly rows.
           ctx.host.log.info("showing Claude Code's status line while rate limited")
-          data = withLiveLimits(last.data, live, nowMs)
+          data = withLiveLimits(last ? last.data : {}, live, nowMs)
         } else {
           if (resp.status < 200 || resp.status >= 300) {
             ctx.host.log.error("usage returned error: status=" + resp.status)
@@ -1236,7 +1250,8 @@
             throw "Usage response invalid. Try again later."
           }
           usageFetched = true
-          saveLastUsage(ctx, creds, nowMs, data)
+          // After a refresh the token pair changed: key the answer to the login now on disk.
+          saveLastUsage(ctx, usageAccount(ctx, creds), nowMs, data)
         }
       }
     } else {
