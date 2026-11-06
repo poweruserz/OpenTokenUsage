@@ -105,6 +105,25 @@ describe("useLoginRecovery", () => {
     expect(startBatch).not.toHaveBeenCalled()
   })
 
+  it("doesn't take another card's token refresh in a shared login folder for a sign-in", async () => {
+    // CLAUDE_CONFIG_DIR set to an extra account's folder: both cards read one login file.
+    const ids = ["claude", "claude-1a2b3c4d"]
+    const { rerender, startBatch } = mount({ claude: state(EXPIRED), [ids[1]]: state(EXPIRED) }, true, ids)
+    await settle()
+    for (let i = 0; i < 3; i++) {
+      rerender({ pluginStates: { claude: { ...state(null), loading: true }, [ids[1]]: state(EXPIRED) } })
+      await settle()
+      stamp! += 100
+      await act(async () => vi.advanceTimersByTime(LOGIN_CHECK_MS))
+      await settle()
+      rerender({ pluginStates: { claude: state(EXPIRED), [ids[1]]: state(EXPIRED) } })
+      await settle()
+      await act(async () => vi.advanceTimersByTime(LOGIN_CHECK_MS))
+      await settle()
+    }
+    expect(startBatch).not.toHaveBeenCalled()
+  })
+
   it("puts the error back when the probe can't start", async () => {
     const { startBatch, setErrorForPlugins } = mount({ claude: state(EXPIRED) })
     startBatch.mockRejectedValueOnce(new Error("no runtime"))
