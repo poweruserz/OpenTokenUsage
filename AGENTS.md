@@ -9,7 +9,7 @@
 - Use `trash` for deletes
 - Use `mv` / `cp` to move and copy files
 - Bugs: add regression test when it fits
-- Keep files <~400 LOC; split/refactor as needed
+- A self-contained new feature gets its own module/component. Existing large files (`src/lib/settings.ts`, `src/pages/settings.tsx`, `src/components/provider-card.tsx`) are not split as part of a feature change; splitting one is its own change
 - Simplicity first: handle only important cases; no enterprise over-engineering/fallbacks
 - New functionality: small OR absolutely necessary
 - NEVER delete files, folders or other data unless explicilty approved or part of a plan
@@ -24,7 +24,8 @@
 
 ## Error Handling
 - Expected issues: explicit result types (not throw/try/catch).
-- Unexpected issues: fail LOUD (throw/console.error + toast.error); NEVER add silent fallbacks.
+- Unexpected issues: fail LOUD (throw/console.error); NEVER add silent fallbacks. Show the failure where the user acted when there is a place for it (an inline message, the card's error). The app has no toast system: don't call `toast.error`.
+- A failed settings save is logged with `console.error` only, the same for every setting; a visible save error would be one app-wide change, not part of a feature PR.
 
 ## Before Creating Pull Request
 - Before creating a PR or pushing to main, ensure that `README.md` is updated with what plugins are supported.
