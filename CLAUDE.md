@@ -138,8 +138,10 @@ This file holds the project facts that are easy to get wrong.
   accounts, logins, panel position, sent alerts, update/star state); `settings_backup.rs` writes it to Downloads
   (write aside, then swap) and reveals it (no dialog plugin, no webview reveal permission). Import writes those keys
   raw and removes the ones the backup lacks (they were at their default there), then `relaunch()`: every loader checks
-  its value at startup. Kept from this PC: a custom alert sound (its WAV isn't in the backup) and its account/WSL
-  cards with their on/off state. A new preference key belongs in `BACKUP_KEYS` too.
+  its value at startup. Kept from this PC: a custom alert sound (its WAV isn't in the backup), and its account/WSL
+  cards in every setting that names cards (`plugins`, `trayHiddenPlugins`, `providerLevels`, the strip's providers and
+  line modes, `trayProvider`); the backup's card ids are dropped. A new preference key belongs in `BACKUP_KEYS` too,
+  and a new setting that names cards in `restoredValue`.
 - Pace (`pace-status.ts`): one elapsed share for everything that shows it (card dot, marker, deficit, tray,
   pace alert) via `paceElapsedFraction`; with `paceWorkdays` a ~7-day window counts Mon–Fri (local time) only.
 - Currency (`src/lib/currency.ts`, setting `currency`): providers report US dollars; the card shows `dollars`

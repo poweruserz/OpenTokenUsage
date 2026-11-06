@@ -68,6 +68,49 @@ describe("settings backup", () => {
     expect(await loadAlertSettings()).toMatchObject({ levels: [80, 95], sound: "windows", customSoundName: "mine.wav" })
   })
 
+  it("keeps every per-card setting of this PC's cards and drops the other PC's card ids", async () => {
+    storeState.set("trayHiddenPlugins", ["claude-1a2b3c4d"])
+    storeState.set("alertSettings", { levels: [80, 95], providerLevels: { "claude-1a2b3c4d": [] } })
+    storeState.set("taskbarStripStyle", { providers: ["claude-1a2b3c4d", "claude"], lineModes: { "claude-1a2b3c4d": "weekly" } })
+    storeState.set("trayProvider", "claude-1a2b3c4d")
+    await restoreSettingsBackup(
+      backup({
+        trayHiddenPlugins: ["cursor", "claude-99999999"],
+        alertSettings: { levels: [70], sound: "chime", providerLevels: { cursor: [90], "claude-99999999": [50] } },
+        taskbarStripStyle: { providers: ["codex", "claude-99999999"], lineModes: { codex: "session", "claude-99999999": "both" } },
+        trayProvider: "claude-99999999",
+      })
+    )
+    expect(storeState.get("trayHiddenPlugins")).toEqual(["cursor", "claude-1a2b3c4d"])
+    expect(storeState.get("alertSettings")).toMatchObject({ levels: [70], providerLevels: { cursor: [90], "claude-1a2b3c4d": [] } })
+    expect(storeState.get("taskbarStripStyle")).toMatchObject({
+      providers: ["codex", "claude-1a2b3c4d"],
+      lineModes: { codex: "session", "claude-1a2b3c4d": "weekly" },
+    })
+    expect(storeState.get("trayProvider")).toBe("claude-1a2b3c4d")
+
+    // A backup that never changed these keeps this PC's cards in them too.
+    await restoreSettingsBackup(backup({ themeMode: "light" }))
+    expect(storeState.get("trayHiddenPlugins")).toEqual(["claude-1a2b3c4d"])
+    expect(storeState.get("taskbarStripStyle")).toMatchObject({ providers: null, lineModes: { "claude-1a2b3c4d": "weekly" } })
+  })
+
+  it("keeps this PC's provider list and sound when the backup's values are damaged", async () => {
+    storeState.set("plugins", { order: ["claude", "claude-1a2b3c4d"], disabled: [] })
+    storeState.set("alertSettings", { levels: [95], sound: "custom", customSoundName: "mine.wav" })
+    await restoreSettingsBackup(backup({ plugins: null, alertSettings: null }))
+    expect(storeState.get("plugins")).toEqual({ order: ["claude", "claude-1a2b3c4d"], disabled: [] })
+    expect(await loadAlertSettings()).toMatchObject({ customSoundName: "mine.wav" })
+
+    for (const plugins of [{ order: "claude" }, { order: ["codex"], disabled: "x" }]) {
+      await restoreSettingsBackup(backup({ plugins }))
+      expect(storeState.get("plugins")).toEqual({ order: ["claude", "claude-1a2b3c4d"], disabled: [] })
+    }
+    // A strip style without its provider list shows the first enabled ones, as it would there.
+    await restoreSettingsBackup(backup({ taskbarStripStyle: { fontSize: 13 } }))
+    expect(storeState.get("taskbarStripStyle")).toMatchObject({ fontSize: 13, providers: null })
+  })
+
   it("never brings over the other PC's custom file name, even with a built-in sound chosen", async () => {
     await restoreSettingsBackup(backup({ alertSettings: { levels: [80], sound: "chime", customSoundName: "ding.mp3" } }))
     expect(await loadAlertSettings()).toMatchObject({ sound: "chime", customSoundName: null })
