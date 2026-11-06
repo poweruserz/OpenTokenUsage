@@ -285,6 +285,7 @@ export const tr: Messages = {
   "label.Today": "Bugün",
   "label.Yesterday": "Dün",
   "label.Last 30 Days": "Son 30 gün",
+  "label.Cache Hit Rate": "Önbellek isabet oranı",
   "label.Credits": "Krediler",
   "label.Balance": "Bakiye",
   "label.Status": "Durum",

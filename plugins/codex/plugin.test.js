@@ -499,6 +499,27 @@ describe("codex plugin", () => {
     expect(result.lines.find((l) => l.label === "Session")).toBeTruthy()
   })
 
+  it("shows the share of the 30 days' input read from the prompt cache", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.writeText("~/.codex/auth.json", JSON.stringify({
+      tokens: { access_token: "token" },
+      last_refresh: new Date().toISOString(),
+    }))
+    ctx.host.http.request.mockReturnValue({ status: 200, headers: {}, bodyText: JSON.stringify({}) })
+    ctx.host.ccusage.query.mockReturnValue({
+      status: "ok",
+      data: {
+        daily: [
+          // OpenAI counts cached input inside inputTokens.
+          { date: "Feb 20, 2026", inputTokens: 1000, cachedInputTokens: 750, outputTokens: 10, totalTokens: 1010 },
+          { date: "Feb 19, 2026", inputTokens: 1000, cachedInputTokens: 850, outputTokens: 10, totalTokens: 1010 },
+        ],
+      },
+    })
+    const result = (await loadPlugin()).probe(ctx)
+    expect(result.lines.find((l) => l.label === "Cache Hit Rate")).toMatchObject({ type: "text", value: "80%" })
+  })
+
   it("adds token lines from codex ccusage format and passes codex provider", async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-02-20T16:00:00.000Z"))

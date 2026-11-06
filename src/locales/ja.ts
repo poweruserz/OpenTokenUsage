@@ -285,6 +285,7 @@ export const ja: Messages = {
   "label.Today": "今日",
   "label.Yesterday": "昨日",
   "label.Last 30 Days": "過去30日間",
+  "label.Cache Hit Rate": "キャッシュヒット率",
   "label.Credits": "クレジット",
   "label.Balance": "残高",
   "label.Status": "状態",

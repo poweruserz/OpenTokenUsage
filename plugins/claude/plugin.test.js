@@ -1812,6 +1812,22 @@ describe("claude plugin", () => {
       expect(todayLine.value).toContain("$0.75")
     })
 
+    it("shows the share of the 30 days' input read from the prompt cache", async () => {
+      const todayKey = localDayKey(new Date())
+      const ctx = makeProbeCtx({
+        ccusageResult: okUsage([
+          { date: todayKey, inputTokens: 100, outputTokens: 50, cacheCreationTokens: 300, cacheReadTokens: 1600, totalTokens: 2050 },
+          { date: "2026-01-01", inputTokens: 0, outputTokens: 10, cacheCreationTokens: 0, cacheReadTokens: 2000, totalTokens: 2010 },
+        ]),
+      })
+      const result = (await loadPlugin()).probe(ctx)
+      // 3600 of 4000 input tokens were cache reads.
+      expect(result.lines.find((l) => l.label === "Cache Hit Rate")).toMatchObject({ type: "text", value: "90%" })
+
+      const noInput = makeProbeCtx({ ccusageResult: okUsage([{ date: todayKey, outputTokens: 5, totalTokens: 5 }]) })
+      expect((await loadPlugin()).probe(noInput).lines.find((l) => l.label === "Cache Hit Rate")).toBeUndefined()
+    })
+
     it("adds Yesterday line when ccusage returns yesterday's data", async () => {
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)

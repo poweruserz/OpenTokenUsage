@@ -285,6 +285,7 @@ export const zhCN: Messages = {
   "label.Today": "今天",
   "label.Yesterday": "昨天",
   "label.Last 30 Days": "近30天",
+  "label.Cache Hit Rate": "缓存命中率",
   "label.Credits": "额度",
   "label.Balance": "余额",
   "label.Status": "状态",

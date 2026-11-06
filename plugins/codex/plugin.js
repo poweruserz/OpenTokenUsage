@@ -933,6 +933,22 @@
           }))
         }
 
+        // Share of the 30 days' input read from the prompt cache. OpenAI's `inputTokens` already
+        // include the cached ones (`cachedInputTokens` is a part of it).
+        let cachedInput = 0
+        let input = 0
+        for (let i = 0; i < tokenUsage.daily.length; i++) {
+          const day = tokenUsage.daily[i] || {}
+          const dayInput = Number(day.inputTokens)
+          const dayCached = Number(day.cachedInputTokens)
+          if (Number.isFinite(dayInput) && dayInput > 0) input += dayInput
+          if (Number.isFinite(dayCached) && dayCached > 0) cachedInput += dayCached
+        }
+        if (input > 0) {
+          const rate = Math.round((Math.min(cachedInput, input) / input) * 100)
+          lines.push(ctx.line.text({ label: "Cache Hit Rate", value: rate + "%" }))
+        }
+
         pushUsageChartLine(lines, ctx, tokenUsage.daily)
         pushModelUsageLines(lines, ctx, tokenUsage.daily)
       }

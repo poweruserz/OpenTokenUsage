@@ -1006,6 +1006,20 @@
     }
   }
 
+  // Share of the 30 days' input read from the prompt cache. Anthropic counts cache reads and writes
+  // apart from `inputTokens`, so all three make up the input.
+  function pushCacheHitLine(lines, ctx, daily) {
+    let read = 0
+    let input = 0
+    for (let i = 0; i < daily.length; i++) {
+      const day = daily[i] || {}
+      const fields = [Number(day.inputTokens), Number(day.cacheCreationTokens), Number(day.cacheReadTokens)]
+      for (let j = 0; j < fields.length; j++) if (Number.isFinite(fields[j]) && fields[j] > 0) input += fields[j]
+      if (Number.isFinite(fields[2]) && fields[2] > 0) read += fields[2]
+    }
+    if (input > 0) lines.push(ctx.line.text({ label: "Cache Hit Rate", value: Math.round((read / input) * 100) + "%" }))
+  }
+
   function pushLocalUsageLines(lines, ctx, usage) {
     const now = new Date()
     const todayKey = dayKeyFromDate(now)
@@ -1050,6 +1064,7 @@
         value: costAndTokensLabel({ tokens: totalTokens, costUSD: hasCost ? totalCostNanos / 1e9 : null })
       }))
     }
+    pushCacheHitLine(lines, ctx, usage.daily)
 
     pushUsageChartLine(lines, ctx, usage.daily)
     pushModelUsageLines(lines, ctx, usage.daily)

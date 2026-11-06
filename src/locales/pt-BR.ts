@@ -285,6 +285,7 @@ export const ptBR: Messages = {
   "label.Today": "Hoje",
   "label.Yesterday": "Ontem",
   "label.Last 30 Days": "Últimos 30 dias",
+  "label.Cache Hit Rate": "Taxa de acerto do cache",
   "label.Credits": "Créditos",
   "label.Balance": "Saldo",
   "label.Status": "Status",

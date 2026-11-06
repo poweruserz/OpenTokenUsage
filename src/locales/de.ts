@@ -285,6 +285,7 @@ export const de: Messages = {
   "label.Today": "Heute",
   "label.Yesterday": "Gestern",
   "label.Last 30 Days": "Letzte 30 Tage",
+  "label.Cache Hit Rate": "Cache-Trefferquote",
   "label.Credits": "Guthaben",
   "label.Balance": "Saldo",
   "label.Status": "Status",

@@ -285,6 +285,7 @@ export const esES: Messages = {
   "label.Today": "Hoy",
   "label.Yesterday": "Ayer",
   "label.Last 30 Days": "Últimos 30 días",
+  "label.Cache Hit Rate": "Tasa de aciertos de caché",
   "label.Credits": "Créditos",
   "label.Balance": "Saldo",
   "label.Status": "Estado",
