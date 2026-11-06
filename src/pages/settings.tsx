@@ -37,6 +37,7 @@ import {
   RESET_TIMER_DISPLAY_OPTIONS,
   saveAlertSettings,
   saveLanguage,
+  savePaceWorkdays,
   saveRememberPanelPosition,
   saveTrayHiddenPlugins,
   saveTrayLogoColors,
@@ -164,6 +165,29 @@ function TrayIconStylePreview({
     <span className="text-[13px] font-bold tabular-nums leading-none">
       {(traySettingsPreview.providerPercentText || "0%").replace(/%$/, "")}
     </span>
+  );
+}
+
+function PaceWorkdaysToggle() {
+  const workdays = useAppPreferencesStore((state) => state.paceWorkdays);
+  const setWorkdays = useAppPreferencesStore((state) => state.setPaceWorkdays);
+  return (
+    <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
+      <Checkbox
+        key={`pace-workdays-${workdays}`}
+        checked={workdays}
+        className="mt-0.5"
+        onCheckedChange={(checked) => {
+          const next = checked === true;
+          setWorkdays(next);
+          void savePaceWorkdays(next).catch((error) => console.error("Failed to save the work-day pace setting:", error));
+        }}
+      />
+      <span>
+        {t("settings.usageMode.workdays")}
+        <span className="block text-xs text-muted-foreground">{t("settings.usageMode.workdaysHint")}</span>
+      </span>
+    </label>
   );
 }
 
@@ -601,6 +625,7 @@ export function SettingsPage({
           value={displayMode}
           onChange={onDisplayModeChange}
         />
+        <PaceWorkdaysToggle />
       </SettingsSection>
 
       <SettingsSection title={t("settings.resetTimers.title")} description={t("settings.resetTimers.desc")}>

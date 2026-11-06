@@ -30,6 +30,7 @@ import {
   loadPanelPinned,
   loadRememberPanelPosition,
   loadTrayLogoColors,
+  loadPaceWorkdays,
   loadTaskbarStrip,
   loadTaskbarStripStyle,
   loadTrayPercentColor,
@@ -79,6 +80,7 @@ type UseSettingsBootstrapArgs = {
   setPanelPinned: (value: boolean) => void
   setRememberPanelPosition: (value: boolean) => void
   setTrayLogoColors: (value: boolean) => void
+  setPaceWorkdays: (value: boolean) => void
   setTaskbarStrip: (value: boolean) => void
   setTaskbarStripStyle: (value: TaskbarStripStyle) => void
   setLoadingForPlugins: (ids: string[]) => void
@@ -106,6 +108,7 @@ export function useSettingsBootstrap({
   setPanelPinned,
   setRememberPanelPosition,
   setTrayLogoColors,
+  setPaceWorkdays,
   setTaskbarStrip,
   setTaskbarStripStyle,
   setLoadingForPlugins,
@@ -168,6 +171,12 @@ export function useSettingsBootstrap({
         }
       } catch (error) {
         console.error("Failed to load tray logo/taskbar strip settings:", error)
+      }
+      try {
+        const workdays = await loadPaceWorkdays()
+        if (isMounted) setPaceWorkdays(workdays)
+      } catch (error) {
+        console.error("Failed to load the work-day pace setting:", error)
       }
       try {
         const storedLanguage = await loadLanguage()
@@ -320,6 +329,7 @@ export function useSettingsBootstrap({
     setPanelPinned,
     setRememberPanelPosition,
     setTrayLogoColors,
+    setPaceWorkdays,
     setTaskbarStrip,
     setTaskbarStripStyle,
     migrateWindsurfToDevin,

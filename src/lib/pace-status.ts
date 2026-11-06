@@ -1,5 +1,39 @@
 export type PaceStatus = "ahead" | "on-track" | "behind"
 
+const DAY_MS = 24 * 60 * 60 * 1000
+const WEEK_MS = 7 * DAY_MS
+
+/** Time between two instants that falls on Monday to Friday (local time). */
+export function workdayMs(fromMs: number, toMs: number): number {
+  let total = 0
+  for (let at = fromMs; at < toMs; ) {
+    const day = new Date(at)
+    const nextMidnight = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime()
+    const end = Math.min(nextMidnight, toMs)
+    if (day.getDay() !== 0 && day.getDay() !== 6) total += end - at
+    at = end
+  }
+  return total
+}
+
+/**
+ * How much of a window has passed (0..1, unclamped outside it). With `workdays`, a weekly window
+ * counts only Monday to Friday, so a weekend without use doesn't read as being ahead of pace.
+ */
+export function paceElapsedFraction(
+  resetsAtMs: number,
+  periodDurationMs: number,
+  nowMs: number,
+  workdays = false
+): number {
+  const startMs = resetsAtMs - periodDurationMs
+  if (workdays && Math.abs(periodDurationMs - WEEK_MS) < DAY_MS) {
+    const total = workdayMs(startMs, resetsAtMs)
+    if (total > 0) return workdayMs(startMs, Math.min(Math.max(nowMs, startMs), resetsAtMs)) / total
+  }
+  return (nowMs - startMs) / periodDurationMs
+}
+
 export type PaceResult = {
   status: PaceStatus
   /** Projected usage at end of period (same unit as used/limit) */
@@ -14,6 +48,7 @@ export type PaceResult = {
  * @param resetsAtMs - Timestamp (ms) when the period resets
  * @param periodDurationMs - Total duration of the period (ms)
  * @param nowMs - Current timestamp (ms)
+ * @param workdays - A weekly window counts Monday to Friday only (`paceElapsedFraction`)
  * @returns PaceResult or null if calculation not possible
  */
 export function calculatePaceStatus(
@@ -21,7 +56,8 @@ export function calculatePaceStatus(
   limit: number,
   resetsAtMs: number,
   periodDurationMs: number,
-  nowMs: number
+  nowMs: number,
+  workdays = false
 ): PaceResult | null {
   if (
     !Number.isFinite(used) ||
@@ -42,14 +78,14 @@ export function calculatePaceStatus(
   // No usage = definitionally ahead of pace (skip 5% threshold)
   if (used === 0) return { status: "ahead", projectedUsage: 0 }
 
-  const usageRate = used / elapsedMs
-  const projectedUsage = usageRate * periodDurationMs
+  const elapsedFraction = paceElapsedFraction(resetsAtMs, periodDurationMs, nowMs, workdays)
+  // A weekend at the start of a work-day week has no work time yet.
+  const projectedUsage = elapsedFraction > 0 ? used / elapsedFraction : used
 
   // Already at/over limit = definitionally behind (skip 5% threshold)
   if (used >= limit) return { status: "behind", projectedUsage }
 
   // Too early to predict accurately (< 5% of period elapsed)
-  const elapsedFraction = elapsedMs / periodDurationMs
   if (elapsedFraction < 0.05) return null
 
   // Normal classification
@@ -74,7 +110,8 @@ export function calculateDeficit(
   limit: number,
   resetsAtMs: number,
   periodDurationMs: number,
-  nowMs: number
+  nowMs: number,
+  workdays = false
 ): number | null {
   if (
     !Number.isFinite(used) ||
@@ -91,7 +128,7 @@ export function calculateDeficit(
   const elapsedMs = nowMs - periodStartMs
   if (elapsedMs <= 0 || nowMs >= resetsAtMs) return null
 
-  const elapsedFraction = elapsedMs / periodDurationMs
+  const elapsedFraction = paceElapsedFraction(resetsAtMs, periodDurationMs, nowMs, workdays)
   if (elapsedFraction < 0.05 && used < limit) return null
 
   const expectedUsage = elapsedFraction * limit

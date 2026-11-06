@@ -57,6 +57,8 @@ export const tr: Messages = {
   "settings.usageMode.desc": "Kalan veya kullanılan miktarı göster",
   "settings.usageMode.left": "Kalan",
   "settings.usageMode.used": "Kullanılan",
+  "settings.usageMode.workdays": "Haftalık tempo iş günlerine göre",
+  "settings.usageMode.workdaysHint": "Yalnızca pazartesiden cumaya sayılır; sakin bir hafta sonu fazladan pay gibi görünmez.",
   "settings.resetTimers.title": "Sıfırlanma zamanı",
   "settings.resetTimers.desc": "Geri sayım veya saat",
   "settings.resetTimers.relative": "Göreli",

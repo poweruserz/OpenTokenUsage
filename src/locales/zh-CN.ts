@@ -57,6 +57,8 @@ export const zhCN: Messages = {
   "settings.usageMode.desc": "显示剩余量或已用量",
   "settings.usageMode.left": "剩余",
   "settings.usageMode.used": "已用",
+  "settings.usageMode.workdays": "每周进度按工作日计算",
+  "settings.usageMode.workdaysHint": "只计算周一到周五，安静的周末不会被当成多出来的余量。",
   "settings.resetTimers.title": "重置时间",
   "settings.resetTimers.desc": "倒计时或具体时间",
   "settings.resetTimers.relative": "相对",

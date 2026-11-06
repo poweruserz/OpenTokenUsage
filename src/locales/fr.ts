@@ -57,6 +57,8 @@ export const fr: Messages = {
   "settings.usageMode.desc": "Afficher ce qu'il reste ou ce qui a été utilisé",
   "settings.usageMode.left": "Restant",
   "settings.usageMode.used": "Utilisé",
+  "settings.usageMode.workdays": "Rythme hebdomadaire sur les jours ouvrés",
+  "settings.usageMode.workdaysHint": "Compter seulement du lundi au vendredi, pour qu’un week-end calme ne ressemble pas à de la marge.",
   "settings.resetTimers.title": "Minuteurs de réinitialisation",
   "settings.resetTimers.desc": "Compte à rebours ou heure",
   "settings.resetTimers.relative": "Relatif",

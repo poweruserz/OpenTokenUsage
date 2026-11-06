@@ -57,6 +57,8 @@ export const de: Messages = {
   "settings.usageMode.desc": "Verbleibende oder verbrauchte Menge anzeigen",
   "settings.usageMode.left": "Verbleibend",
   "settings.usageMode.used": "Verbraucht",
+  "settings.usageMode.workdays": "Wochentempo an Arbeitstagen",
+  "settings.usageMode.workdaysHint": "Nur Montag bis Freitag zählen, damit ein ruhiges Wochenende nicht wie freier Spielraum aussieht.",
   "settings.resetTimers.title": "Zurücksetzungszeit",
   "settings.resetTimers.desc": "Countdown oder Uhrzeit",
   "settings.resetTimers.relative": "Relativ",

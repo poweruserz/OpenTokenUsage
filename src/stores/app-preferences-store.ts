@@ -45,6 +45,7 @@ type AppPreferencesStore = {
   panelPinned: boolean
   rememberPanelPosition: boolean
   trayLogoColors: boolean
+  paceWorkdays: boolean
   taskbarStrip: boolean
   taskbarStripStyle: TaskbarStripStyle
   setAutoUpdateInterval: (value: AutoUpdateInterval) => void
@@ -64,6 +65,7 @@ type AppPreferencesStore = {
   setPanelPinned: (value: boolean) => void
   setRememberPanelPosition: (value: boolean) => void
   setTrayLogoColors: (value: boolean) => void
+  setPaceWorkdays: (value: boolean) => void
   setTaskbarStrip: (value: boolean) => void
   setTaskbarStripStyle: (value: TaskbarStripStyle) => void
   resetState: () => void
@@ -87,6 +89,7 @@ const initialState = {
   panelPinned: false,
   rememberPanelPosition: false,
   trayLogoColors: true,
+  paceWorkdays: false,
   taskbarStrip: false,
   taskbarStripStyle: DEFAULT_TASKBAR_STRIP_STYLE,
 }
@@ -110,6 +113,7 @@ export const useAppPreferencesStore = create<AppPreferencesStore>((set) => ({
   setPanelPinned: (value) => set({ panelPinned: value }),
   setRememberPanelPosition: (value) => set({ rememberPanelPosition: value }),
   setTrayLogoColors: (value) => set({ trayLogoColors: value }),
+  setPaceWorkdays: (value) => set({ paceWorkdays: value }),
   setTaskbarStrip: (value) => set({ taskbarStrip: value }),
   setTaskbarStripStyle: (value) => set({ taskbarStripStyle: value }),
   resetState: () => set(initialState),

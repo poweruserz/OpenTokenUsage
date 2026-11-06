@@ -57,6 +57,8 @@ export const ko: Messages = {
   "settings.usageMode.desc": "남은 양 또는 사용한 양 표시",
   "settings.usageMode.left": "남음",
   "settings.usageMode.used": "사용됨",
+  "settings.usageMode.workdays": "주간 속도를 평일 기준으로",
+  "settings.usageMode.workdaysHint": "월요일부터 금요일까지만 계산하므로 조용한 주말이 여유처럼 보이지 않습니다.",
   "settings.resetTimers.title": "초기화 타이머",
   "settings.resetTimers.desc": "카운트다운 또는 시각",
   "settings.resetTimers.relative": "상대",

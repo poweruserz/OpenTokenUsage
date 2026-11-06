@@ -57,6 +57,8 @@ export const ja: Messages = {
   "settings.usageMode.desc": "残量または使用量を表示",
   "settings.usageMode.left": "残り",
   "settings.usageMode.used": "使用済み",
+  "settings.usageMode.workdays": "週間ペースを平日で計算",
+  "settings.usageMode.workdaysHint": "月曜から金曜だけを数えるので、静かな週末が余裕のように見えません。",
   "settings.resetTimers.title": "リセット タイマー",
   "settings.resetTimers.desc": "カウントダウンまたは時刻",
   "settings.resetTimers.relative": "相対",

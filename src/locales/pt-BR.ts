@@ -57,6 +57,8 @@ export const ptBR: Messages = {
   "settings.usageMode.desc": "Mostre o que resta ou o que já foi usado",
   "settings.usageMode.left": "Restante",
   "settings.usageMode.used": "Usado",
+  "settings.usageMode.workdays": "Ritmo semanal em dias úteis",
+  "settings.usageMode.workdaysHint": "Conta só de segunda a sexta, para que um fim de semana tranquilo não pareça folga.",
   "settings.resetTimers.title": "Timers de redefinição",
   "settings.resetTimers.desc": "Contagem regressiva ou horário",
   "settings.resetTimers.relative": "Relativo",

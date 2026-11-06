@@ -13,6 +13,7 @@ import {
   type PluginSettings
 } from "@/lib/settings"
 import { collectResetCreditAlerts, collectUsageAlerts, type UsageAlert } from "@/lib/usage-alerts"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 // The toasts stay silent (an unpackaged app can't give them its own sound); one sound per batch
 // is played by the host, which also keeps quiet during Do Not Disturb.
@@ -45,6 +46,7 @@ export function useUsageAlerts({
 }) {
   // Keys of alerts already shown; persisted so a restart doesn't repeat them. null = still loading.
   const now = useNowTicker({ enabled, intervalMs: 60_000, pauseWhenHidden: false })
+  const paceWorkdays = useAppPreferencesStore((state) => state.paceWorkdays)
   const [loaded, setLoaded] = useState(false)
   const sentRef = useRef<Set<string> | null>(null)
   const pendingRef = useRef(new Set<string>())
@@ -94,7 +96,8 @@ export function useUsageAlerts({
           sent,
           nowMs: Date.now(),
           levels: settings.levels,
-          displayMode
+          displayMode,
+          workdays: paceWorkdays
         })
       )
     }
@@ -109,5 +112,5 @@ export function useUsageAlerts({
       })
       .catch((error) => console.error("Failed to show or save usage notification:", error))
       .finally(() => ready.forEach((alert) => alert.keys.forEach((key) => pendingRef.current.delete(key))))
-  }, [pluginStates, pluginsMeta, pluginSettings, enabled, settings, displayMode, now, loaded])
+  }, [pluginStates, pluginsMeta, pluginSettings, enabled, settings, displayMode, paceWorkdays, now, loaded])
 }

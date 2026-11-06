@@ -56,6 +56,8 @@ export function getTrayPrimaryBars(args: {
   preferredMetric?: string
   preferWeekly?: boolean
   nowMs?: number
+  /** Weekly pace counts Monday to Friday only. */
+  workdays?: boolean
 }): TrayPrimaryBar[] {
   const {
     pluginsMeta,
@@ -67,6 +69,7 @@ export function getTrayPrimaryBars(args: {
     preferredMetric,
     preferWeekly = false,
     nowMs = Date.now(),
+    workdays = false,
   } = args
   if (!pluginSettings) return []
 
@@ -132,7 +135,8 @@ export function getTrayPrimaryBars(args: {
               metricLine.limit,
               Date.parse(metricLine.resetsAt),
               metricLine.periodDurationMs,
-              nowMs
+              nowMs,
+              workdays
             )?.status
           }
         }

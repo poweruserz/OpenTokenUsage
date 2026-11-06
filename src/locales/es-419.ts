@@ -57,6 +57,8 @@ export const es419: Messages = {
   "settings.usageMode.desc": "Mostrar lo que queda o lo que usaste",
   "settings.usageMode.left": "Restante",
   "settings.usageMode.used": "Usado",
+  "settings.usageMode.workdays": "Ritmo semanal en días laborables",
+  "settings.usageMode.workdaysHint": "Cuenta solo de lunes a viernes, para que un fin de semana tranquilo no parezca margen de sobra.",
   "settings.resetTimers.title": "Tiempo de restablecimiento",
   "settings.resetTimers.desc": "Cuenta regresiva u hora del reloj",
   "settings.resetTimers.relative": "Relativo",

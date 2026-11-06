@@ -57,6 +57,8 @@ export const en = {
   "settings.usageMode.desc": "Show what's left or what you've used",
   "settings.usageMode.left": "Left",
   "settings.usageMode.used": "Used",
+  "settings.usageMode.workdays": "Weekly pace on work days",
+  "settings.usageMode.workdaysHint": "Count only Monday to Friday, so a quiet weekend doesn't look like room to spare.",
   "settings.resetTimers.title": "Reset timers",
   "settings.resetTimers.desc": "Countdown or clock time",
   "settings.resetTimers.relative": "Relative",

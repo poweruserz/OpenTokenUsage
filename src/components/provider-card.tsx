@@ -14,11 +14,12 @@ import { ProviderStatusBadge } from "@/components/provider-status-badge"
 import { useNowTicker } from "@/hooks/use-now-ticker"
 import { useUnseenUsage } from "@/hooks/use-unseen-usage"
 import { REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerDisplayMode, type TimeFormatMode } from "@/lib/settings"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import type { ManifestLine, MetricLine, PluginLink } from "@/lib/plugin-types"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
 import { clamp01, formatCountNumber, formatFixedPrecisionNumber } from "@/lib/utils"
 import { getDisplayedUsage } from "@/lib/usage-display"
-import { calculateDeficit, calculatePaceStatus, type PaceStatus } from "@/lib/pace-status"
+import { calculateDeficit, calculatePaceStatus, paceElapsedFraction, type PaceStatus } from "@/lib/pace-status"
 import { buildPaceDetailText, formatDeficitText, formatRunsOutText, getPaceStatusText } from "@/lib/pace-tooltip"
 import { formatResetAbsoluteLabel, formatResetRelativeLabel, formatResetTooltipText } from "@/lib/reset-tooltip"
 import { t, tLabel } from "@/lib/i18n"
@@ -381,6 +382,7 @@ function MetricLineRenderer({
   refreshing?: boolean
   pluginId?: string
 }) {
+  const paceWorkdays = useAppPreferencesStore((state) => state.paceWorkdays)
   const isProgress = line.type === "progress"
   const unseen = useUnseenUsage(
     isProgress && pluginId ? `${pluginId}|${line.label}` : null,
@@ -483,11 +485,11 @@ function MetricLineRenderer({
 
     // Calculate pace status if we have reset time and period duration
     const paceResult = hasPaceContext
-      ? calculatePaceStatus(line.used, line.limit, resetsAtMs, periodDurationMs!, now)
+      ? calculatePaceStatus(line.used, line.limit, resetsAtMs, periodDurationMs!, now, paceWorkdays)
       : null
     const paceStatus = paceResult?.status ?? null
     const elapsedPercent = hasTimeMarkerContext
-      ? clamp01((now - (resetsAtMs - periodDurationMs!)) / periodDurationMs!) * 100
+      ? clamp01(paceElapsedFraction(resetsAtMs, periodDurationMs!, now, paceWorkdays)) * 100
       : 0
     const paceMarkerValue = hasTimeMarkerContext && paceStatus && paceStatus !== "on-track"
       ? (displayMode === "used" ? elapsedPercent : 100 - elapsedPercent)
@@ -507,7 +509,7 @@ function MetricLineRenderer({
         : null
 
     const deficit = hasPaceContext && !isLimitReached
-      ? calculateDeficit(line.used, line.limit, resetsAtMs, periodDurationMs!, now)
+      ? calculateDeficit(line.used, line.limit, resetsAtMs, periodDurationMs!, now, paceWorkdays)
       : null
     const deficitText = deficit !== null
       ? formatDeficitText(deficit, line.format, displayMode)

@@ -88,6 +88,7 @@ vi.mock("@/lib/settings", () => ({
   loadTrayHiddenPlugins: loadTrayHiddenPluginsMock,
   loadUsageAlerts: vi.fn(async () => true),
   loadTrayLogoColors: vi.fn(async () => true),
+  loadPaceWorkdays: vi.fn(async () => true),
   loadTaskbarStrip: vi.fn(async () => false),
   loadTaskbarStripStyle: vi.fn(async () => ({})),
   loadTrayProvider: loadTrayProviderMock,
@@ -122,6 +123,7 @@ function createArgs() {
     setTrayHiddenPlugins: vi.fn(),
     setUsageAlerts: vi.fn(),
     setTrayLogoColors: vi.fn(),
+    setPaceWorkdays: vi.fn(),
     setTaskbarStrip: vi.fn(),
     setTaskbarStripStyle: vi.fn(),
     setLoadingForPlugins: vi.fn(),
@@ -229,6 +231,12 @@ describe("useSettingsBootstrap", () => {
 
     expect(disableAutostartMock).not.toHaveBeenCalled()
     expect(enableAutostartMock).not.toHaveBeenCalled()
+  })
+
+  it("loads the work-day pace setting", async () => {
+    const args = createArgs()
+    renderHook(() => useSettingsBootstrap(args))
+    await waitFor(() => expect(args.setPaceWorkdays).toHaveBeenCalledWith(true))
   })
 
   it("falls back to default reset timer mode when loading fails", async () => {

@@ -57,6 +57,8 @@ export const it: Messages = {
   "settings.usageMode.desc": "Mostra la quota rimanente o quella utilizzata",
   "settings.usageMode.left": "Rimanente",
   "settings.usageMode.used": "Utilizzato",
+  "settings.usageMode.workdays": "Ritmo settimanale nei giorni lavorativi",
+  "settings.usageMode.workdaysHint": "Conta solo da lunedì a venerdì, così un weekend tranquillo non sembra margine in più.",
   "settings.resetTimers.title": "Timer di azzeramento",
   "settings.resetTimers.desc": "Conto alla rovescia o orario",
   "settings.resetTimers.relative": "Relativo",
