@@ -230,6 +230,8 @@ export const fr: Messages = {
   "alert.pace.body": "À ce rythme, vous atteindrez la limite dans {time}, avant la réinitialisation.",
   "alert.update.title": "OpenTokenUsage {version} est prêt",
   "alert.update.body": "Ouvrez le panneau et choisissez Redémarrer pour mettre à jour.",
+  "alert.signIn.title": "{provider} : reconnectez-vous",
+  "alert.signIn.body": "Son utilisation n'est plus mise à jour. Ouvrez le panneau et utilisez le bouton de connexion de la carte ; elle se met à jour seule une fois connecté.",
 
   "sparkline.peak": "pic {value}",
   "sparkline.summary": "{label} : {days} jours, dernière valeur {latest} le {date}, pic {peak}.",

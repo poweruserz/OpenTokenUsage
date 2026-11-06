@@ -241,7 +241,7 @@ fn read_env_from_registry(name: &str) -> Option<String> {
     })
 }
 
-fn resolve_env_value(name: &str) -> Option<String> {
+pub(crate) fn resolve_env_value(name: &str) -> Option<String> {
     // Prefer the current process env (fast + supports launchctl/terminal-launch).
     if let Some(value) = read_env_from_process(name) {
         return Some(value);

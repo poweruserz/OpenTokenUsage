@@ -230,6 +230,8 @@ export const ja: Messages = {
   "alert.pace.body": "このペースでは、リセット前の {time} 後に上限に達します。",
   "alert.update.title": "OpenTokenUsage {version} の準備ができました",
   "alert.update.body": "パネルを開いて「再起動して更新」を選んでください。",
+  "alert.signIn.title": "{provider}: 再度サインインしてください",
+  "alert.signIn.body": "使用量が更新されなくなりました。パネルを開いてカードのサインインボタンを使ってください。サインインすると自動で更新されます。",
 
   "sparkline.peak": "ピーク {value}",
   "sparkline.summary": "{label}: {days}日間、最新は {date} の {latest}、ピークは {peak}。",

@@ -5,6 +5,7 @@ mod config;
 mod data_dirs;
 mod local_http_api;
 mod log_path;
+mod login_stamp;
 mod panel;
 mod plugin_engine;
 mod provider_status;
@@ -607,6 +608,7 @@ pub fn run() {
             accounts::add_account,
             accounts::remove_account,
             accounts::start_account_login,
+            login_stamp::login_file_stamp,
             alert_sound::play_alert_sound,
             alert_sound::save_custom_alert_sound
         ])

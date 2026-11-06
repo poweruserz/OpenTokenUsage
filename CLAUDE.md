@@ -65,7 +65,10 @@ This file holds the project facts that are easy to get wrong.
 - Errors: `getPluginErrorAction` turns known errors into one-click fixes: a login command →
   `run_in_terminal` (Rust allow-list in `setup_actions.rs`, test-synced with the plugin fixtures),
   a missing API-key env var → the Windows Environment Variables dialog. Env vars are also read from
-  the registry, so a key added while the app is running works on the next refresh.
+  the registry, so a key added while the app is running works on the next refresh. While a card shows a
+  sign-in error (its fix is a login command), `use-login-recovery.ts` checks the CLI's login file time every
+  5 s (`login_stamp.rs`: Claude, Codex, their extra accounts and WSL copies) and probes the card the moment
+  it changes; a card that worked in this run and loses its sign-in gets one toast per episode.
 - Tray metric: one setting, `trayMetric` (auto | Session | Weekly), drives bars, percent and tooltip.
   Tray provider `tightest` = "Most used" line across providers. `trayHiddenPlugins` keeps a provider
   in the nav but out of the tray. The tray icon color follows the *taskbar* theme, not the app theme:

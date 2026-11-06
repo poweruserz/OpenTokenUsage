@@ -230,6 +230,8 @@ export const es419: Messages = {
   "alert.pace.body": "A este ritmo alcanzarás el límite en {time}, antes de que se restablezca.",
   "alert.update.title": "OpenTokenUsage {version} está listo",
   "alert.update.body": "Abre el panel y elige Reiniciar para actualizar.",
+  "alert.signIn.title": "{provider}: vuelve a iniciar sesión",
+  "alert.signIn.body": "Su uso dejó de actualizarse. Abre el panel y usa el botón de inicio de sesión de la tarjeta; se actualiza sola cuando inicias sesión.",
 
   "sparkline.peak": "máximo {value}",
   "sparkline.summary": "{label}: {days} días, último {latest} el {date}, máximo {peak}.",

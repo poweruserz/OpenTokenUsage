@@ -21,6 +21,7 @@ import { t, useLocaleStore } from "@/lib/i18n"
 import { invoke } from "@tauri-apps/api/core"
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { useUsageAlerts } from "@/hooks/app/use-usage-alerts"
+import { useLoginRecovery } from "@/hooks/app/use-login-recovery"
 import { useProviderTrayIcons } from "@/hooks/app/use-provider-tray-icons"
 import { useTaskbarStrip } from "@/hooks/app/use-taskbar-strip"
 
@@ -153,6 +154,7 @@ function App() {
   )
 
   useUsageAlerts({ pluginStates, pluginsMeta, pluginSettings, enabled: usageAlerts, settings: alertSettings, displayMode })
+  useLoginRecovery({ pluginStates, pluginsMeta, notify: usageAlerts, alertSettings, setLoadingForPlugins, startBatch })
 
   const { scheduleTrayIconUpdate, traySettingsPreview } = useTrayIcon({
     pluginsMeta,

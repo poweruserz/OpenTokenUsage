@@ -230,6 +230,8 @@ export const en = {
   "alert.pace.body": "At this pace you'll hit the limit in {time}, before it resets.",
   "alert.update.title": "OpenTokenUsage {version} is ready",
   "alert.update.body": "Open the panel and choose Restart to update.",
+  "alert.signIn.title": "{provider}: sign in again",
+  "alert.signIn.body": "Its usage stopped updating. Open the panel and use the card's sign-in button; it updates on its own once you've signed in.",
 
   "sparkline.peak": "peak {value}",
   "sparkline.summary": "{label}: {days} days, latest {latest} on {date}, peak {peak}.",
