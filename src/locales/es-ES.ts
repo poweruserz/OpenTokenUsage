@@ -140,6 +140,8 @@ export const esES: Messages = {
   "settings.tray.metric": "Métrica",
   "settings.tray.color": "Color",
   "settings.tray.colorTitle": "Color del texto del porcentaje en la bandeja",
+  "settings.tray.paceColor": "Color según el ritmo",
+  "settings.tray.paceColorHint": "Verde: margen de sobra. Amarillo: al ritmo previsto. Rojo: se agotará antes del reinicio.",
   "settings.tray.auto": "Automático",
   "settings.tray.tightest": "El más usado",
   "settings.theme.title": "Tema",

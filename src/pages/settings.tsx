@@ -26,9 +26,11 @@ import { SegmentedControl, SettingsSection } from "@/components/settings-section
 import { audioFileToWav, CUSTOM_SOUND_MAX_MB, CUSTOM_SOUND_MAX_SECONDS, SoundFileTooLargeError } from "@/lib/alert-sound";
 import { getBarFillLayout, getTrayIconSizePx } from "@/lib/tray-bars-icon";
 import { bytesToBase64 } from "@/lib/tray-provider-icons";
+import { TRAY_PACE_COLOR } from "@/lib/tray-primary-progress";
 import {
   ALERT_SOUNDS,
   AUTO_UPDATE_OPTIONS,
+  DEFAULT_TRAY_PERCENT_COLOR,
   DISPLAY_MODE_OPTIONS,
   isPerProviderTrayStyle,
   MENUBAR_ICON_STYLE_OPTIONS,
@@ -746,7 +748,7 @@ export function SettingsPage({
                 <option value="Weekly">{t("label.Weekly")}</option>
               </select>
             </label>
-            {menubarIconStyle === "percent" && (
+            {menubarIconStyle === "percent" && trayPercentColor !== TRAY_PACE_COLOR && (
               <label className="w-14 text-xs text-muted-foreground">
                 <span className="mb-1 block">{t("settings.tray.color")}</span>
                 <input
@@ -759,6 +761,22 @@ export function SettingsPage({
               </label>
             )}
           </div>
+        )}
+        {menubarIconStyle === "percent" && (
+          <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
+            <Checkbox
+              key={`tray-pace-color-${trayPercentColor === TRAY_PACE_COLOR}`}
+              checked={trayPercentColor === TRAY_PACE_COLOR}
+              className="mt-0.5"
+              onCheckedChange={(checked) =>
+                onTrayPercentColorChange(checked === true ? TRAY_PACE_COLOR : DEFAULT_TRAY_PERCENT_COLOR)
+              }
+            />
+            <span>
+              {t("settings.tray.paceColor")}
+              <span className="block text-xs text-muted-foreground">{t("settings.tray.paceColorHint")}</span>
+            </span>
+          </label>
         )}
         {menubarIconStyle === "logos" && <TrayLogoColorsToggle />}
         {isPerProviderTrayStyle(menubarIconStyle) && (

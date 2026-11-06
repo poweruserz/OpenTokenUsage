@@ -140,6 +140,8 @@ export const it: Messages = {
   "settings.tray.metric": "Metrica",
   "settings.tray.color": "Colore",
   "settings.tray.colorTitle": "Colore del testo della percentuale",
+  "settings.tray.paceColor": "Colore in base al ritmo",
+  "settings.tray.paceColorHint": "Verde: ampio margine. Giallo: in linea. Rosso: si esaurirà prima del reset.",
   "settings.tray.auto": "Automatico",
   "settings.tray.tightest": "Più utilizzato",
   "settings.theme.title": "Tema",

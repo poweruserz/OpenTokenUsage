@@ -1,6 +1,73 @@
 import { describe, expect, it } from "vitest"
 
-import { findTightestLimit, getTrayPrimaryBars } from "@/lib/tray-primary-progress"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+import {
+  findTightestLimit,
+  getTrayPrimaryBars,
+  PACE_COLORS,
+  TRAY_PACE_COLOR,
+  trayPercentTextColor,
+} from "@/lib/tray-primary-progress"
+
+describe("tray pace color", () => {
+  const HOUR = 3_600_000
+  const NOW = Date.parse("2026-11-06T12:00:00Z")
+  const barFor = (used: number, resetsAt?: string) =>
+    getTrayPrimaryBars({
+      pluginsMeta: [{ id: "a", name: "A", iconUrl: "", primaryCandidates: ["Session"], lines: [] }],
+      pluginSettings: { order: ["a"], disabled: [] },
+      pluginStates: {
+        a: {
+          loading: false,
+          error: null,
+          data: {
+            providerId: "a",
+            displayName: "A",
+            iconUrl: "",
+            lines: [
+              {
+                type: "progress",
+                label: "Session",
+                used,
+                limit: 100,
+                format: { kind: "percent" },
+                resetsAt,
+                periodDurationMs: resetsAt ? 5 * HOUR : undefined,
+              },
+            ],
+          },
+        },
+      },
+      nowMs: NOW,
+    })[0]
+
+  it("gives the tray line its pace when it has a window", () => {
+    // Half of a 5-hour window has passed.
+    const resetsAt = new Date(NOW + 2.5 * HOUR).toISOString()
+    expect(barFor(20, resetsAt).pace).toBe("ahead")
+    expect(barFor(45, resetsAt).pace).toBe("on-track")
+    expect(barFor(70, resetsAt).pace).toBe("behind")
+    expect(barFor(70).pace).toBeUndefined()
+  })
+
+  it("colors the number by pace only when asked, in the taskbar theme's shade", () => {
+    expect(trayPercentTextColor("#ff00ff", "behind")).toBe("#ff00ff")
+    expect(trayPercentTextColor(TRAY_PACE_COLOR, "ahead")).toBe(PACE_COLORS.dark.ahead)
+    expect(trayPercentTextColor(TRAY_PACE_COLOR, "behind", true)).toBe(PACE_COLORS.light.behind)
+    // No pace yet: the taskbar's own text color.
+    expect(trayPercentTextColor(TRAY_PACE_COLOR, undefined)).toBeUndefined()
+  })
+
+  it("uses the card's pace dot colors from index.css", () => {
+    const css = readFileSync(resolve(__dirname, "../index.css"), "utf8")
+    const tokens = (name: string) => [...css.matchAll(new RegExp(`--${name}-500:\\s*(#[0-9a-f]{6})`, "gi"))].map((m) => m[1])
+    // index.css defines :root (light) first, then :root.dark.
+    expect(tokens("green")).toEqual([PACE_COLORS.light.ahead, PACE_COLORS.dark.ahead])
+    expect(tokens("yellow")).toEqual([PACE_COLORS.light["on-track"], PACE_COLORS.dark["on-track"]])
+    expect(tokens("red")).toEqual([PACE_COLORS.light.behind, PACE_COLORS.dark.behind])
+  })
+})
 
 describe("getTrayPrimaryBars", () => {
   it("returns empty when settings missing", () => {

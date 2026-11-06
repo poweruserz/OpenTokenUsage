@@ -1,7 +1,31 @@
+import { calculatePaceStatus, type PaceStatus } from "@/lib/pace-status"
 import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
 import type { PluginSettings } from "@/lib/settings"
 import { DEFAULT_DISPLAY_MODE, type DisplayMode } from "@/lib/settings"
 import { getDisplayedUsage } from "@/lib/usage-display"
+
+/** `trayPercentColor` value that colors the tray number by its line's pace. */
+export const TRAY_PACE_COLOR = "pace"
+
+/**
+ * The card's pace dot colors (`--green/yellow/red-500` of index.css's light and dark themes,
+ * test-synced). The tray icon is an image on the taskbar, so it takes the values of the taskbar's
+ * theme rather than the tokens, which follow the app's.
+ */
+export const PACE_COLORS: Record<"light" | "dark", Record<PaceStatus, string>> = {
+  light: { ahead: "#0f7b0f", "on-track": "#9d5d00", behind: "#c42b1c" },
+  dark: { ahead: "#6ccb5f", "on-track": "#fce100", behind: "#ff99a4" },
+}
+
+/** The tray number's color: the chosen one, or its pace's; undefined = the taskbar's text color. */
+export function trayPercentTextColor(
+  setting: string,
+  pace: PaceStatus | undefined,
+  taskbarIsLight = false
+): string | undefined {
+  if (setting !== TRAY_PACE_COLOR) return setting
+  return pace ? PACE_COLORS[taskbarIsLight ? "light" : "dark"][pace] : undefined
+}
 
 type PluginState = {
   data: PluginOutput | null
@@ -16,6 +40,8 @@ export type TrayPrimaryBar = {
   label?: string
   /** True when the value came from the provider's declared weekly line. */
   weekly?: boolean
+  /** The line's pace in its window, when it has a reset time and a window length. */
+  pace?: PaceStatus
 }
 
 type ProgressLine = Extract<
@@ -36,6 +62,7 @@ export function getTrayPrimaryBars(args: {
   pluginId?: string
   preferredMetric?: string
   preferWeekly?: boolean
+  nowMs?: number
 }): TrayPrimaryBar[] {
   const {
     pluginsMeta,
@@ -46,6 +73,7 @@ export function getTrayPrimaryBars(args: {
     pluginId,
     preferredMetric,
     preferWeekly = false,
+    nowMs = Date.now(),
   } = args
   if (!pluginSettings) return []
 
@@ -73,6 +101,7 @@ export function getTrayPrimaryBars(args: {
     let fraction: number | undefined
     let label: string | undefined
     let weekly: true | undefined
+    let pace: PaceStatus | undefined
     if (data) {
       // Prefer an explicitly chosen metric, then the declared weekly line when
       // requested, otherwise fall back to the first primary candidate in data.
@@ -104,11 +133,20 @@ export function getTrayPrimaryBars(args: {
         )
         if (metricLine && metricLine.limit > 0) {
           fraction = getDisplayedUsage(metricLine.used, metricLine.limit, displayMode).fraction
+          if (metricLine.resetsAt && metricLine.periodDurationMs) {
+            pace = calculatePaceStatus(
+              metricLine.used,
+              metricLine.limit,
+              Date.parse(metricLine.resetsAt),
+              metricLine.periodDurationMs,
+              nowMs
+            )?.status
+          }
         }
       }
     }
 
-    out.push({ id, fraction, label, weekly })
+    out.push({ id, fraction, label, weekly, ...(pace && { pace }) })
     if (out.length >= maxBars) break
   }
 

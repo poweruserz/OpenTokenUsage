@@ -140,6 +140,8 @@ export const zhCN: Messages = {
   "settings.tray.metric": "指标",
   "settings.tray.color": "颜色",
   "settings.tray.colorTitle": "通知区域百分比文字颜色",
+  "settings.tray.paceColor": "按速度着色",
+  "settings.tray.paceColorHint": "绿色：余量充足。黄色：进度正常。红色：重置前将会用尽。",
   "settings.tray.auto": "自动",
   "settings.tray.tightest": "用量最高",
   "settings.theme.title": "主题",

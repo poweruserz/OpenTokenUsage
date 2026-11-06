@@ -140,6 +140,8 @@ export const tr: Messages = {
   "settings.tray.metric": "Ölçüm",
   "settings.tray.color": "Renk",
   "settings.tray.colorTitle": "Bildirim alanı yüzde metni rengi",
+  "settings.tray.paceColor": "Tempoya göre renklendir",
+  "settings.tray.paceColorHint": "Yeşil: bol pay var. Sarı: tam hedefte. Kırmızı: sıfırlanmadan önce tükenecek.",
   "settings.tray.auto": "Otomatik",
   "settings.tray.tightest": "En çok kullanılan",
   "settings.theme.title": "Tema",

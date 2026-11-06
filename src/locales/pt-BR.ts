@@ -140,6 +140,8 @@ export const ptBR: Messages = {
   "settings.tray.metric": "Métrica",
   "settings.tray.color": "Cor",
   "settings.tray.colorTitle": "Cor do texto da porcentagem",
+  "settings.tray.paceColor": "Cor conforme o ritmo",
+  "settings.tray.paceColorHint": "Verde: folga de sobra. Amarelo: dentro do previsto. Vermelho: vai acabar antes da redefinição.",
   "settings.tray.auto": "Automático",
   "settings.tray.tightest": "Mais usado",
   "settings.theme.title": "Tema",

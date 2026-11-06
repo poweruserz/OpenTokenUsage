@@ -7,12 +7,20 @@ import type { PluginMeta } from "@/lib/plugin-types"
 import type { DisplayMode, MenubarIconStyle, PluginSettings } from "@/lib/settings"
 import { getEnabledPluginIds, isPerProviderTrayStyle } from "@/lib/settings"
 import { getTrayIconSizePx, renderTrayBarsIcon } from "@/lib/tray-bars-icon"
-import { findTightestLimit, getTrayPrimaryBars, type TrayPrimaryBar } from "@/lib/tray-primary-progress"
+import {
+  findTightestLimit,
+  getTrayPrimaryBars,
+  TRAY_PACE_COLOR,
+  trayPercentTextColor,
+  type TrayPrimaryBar,
+} from "@/lib/tray-primary-progress"
 import { formatTrayPercentText, formatTrayTooltip } from "@/lib/tray-tooltip"
 import type { PluginState } from "@/hooks/app/types"
 import { isAppTrayIconHidden } from "@/hooks/app/use-provider-tray-icons"
 
 type TrayUpdateReason = "probe" | "settings" | "init"
+
+const PACE_REDRAW_MS = 5 * 60 * 1000
 
 type UseTrayIconArgs = {
   pluginsMeta: PluginMeta[]
@@ -355,7 +363,7 @@ export function useTrayIcon({
         style: "percent",
         percentText: percentNumber,
         iconColor: trayIconColor,
-        textColor: trayPercentColorRef.current,
+        textColor: trayPercentTextColor(trayPercentColorRef.current, providerBars[0]?.pace, taskbarIsLightRef.current),
       })
         .then(async (img) => {
           await tray.setIcon(img)
@@ -412,6 +420,13 @@ export function useTrayIcon({
     if (!trayReady) return
     scheduleTrayIconUpdate("settings", 0)
   }, [activeView, menubarIconStyle, scheduleTrayIconUpdate, trayReady])
+
+  // Pace moves with time, not only with usage: redraw a pace-colored number between probes.
+  useEffect(() => {
+    if (!trayReady || menubarIconStyle !== "percent" || trayPercentColor !== TRAY_PACE_COLOR) return
+    const timer = window.setInterval(() => scheduleTrayIconUpdate("settings", 0), PACE_REDRAW_MS)
+    return () => window.clearInterval(timer)
+  }, [menubarIconStyle, scheduleTrayIconUpdate, trayPercentColor, trayReady])
 
   // Taskbar theme drives the icon color; re-read it when Windows switches light/dark (the host's
   // "taskbar:theme"), when the app theme changes, and whenever the panel is focused.
