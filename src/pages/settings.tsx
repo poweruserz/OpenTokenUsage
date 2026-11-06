@@ -60,6 +60,7 @@ import {
 } from "@/lib/settings";
 import { getTimeFormatter } from "@/lib/reset-tooltip";
 import { LANGUAGES, resolveLanguage, t, useLocaleStore, type LanguagePreference } from "@/lib/i18n";
+import { SettingsBackupSection } from "@/components/settings-backup-section";
 import type { TraySettingsPreview } from "@/hooks/app/use-tray-icon";
 import { cn } from "@/lib/utils";
 import type { AccountsChange } from "@/lib/accounts";
@@ -924,6 +925,9 @@ export function SettingsPage({
           {t("settings.startOnLogin.label")}
         </label>
       </SettingsSection>
+
+      <SettingsBackupSection />
     </div>
   );
 }
+

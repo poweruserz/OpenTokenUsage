@@ -143,6 +143,15 @@ describe("SettingsPage", () => {
     }
   })
 
+  it("refuses a file that isn't a settings backup and says so", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    render(<SettingsPage {...defaultProps} />)
+    const file = new File([JSON.stringify({ hello: "world" })], "other.json", { type: "application/json" })
+    await userEvent.upload(screen.getByLabelText("Import and restart"), file)
+    expect(await screen.findByText("That isn't an OpenTokenUsage settings backup.")).toBeInTheDocument()
+    vi.mocked(console.error).mockRestore()
+  })
+
   it("picks a currency and takes the rate the user types", async () => {
     const saved = useAppPreferencesStore.getState().currency
     const currency = () => useAppPreferencesStore.getState().currency

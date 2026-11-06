@@ -847,3 +847,11 @@ export async function saveLanguage(value: LanguagePreference): Promise<void> {
   await store.set(LANGUAGE_KEY, value);
   await store.save();
 }
+
+/** Raw access to stored keys, for settings backups only (`settings-backup.ts`); everything else uses its loader. */
+export const backupStore = {
+  get: (key: string) => store.get<unknown>(key),
+  set: (key: string, value: unknown) => store.set(key, value),
+  delete: (key: string) => deleteStoreKey(key),
+  save: () => store.save(),
+};

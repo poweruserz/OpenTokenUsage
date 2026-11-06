@@ -11,6 +11,7 @@ mod login_stamp;
 mod panel;
 mod plugin_engine;
 mod provider_status;
+mod settings_backup;
 mod setup_actions;
 mod taskbar_strip;
 mod tray;
@@ -614,6 +615,7 @@ pub fn run() {
             claude_statusline::claude_statusline_state,
             claude_statusline::set_claude_statusline,
             claude_sessions::claude_sessions,
+            settings_backup::export_settings,
             alert_sound::play_alert_sound,
             alert_sound::save_custom_alert_sound
         ])
