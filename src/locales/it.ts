@@ -231,7 +231,7 @@ export const it: Messages = {
   "alert.update.title": "OpenTokenUsage {version} è pronto",
   "alert.update.body": "Apri il pannello e scegli Riavvia per aggiornare.",
   "alert.signIn.title": "{provider}: accedi di nuovo",
-  "alert.signIn.body": "Il suo utilizzo non si aggiorna più. Apri il pannello e usa il pulsante di accesso della scheda; si aggiorna da sola dopo l'accesso.",
+  "alert.signIn.body": "Il suo utilizzo non si aggiornerà finché non accedi di nuovo.",
 
   "sparkline.peak": "picco {value}",
   "sparkline.summary": "{label}: {days} giorni, ultimo valore {latest} il {date}, picco {peak}.",

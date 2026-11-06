@@ -231,7 +231,7 @@ export const ptBR: Messages = {
   "alert.update.title": "OpenTokenUsage {version} está pronto",
   "alert.update.body": "Abra o painel e escolha Reiniciar para atualizar.",
   "alert.signIn.title": "{provider}: entre novamente",
-  "alert.signIn.body": "O uso parou de atualizar. Abra o painel e use o botão de entrar do cartão; ele atualiza sozinho depois que você entrar.",
+  "alert.signIn.body": "O uso não será atualizado até você entrar novamente.",
 
   "sparkline.peak": "pico {value}",
   "sparkline.summary": "{label}: {days} dias, último {latest} em {date}, pico {peak}.",

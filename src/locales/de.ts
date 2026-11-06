@@ -231,7 +231,7 @@ export const de: Messages = {
   "alert.update.title": "OpenTokenUsage {version} ist bereit",
   "alert.update.body": "Öffnen Sie den Bereich und wählen Sie „Zum Aktualisieren neu starten“.",
   "alert.signIn.title": "{provider}: erneut anmelden",
-  "alert.signIn.body": "Die Nutzung wird nicht mehr aktualisiert. Öffnen Sie den Bereich und nutzen Sie die Anmeldeschaltfläche der Karte; nach der Anmeldung aktualisiert sie sich von selbst.",
+  "alert.signIn.body": "Die Nutzung wird erst wieder aktualisiert, wenn Sie sich erneut anmelden.",
 
   "sparkline.peak": "Höchstwert {value}",
   "sparkline.summary": "{label}: {days} Tage, zuletzt {latest} am {date}, Höchstwert {peak}.",

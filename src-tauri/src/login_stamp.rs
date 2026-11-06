@@ -8,62 +8,72 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-/// The CLIs that sign in to a file: the variable that moves their home, its default under the user
-/// home, and the login file inside it.
-const LOGIN_FILES: [(&str, &str, &str, &str); 2] = [
+/// The CLIs that sign in to a file: the variable that moves their home, the folders the plugin
+/// looks in without it (under the user home, in the plugin's order), and the login file.
+const LOGIN_FILES: [(&str, &str, &[&str], &str); 2] = [
     (
         "claude",
         "CLAUDE_CONFIG_DIR",
-        ".claude",
+        &[".claude"],
         ".credentials.json",
     ),
-    ("codex", "CODEX_HOME", ".codex", "auth.json"),
+    // plugins/codex: CONFIG_AUTH_PATHS
+    (
+        "codex",
+        "CODEX_HOME",
+        &[".config/codex", ".codex"],
+        "auth.json",
+    ),
 ];
 
-fn login_file(plugin: &LoadedPlugin) -> Option<PathBuf> {
+/// The files a plugin's login can be in. None for a WSL copy: reading its `\\wsl.localhost` share
+/// can start a stopped distro, which the app never does (it signs in at the next refresh).
+fn login_files(plugin: &LoadedPlugin) -> Vec<PathBuf> {
     let account = plugin.account.as_ref();
+    if account.is_some_and(|a| a.home.is_some()) {
+        return Vec::new();
+    }
     let base_id = account.map_or(plugin.manifest.id.as_str(), |a| a.base_id.as_str());
-    let (_, var, default_dir, file) = LOGIN_FILES.iter().find(|(id, ..)| *id == base_id)?;
-    // An extra account names its folder in the variable; a WSL login has its own home and sees no
-    // Windows variables.
-    let bound = account.and_then(|a| {
-        a.env
-            .iter()
-            .find(|(name, _)| name == var)
-            .map(|(_, value)| value.clone())
-    });
-    let configured = match bound {
-        Some(value) => value,
-        None if account.is_some_and(|a| a.isolated_env) => None,
+    let Some((_, var, default_dirs, file)) = LOGIN_FILES.iter().find(|(id, ..)| *id == base_id)
+    else {
+        return Vec::new();
+    };
+    // An extra account names its folder in the variable.
+    let configured = match account.and_then(|a| a.env.iter().find(|(name, _)| name == var)) {
+        Some((_, value)) => value.clone(),
         None => crate::plugin_engine::host_api::resolve_env_value(var),
     };
-    let home = account
-        .and_then(|a| a.home.clone())
-        .or_else(dirs::home_dir)?;
-    let dir = match configured {
-        Some(dir) => match dir.strip_prefix('~') {
+    let Some(home) = dirs::home_dir() else {
+        return Vec::new();
+    };
+    let dirs: Vec<PathBuf> = match configured {
+        Some(dir) => vec![match dir.strip_prefix('~') {
             Some(rest) => home.join(rest.trim_start_matches(['/', '\\'])),
             None => PathBuf::from(dir),
-        },
-        None => home.join(default_dir),
+        }],
+        None => default_dirs.iter().map(|dir| home.join(dir)).collect(),
     };
-    Some(dir.join(file))
+    dirs.into_iter().map(|dir| dir.join(file)).collect()
 }
 
-/// Unix ms of the last write to the plugin's login file; `None` when the plugin has no login file
-/// or it doesn't exist yet.
+/// Unix ms of the latest write to one of the plugin's login files; `None` when it has none or none
+/// exists yet.
 #[tauri::command]
 pub fn login_file_stamp(
     state: tauri::State<'_, Mutex<AppState>>,
     plugin_id: String,
 ) -> Option<u64> {
-    let path = {
+    let files = {
         let state = state.lock().ok()?;
         let plugin = state.plugins.iter().find(|p| p.manifest.id == plugin_id)?;
-        login_file(plugin)?
+        login_files(plugin)
     };
-    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
-    Some(modified.duration_since(UNIX_EPOCH).ok()?.as_millis() as u64)
+    files
+        .iter()
+        .filter_map(|path| std::fs::metadata(path).ok()?.modified().ok())
+        .filter_map(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|since| since.as_millis() as u64)
+        .max()
 }
 
 #[cfg(test)]
@@ -98,33 +108,42 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            login_file(&plugin("claude-1a2b3c4d", Some(account))),
-            Some(PathBuf::from(r"C:\data\accounts\work").join(".credentials.json"))
+            login_files(&plugin("claude-1a2b3c4d", Some(account))),
+            vec![PathBuf::from(r"C:\data\accounts\work").join(".credentials.json")]
         );
     }
 
     #[test]
-    fn a_wsl_login_is_found_under_its_linux_home_without_windows_variables() {
+    fn codex_without_codex_home_is_watched_in_both_folders_the_plugin_reads() {
+        if crate::plugin_engine::host_api::resolve_env_value("CODEX_HOME").is_some() {
+            return;
+        }
+        let home = dirs::home_dir().unwrap();
+        assert_eq!(
+            login_files(&plugin("codex", None)),
+            vec![
+                home.join(".config/codex").join("auth.json"),
+                home.join(".codex").join("auth.json")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_wsl_copy_is_never_read_so_a_stopped_distro_stays_stopped() {
         let account = AccountBinding {
             base_id: "codex".into(),
             home: Some(PathBuf::from(r"\\wsl.localhost\Ubuntu\home\me")),
             isolated_env: true,
             ..Default::default()
         };
-        assert_eq!(
-            login_file(&plugin("codex-wsl-0011aabb", Some(account))),
-            Some(
-                PathBuf::from(r"\\wsl.localhost\Ubuntu\home\me")
-                    .join(".codex")
-                    .join("auth.json")
-            )
-        );
+        assert!(login_files(&plugin("codex-wsl-0011aabb", Some(account))).is_empty());
     }
 
     #[test]
     fn providers_without_a_login_file_have_nothing_to_watch() {
-        assert_eq!(login_file(&plugin("cursor", None)), None);
-        assert!(login_file(&plugin("claude", None))
-            .is_some_and(|path| path.ends_with(".credentials.json")));
+        assert!(login_files(&plugin("cursor", None)).is_empty());
+        assert!(login_files(&plugin("claude", None))
+            .iter()
+            .all(|path| path.ends_with(".credentials.json")));
     }
 }

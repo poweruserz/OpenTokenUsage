@@ -231,7 +231,7 @@ export const ko: Messages = {
   "alert.update.title": "OpenTokenUsage {version} 준비 완료",
   "alert.update.body": "패널을 열고 다시 시작하여 업데이트를 선택하세요.",
   "alert.signIn.title": "{provider}: 다시 로그인하세요",
-  "alert.signIn.body": "사용량이 더 이상 업데이트되지 않습니다. 패널을 열고 카드의 로그인 버튼을 사용하세요. 로그인하면 자동으로 업데이트됩니다.",
+  "alert.signIn.body": "다시 로그인할 때까지 사용량이 업데이트되지 않습니다.",
 
   "sparkline.peak": "최고 {value}",
   "sparkline.summary": "{label}: {days}일, 최근 {date} {latest}, 최고 {peak}.",

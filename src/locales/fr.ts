@@ -231,7 +231,7 @@ export const fr: Messages = {
   "alert.update.title": "OpenTokenUsage {version} est prêt",
   "alert.update.body": "Ouvrez le panneau et choisissez Redémarrer pour mettre à jour.",
   "alert.signIn.title": "{provider} : reconnectez-vous",
-  "alert.signIn.body": "Son utilisation n'est plus mise à jour. Ouvrez le panneau et utilisez le bouton de connexion de la carte ; elle se met à jour seule une fois connecté.",
+  "alert.signIn.body": "Son utilisation ne sera plus mise à jour tant que vous ne vous reconnecterez pas.",
 
   "sparkline.peak": "pic {value}",
   "sparkline.summary": "{label} : {days} jours, dernière valeur {latest} le {date}, pic {peak}.",

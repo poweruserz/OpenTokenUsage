@@ -29,22 +29,25 @@ const settle = () => act(async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve()
 })
 
-function mount(initial: Record<string, PluginState>, notify = true) {
+function mount(initial: Record<string, PluginState>, notify = true, enabledIds = ["claude", "cursor"]) {
   const setLoadingForPlugins = vi.fn()
-  const startBatch = vi.fn(() => Promise.resolve(undefined))
+  const setErrorForPlugins = vi.fn()
+  const startBatch = vi.fn(() => Promise.resolve<string[] | undefined>(undefined))
   const view = renderHook(
     ({ pluginStates }) =>
       useLoginRecovery({
         pluginStates,
         pluginsMeta: META,
+        enabledIds,
         notify,
         alertSettings: { levels: [80, 95], sound: "windows", customSoundName: null },
         setLoadingForPlugins,
+        setErrorForPlugins,
         startBatch,
       }),
     { initialProps: { pluginStates: initial } }
   )
-  return { ...view, setLoadingForPlugins, startBatch }
+  return { ...view, setLoadingForPlugins, setErrorForPlugins, startBatch }
 }
 
 describe("useLoginRecovery", () => {
@@ -85,6 +88,37 @@ describe("useLoginRecovery", () => {
     expect(startBatch).toHaveBeenCalledTimes(1)
   })
 
+  it("still catches a sign-in that lands while the probe it started runs", async () => {
+    const { rerender, startBatch } = mount({ claude: state(EXPIRED) })
+    await settle()
+    stamp = 200
+    await act(async () => vi.advanceTimersByTime(LOGIN_CHECK_MS))
+    await settle()
+    expect(startBatch).toHaveBeenCalledTimes(1)
+
+    rerender({ pluginStates: { claude: { ...state(null), loading: true } } })
+    stamp = 300 // signed in again, but the probe already read the old login
+    rerender({ pluginStates: { claude: state(EXPIRED) } })
+    await settle()
+    expect(startBatch).toHaveBeenCalledTimes(2)
+  })
+
+  it("puts the error back when the probe can't start", async () => {
+    const { startBatch, setErrorForPlugins } = mount({ claude: state(EXPIRED) })
+    startBatch.mockRejectedValueOnce(new Error("no runtime"))
+    await settle()
+    stamp = 200
+    await act(async () => vi.advanceTimersByTime(LOGIN_CHECK_MS))
+    await settle()
+    expect(setErrorForPlugins).toHaveBeenCalledWith(["claude"], "Failed to start probe")
+  })
+
+  it("leaves a disabled card alone", async () => {
+    mount({ claude: state(EXPIRED) }, true, ["cursor"])
+    await settle()
+    expect(invoke).not.toHaveBeenCalledWith("login_file_stamp", expect.anything())
+  })
+
   it("watches nothing while no card asks for a sign-in", async () => {
     mount({ claude: state(null), cursor: state("Rate limited by Cursor, try again later") })
     await settle()
@@ -109,6 +143,10 @@ describe("useLoginRecovery", () => {
 
   it("doesn't toast for a card that was signed out when the app started, or with alerts off", async () => {
     mount({ claude: state(EXPIRED, null) })
+    await settle()
+    // Cached data from an earlier run (a stopped WSL distro's card) isn't this run working.
+    const cached = mount({ claude: state(null, { ...DATA, staleSince: "2026-11-01T00:00:00Z" } as PluginOutput) })
+    cached.rerender({ pluginStates: { claude: state(EXPIRED) } })
     await settle()
     const { rerender } = mount({ claude: state(null) }, false)
     rerender({ pluginStates: { claude: state(EXPIRED) } })

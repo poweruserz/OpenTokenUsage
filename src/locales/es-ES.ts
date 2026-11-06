@@ -231,7 +231,7 @@ export const esES: Messages = {
   "alert.update.title": "OpenTokenUsage {version} está listo",
   "alert.update.body": "Abre el panel y elige Reiniciar para actualizar.",
   "alert.signIn.title": "{provider}: vuelve a iniciar sesión",
-  "alert.signIn.body": "Su uso ha dejado de actualizarse. Abre el panel y usa el botón de inicio de sesión de la tarjeta; se actualiza sola cuando inicias sesión.",
+  "alert.signIn.body": "Su uso no se actualizará hasta que vuelvas a iniciar sesión.",
 
   "sparkline.peak": "máximo {value}",
   "sparkline.summary": "{label}: {days} días, último {latest} el {date}, máximo {peak}.",
