@@ -17,6 +17,7 @@ import {
 import { formatTrayPercentText, formatTrayTooltip } from "@/lib/tray-tooltip"
 import type { PluginState } from "@/hooks/app/types"
 import { isAppTrayIconHidden } from "@/hooks/app/use-provider-tray-icons"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 type TrayUpdateReason = "probe" | "settings" | "init"
 
@@ -129,6 +130,12 @@ export function useTrayIcon({
   useEffect(() => {
     trayPercentColorRef.current = trayPercentColor
   }, [trayPercentColor])
+
+  const paceWorkdays = useAppPreferencesStore((state) => state.paceWorkdays)
+  const paceWorkdaysRef = useRef(paceWorkdays)
+  useEffect(() => {
+    paceWorkdaysRef.current = paceWorkdays
+  }, [paceWorkdays])
 
 
 
@@ -285,6 +292,7 @@ export function useTrayIcon({
             pluginId: trayProviderId,
             preferredMetric: tightest?.label ?? preferredMetric,
             preferWeekly,
+            workdays: paceWorkdaysRef.current,
           })
         : []
 
@@ -419,7 +427,7 @@ export function useTrayIcon({
   useEffect(() => {
     if (!trayReady) return
     scheduleTrayIconUpdate("settings", 0)
-  }, [activeView, menubarIconStyle, scheduleTrayIconUpdate, trayReady])
+  }, [activeView, menubarIconStyle, paceWorkdays, scheduleTrayIconUpdate, trayReady])
 
   // Pace moves with time, not only with usage: redraw a pace-colored number between probes.
   useEffect(() => {

@@ -88,6 +88,7 @@ vi.mock("@/lib/settings", () => ({
   loadTrayHiddenPlugins: loadTrayHiddenPluginsMock,
   loadUsageAlerts: vi.fn(async () => true),
   loadTrayLogoColors: vi.fn(async () => true),
+  loadPaceWorkdays: vi.fn(async () => true),
   loadCurrency: vi.fn(async () => ({ code: "TRY", rate: 40 })),
   loadTaskbarStrip: vi.fn(async () => false),
   loadTaskbarStripStyle: vi.fn(async () => ({})),
@@ -123,6 +124,7 @@ function createArgs() {
     setTrayHiddenPlugins: vi.fn(),
     setUsageAlerts: vi.fn(),
     setTrayLogoColors: vi.fn(),
+    setPaceWorkdays: vi.fn(),
     setCurrency: vi.fn(),
     setTaskbarStrip: vi.fn(),
     setTaskbarStripStyle: vi.fn(),
@@ -231,6 +233,12 @@ describe("useSettingsBootstrap", () => {
 
     expect(disableAutostartMock).not.toHaveBeenCalled()
     expect(enableAutostartMock).not.toHaveBeenCalled()
+  })
+
+  it("loads the work-day pace setting", async () => {
+    const args = createArgs()
+    renderHook(() => useSettingsBootstrap(args))
+    await waitFor(() => expect(args.setPaceWorkdays).toHaveBeenCalledWith(true))
   })
 
   it("loads the currency setting", async () => {

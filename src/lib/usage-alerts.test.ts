@@ -70,6 +70,46 @@ describe("collectUsageAlerts", () => {
     expect(alert?.body).toContain("1h 20m")
   })
 
+  it("times a work-day week's pace alert in work days, skipping the weekend", () => {
+    // Saturday-to-Saturday week (local time), Wednesday noon, 55% used over 2.5 work days.
+    const now = new Date(2026, 10, 11, 12).getTime()
+    const weekly: MetricLine = {
+      type: "progress",
+      label: "Weekly",
+      used: 55,
+      limit: 100,
+      format: { kind: "percent" },
+      resetsAt: new Date(2026, 10, 14).toISOString(),
+      periodDurationMs: 7 * 24 * HOUR,
+    }
+    const alerts = collectUsageAlerts({
+      pluginId: "claude",
+      providerName: "Claude",
+      lines: [weekly],
+      sent: new Set(),
+      nowMs: now,
+      levels: [80, 95],
+      displayMode: "used",
+      workdays: true,
+    })
+    // 45% more at 22% a work day: Friday about 13:05.
+    expect(alerts.map((alert) => alert.body)).toEqual([expect.stringContaining("2d 1h")])
+
+    // Monday 00:02, 60% used over the weekend: two minutes of work time is no rate (the card shows
+    // no pace yet either), so no alert that would use up the window's only pace alert.
+    const early = collectUsageAlerts({
+      pluginId: "claude",
+      providerName: "Claude",
+      lines: [{ ...weekly, used: 60 }],
+      sent: new Set(),
+      nowMs: new Date(2026, 10, 9, 0, 2).getTime(),
+      levels: [80, 95],
+      displayMode: "used",
+      workdays: true,
+    })
+    expect(early).toEqual([])
+  })
+
   it("no pace alert when the window resets before it would run out", () => {
     // 55% used after 4h -> would need ~3.3h more, reset in 1h.
     expect(collect([line(55, HOUR)])).toEqual([])

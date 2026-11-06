@@ -57,6 +57,8 @@ export const ptBR: Messages = {
   "settings.usageMode.desc": "Mostre o que resta ou o que já foi usado",
   "settings.usageMode.left": "Restante",
   "settings.usageMode.used": "Usado",
+  "settings.usageMode.workdays": "Ritmo semanal em dias úteis",
+  "settings.usageMode.workdaysHint": "Conta só de segunda a sexta, para que um fim de semana tranquilo não pareça folga.",
   "settings.currency.title": "Moeda",
   "settings.currency.desc": "Mostrar custos em outra moeda com a cotação que você informar",
   "settings.currency.rate": "1 USD em {code}",

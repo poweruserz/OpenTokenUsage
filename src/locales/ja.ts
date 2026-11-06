@@ -57,6 +57,8 @@ export const ja: Messages = {
   "settings.usageMode.desc": "残量または使用量を表示",
   "settings.usageMode.left": "残り",
   "settings.usageMode.used": "使用済み",
+  "settings.usageMode.workdays": "週間ペースを平日で計算",
+  "settings.usageMode.workdaysHint": "月曜から金曜だけを数えるので、静かな週末が余裕のように見えません。",
   "settings.currency.title": "通貨",
   "settings.currency.desc": "入力したレートで費用を別の通貨で表示します",
   "settings.currency.rate": "1 USD あたりの {code}",

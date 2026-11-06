@@ -57,6 +57,8 @@ export const zhCN: Messages = {
   "settings.usageMode.desc": "显示剩余量或已用量",
   "settings.usageMode.left": "剩余",
   "settings.usageMode.used": "已用",
+  "settings.usageMode.workdays": "每周进度按工作日计算",
+  "settings.usageMode.workdaysHint": "只计算周一到周五，安静的周末不会被当成多出来的余量。",
   "settings.currency.title": "货币",
   "settings.currency.desc": "按你输入的汇率以其他货币显示费用",
   "settings.currency.rate": "1 USD 兑 {code}",

@@ -57,6 +57,8 @@ export const fr: Messages = {
   "settings.usageMode.desc": "Afficher ce qu'il reste ou ce qui a été utilisé",
   "settings.usageMode.left": "Restant",
   "settings.usageMode.used": "Utilisé",
+  "settings.usageMode.workdays": "Rythme hebdomadaire sur les jours ouvrés",
+  "settings.usageMode.workdaysHint": "Compter seulement du lundi au vendredi, pour qu’un week-end calme ne ressemble pas à de la marge.",
   "settings.currency.title": "Devise",
   "settings.currency.desc": "Afficher les coûts dans une autre devise, au taux que vous saisissez",
   "settings.currency.rate": "1 USD en {code}",

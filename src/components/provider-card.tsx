@@ -21,7 +21,7 @@ import { groupLinesByType } from "@/lib/group-lines-by-type"
 import { clamp01, formatCountNumber } from "@/lib/utils"
 import { convertUsdText, formatMoney } from "@/lib/currency"
 import { getDisplayedUsage } from "@/lib/usage-display"
-import { calculateDeficit, calculatePaceStatus, type PaceStatus } from "@/lib/pace-status"
+import { calculateDeficit, calculatePaceStatus, paceElapsedFraction, type PaceStatus } from "@/lib/pace-status"
 import { buildPaceDetailText, formatDeficitText, formatRunsOutText, getPaceStatusText } from "@/lib/pace-tooltip"
 import { formatResetAbsoluteLabel, formatResetRelativeLabel, formatResetTooltipText } from "@/lib/reset-tooltip"
 import { getLocale, t, tLabel } from "@/lib/i18n"
@@ -397,6 +397,7 @@ function MetricLineRenderer({
   /** Usage levels (percent used) that notify; marked on the bar. */
   alertLevels?: readonly number[]
 }) {
+  const paceWorkdays = useAppPreferencesStore((state) => state.paceWorkdays)
   // Costs arrive in US dollars; shown in the chosen currency (`currency.ts`).
   const currency = useAppPreferencesStore((state) => state.currency)
   const money = (usd: number) => formatMoney(usd, currency, getLocale())
@@ -504,11 +505,11 @@ function MetricLineRenderer({
 
     // Calculate pace status if we have reset time and period duration
     const paceResult = hasPaceContext
-      ? calculatePaceStatus(line.used, line.limit, resetsAtMs, periodDurationMs!, now)
+      ? calculatePaceStatus(line.used, line.limit, resetsAtMs, periodDurationMs!, now, paceWorkdays)
       : null
     const paceStatus = paceResult?.status ?? null
     const elapsedPercent = hasTimeMarkerContext
-      ? clamp01((now - (resetsAtMs - periodDurationMs!)) / periodDurationMs!) * 100
+      ? clamp01(paceElapsedFraction(resetsAtMs, periodDurationMs!, now, paceWorkdays)) * 100
       : 0
     const paceMarkerValue = hasTimeMarkerContext && paceStatus && paceStatus !== "on-track"
       ? (displayMode === "used" ? elapsedPercent : 100 - elapsedPercent)
@@ -524,11 +525,12 @@ function MetricLineRenderer({
             resetsAtMs,
             nowMs: now,
             displayMode,
+            workdays: paceWorkdays,
           })
         : null
 
     const deficit = hasPaceContext && !isLimitReached
-      ? calculateDeficit(line.used, line.limit, resetsAtMs, periodDurationMs!, now)
+      ? calculateDeficit(line.used, line.limit, resetsAtMs, periodDurationMs!, now, paceWorkdays)
       : null
     const deficitText = deficit !== null
       ? formatDeficitText(deficit, line.format, displayMode, money)
@@ -541,6 +543,7 @@ function MetricLineRenderer({
           periodDurationMs: periodDurationMs!,
           resetsAtMs,
           nowMs: now,
+          workdays: paceWorkdays,
         })
       : null
 

@@ -140,6 +140,8 @@ This file holds the project facts that are easy to get wrong.
   raw and removes the ones the backup lacks (they were at their default there), then `relaunch()`: every loader checks
   its value at startup. Kept from this PC: a custom alert sound (its WAV isn't in the backup) and its account/WSL
   cards with their on/off state. A new preference key belongs in `BACKUP_KEYS` too.
+- Pace (`pace-status.ts`): one elapsed share for everything that shows it (card dot, marker, deficit, tray,
+  pace alert) via `paceElapsedFraction`; with `paceWorkdays` a ~7-day window counts Mon–Fri (local time) only.
 - Currency (`src/lib/currency.ts`, setting `currency`): providers report US dollars; the card shows `dollars`
   lines via `formatMoney` and rewrites `$<number>` in plugin text via `convertUsdText`, at a rate the user
   types (no exchange-rate service: CSP and privacy). USD renders exactly as before. Plugins and the local API stay in USD.
