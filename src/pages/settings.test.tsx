@@ -155,6 +155,11 @@ describe("SettingsPage", () => {
       await userEvent.clear(rate)
       await userEvent.type(rate, "40.5")
       expect(currency()).toEqual({ code: "TRY", rate: 40.5 })
+      // A cleared field isn't applied, and shows the rate in use again once left.
+      await userEvent.clear(rate)
+      await userEvent.tab()
+      expect(currency()).toEqual({ code: "TRY", rate: 40.5 })
+      expect(rate).toHaveValue(40.5)
     } finally {
       useAppPreferencesStore.setState({ currency: saved })
     }

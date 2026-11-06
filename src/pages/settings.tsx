@@ -206,6 +206,10 @@ function CurrencySection() {
                 const rate = Number(e.target.value);
                 if (Number.isFinite(rate) && rate > 0) update({ ...currency, rate });
               }}
+              // An empty or zero rate isn't applied: show the rate the cards still use.
+              onBlur={(e) => {
+                if (Number(e.target.value) !== currency.rate) e.target.value = String(currency.rate);
+              }}
               className="fluent-control min-w-0 flex-1"
             />
           </label>
