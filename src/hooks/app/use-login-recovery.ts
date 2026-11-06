@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification"
 import type { PluginState } from "@/hooks/app/types"
 import { t } from "@/lib/i18n"
-import { getPluginErrorAction } from "@/lib/plugin-errors"
+import { getPluginErrorAction, matchPluginError } from "@/lib/plugin-errors"
 import type { PluginMeta } from "@/lib/plugin-types"
 import type { AlertSettings } from "@/lib/settings"
 
@@ -11,7 +11,9 @@ export const LOGIN_CHECK_MS = 5_000
 
 /** A card whose error asks for a sign-in: its one-click fix runs a login command. */
 export function needsSignIn(state: PluginState | undefined) {
-  return !!state?.error && getPluginErrorAction(state.error)?.kind === "run"
+  if (!state?.error || getPluginErrorAction(state.error)?.kind !== "run") return false
+  // "Start <app> or run `x`" means the app isn't running or the network failed, not a lost login.
+  return matchPluginError(state.error)?.key !== "startAppOrRun"
 }
 
 async function notifySignIn(provider: string, settings: AlertSettings) {

@@ -66,6 +66,8 @@ describe("useLoginRecovery", () => {
     expect(needsSignIn(state(EXPIRED))).toBe(true)
     expect(needsSignIn(state("Rate limited by Anthropic, retry in ~60m"))).toBe(false)
     expect(needsSignIn(state(null))).toBe(false)
+    // Antigravity's IDE is closed (or the network failed): the login itself is fine.
+    expect(needsSignIn(state("Start Antigravity or run `agy` and try again."))).toBe(false)
   })
 
   it("probes a card waiting for a sign-in as soon as its login file is written", async () => {
