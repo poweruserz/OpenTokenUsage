@@ -14,9 +14,11 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) const ROUTE: &str = "/v1/claude/statusline";
 /// Fixed: the webview can only switch the bridge on or off, never choose what Claude Code runs.
-/// `curl.exe` ships with Windows 10 and 11; `-s` keeps a failed post (app not running) quiet.
+/// `curl.exe` ships with Windows 10 and 11; `-s` keeps a failed post (app not running) quiet, and
+/// `--noproxy` keeps an `HTTP_PROXY` in Claude Code's environment from sending the post (and the
+/// session's paths) to a proxy that can't reach this machine's loopback.
 const COMMAND: &str =
-    "curl.exe -s -m 2 --data-binary @- http://127.0.0.1:6736/v1/claude/statusline";
+    "curl.exe -s -m 2 --noproxy 127.0.0.1 --data-binary @- http://127.0.0.1:6736/v1/claude/statusline";
 pub(crate) const MAX_BODY_BYTES: usize = 64 * 1024;
 /// Claude Code runs the command after every message; an unchanged answer is rewritten this often,
 /// only so the plugin can tell a live snapshot from an old one.
@@ -299,6 +301,8 @@ mod tests {
     #[test]
     fn command_posts_to_this_route_on_the_local_api() {
         assert!(COMMAND.ends_with(&format!("127.0.0.1:6736{ROUTE}")));
+        // Never through an HTTP_PROXY/ALL_PROXY from Claude Code's environment.
+        assert!(COMMAND.contains(" --noproxy 127.0.0.1 "));
     }
 
     #[test]
