@@ -1,5 +1,5 @@
 import { insertAccount, isAccountId, isWslId } from "@/lib/accounts"
-import { backupStore, normalizeAlertSettings } from "@/lib/settings"
+import { backupStore, DEFAULT_ALERT_SETTINGS, normalizeAlertSettings } from "@/lib/settings"
 
 /**
  * The preferences a settings backup carries (store keys). Left out: accounts and logins (never in
@@ -105,7 +105,9 @@ export async function restoreSettingsBackup(text: string): Promise<RestoreResult
   if (!settings) return { ok: false, reason: "notBackup" }
   for (const key of BACKUP_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(settings, key)) {
-      if (key !== "plugins") await backupStore.delete(key)
+      // Defaults, but this PC's custom sound file stays choosable (its name lives in alertSettings).
+      if (key === "alertSettings") await backupStore.set(key, await withLocalSound(DEFAULT_ALERT_SETTINGS))
+      else if (key !== "plugins") await backupStore.delete(key)
       continue
     }
     const value =

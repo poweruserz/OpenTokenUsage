@@ -62,6 +62,12 @@ describe("settings backup", () => {
     expect(await loadAlertSettings()).toMatchObject({ levels: [80], sound: "custom", customSoundName: "mine.wav" })
   })
 
+  it("keeps this PC's custom sound file choosable when the backup has no notification settings", async () => {
+    storeState.set("alertSettings", { levels: [95], sound: "custom", customSoundName: "mine.wav" })
+    await restoreSettingsBackup(backup({ themeMode: "light" }))
+    expect(await loadAlertSettings()).toMatchObject({ levels: [80, 95], sound: "windows", customSoundName: "mine.wav" })
+  })
+
   it("never brings over the other PC's custom file name, even with a built-in sound chosen", async () => {
     await restoreSettingsBackup(backup({ alertSettings: { levels: [80], sound: "chime", customSoundName: "ding.mp3" } }))
     expect(await loadAlertSettings()).toMatchObject({ sound: "chime", customSoundName: null })
