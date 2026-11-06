@@ -285,6 +285,7 @@ export const ko: Messages = {
   "label.Today": "오늘",
   "label.Yesterday": "어제",
   "label.Last 30 Days": "최근 30일",
+  "label.Cache Hit Rate": "캐시 적중률",
   "label.Credits": "크레딧",
   "label.Balance": "잔액",
   "label.Status": "상태",

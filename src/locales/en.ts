@@ -285,6 +285,7 @@ export const en = {
   "label.Today": "Today",
   "label.Yesterday": "Yesterday",
   "label.Last 30 Days": "Last 30 Days",
+  "label.Cache Hit Rate": "Cache Hit Rate",
   "label.Credits": "Credits",
   "label.Balance": "Balance",
   "label.Status": "Status",
