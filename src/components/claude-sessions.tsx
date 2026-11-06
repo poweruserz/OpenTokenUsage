@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { useNowTicker } from "@/hooks/use-now-ticker"
+import { usePanelOpen } from "@/hooks/use-unseen-usage"
 import { t, type MessageKey } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -34,7 +35,9 @@ const STATUS: Record<string, { key: MessageKey; dot: string }> = {
 /** Live sessions of a Claude card's login, read every few seconds while the panel is shown. */
 export function useClaudeSessions(pluginId: string) {
   const [sessions, setSessions] = useState<LiveSession[]>([])
-  const enabled = isTauri() && isClaudeLogin(pluginId)
+  // The OS's answer: the hidden panel's page reports itself visible until it is first shown.
+  const panelOpen = usePanelOpen()
+  const enabled = isTauri() && isClaudeLogin(pluginId) && panelOpen
   const tick = useNowTicker({ enabled, intervalMs: SESSIONS_POLL_MS })
   const failedRef = useRef(false)
 

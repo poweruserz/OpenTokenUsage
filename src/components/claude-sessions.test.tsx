@@ -9,6 +9,8 @@ import {
 } from "@/components/claude-sessions"
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }))
+let panelOpen = true
+vi.mock("@/hooks/use-unseen-usage", () => ({ usePanelOpen: () => panelOpen }))
 
 const session = (over: Partial<LiveSession>): LiveSession => ({
   id: "s",
@@ -22,6 +24,7 @@ const session = (over: Partial<LiveSession>): LiveSession => ({
 describe("claude sessions", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockReset()
+    panelOpen = true
   })
 
   it("lists sessions only for the usual Claude login and its extra accounts", () => {
@@ -39,6 +42,12 @@ describe("claude sessions", () => {
 
     vi.mocked(invoke).mockClear()
     renderHook(() => useClaudeSessions("codex"))
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it("reads nothing while the panel sits hidden in the tray", () => {
+    panelOpen = false
+    renderHook(() => useClaudeSessions("claude"))
     expect(invoke).not.toHaveBeenCalled()
   })
 

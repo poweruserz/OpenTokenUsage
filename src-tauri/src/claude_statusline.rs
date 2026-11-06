@@ -136,7 +136,11 @@ fn remember_context(body: &[u8]) -> bool {
 /// The context fill (0-100) Claude Code last reported for a session, with the bridge on.
 pub(crate) fn context_percent(session_id: &str) -> Option<f64> {
     let contexts = contexts().lock().unwrap_or_else(|e| e.into_inner());
-    contexts.get(session_id).map(|(used, _)| *used)
+    // Also on reads: a session that stopped posting (bridge switched off) mustn't keep its warning.
+    contexts
+        .get(session_id)
+        .filter(|(_, at)| at.elapsed() < CONTEXT_KEPT)
+        .map(|(used, _)| *used)
 }
 
 fn last_written() -> &'static Mutex<Option<(Limits, Instant)>> {
@@ -429,6 +433,14 @@ mod tests {
         assert!(!record(cleared.as_bytes(), &dir));
         assert_eq!(context_percent("ctx-b"), None);
         assert_eq!(context_percent("ctx-a"), Some(87.5));
+
+        // A day without a post: gone on read too, not only when the next post prunes.
+        let day_ago = Instant::now().checked_sub(CONTEXT_KEPT).unwrap();
+        contexts()
+            .lock()
+            .unwrap()
+            .insert("ctx-old".into(), (95.0, day_ago));
+        assert_eq!(context_percent("ctx-old"), None);
     }
 
     #[test]
