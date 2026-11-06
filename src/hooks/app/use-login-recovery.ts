@@ -58,6 +58,9 @@ export function useLoginRecovery({
   // chained probes, each rotating the login). A sign-in that lands during the probe waits for the
   // next refresh.
   const stampsRef = useRef(new Map<string, number | null>())
+  // Any card's probe can rewrite a file another card reads too (an extra account's folder set as
+  // CLAUDE_CONFIG_DIR), so while one runs no card keeps or takes a time.
+  const busyRef = useRef(false)
   const failedRef = useRef(new Set<string>())
   const probeRef = useRef<(id: string) => void>(() => {})
   useEffect(() => {
@@ -71,9 +74,10 @@ export function useLoginRecovery({
   }, [setLoadingForPlugins, setErrorForPlugins, startBatch])
 
   useEffect(() => {
+    busyRef.current = enabledIds.some((id) => pluginStates[id]?.loading)
     for (const id of stampsRef.current.keys()) {
       const state = pluginStates[id]
-      if (!enabledIds.includes(id) || !needsSignIn(state)) stampsRef.current.delete(id)
+      if (busyRef.current || !enabledIds.includes(id) || !needsSignIn(state)) stampsRef.current.delete(id)
     }
   }, [pluginStates, enabledIds])
 
@@ -94,6 +98,7 @@ export function useLoginRecovery({
           continue
         }
         if (cancelled) return
+        if (busyRef.current) continue
         const stamps = stampsRef.current
         if (!stamps.has(id)) {
           stamps.set(id, stamp)
