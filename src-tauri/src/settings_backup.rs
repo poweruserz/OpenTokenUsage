@@ -17,7 +17,14 @@ fn write_backup(dir: &Path, json: &str) -> Result<PathBuf, String> {
     }
     let text = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
     let path = dir.join(FILE_NAME);
-    std::fs::write(&path, text).map_err(|e| e.to_string())?;
+    // Write aside and swap in: a failed write never leaves the previous backup half overwritten.
+    let partial = path.with_extension("json.tmp");
+    std::fs::write(&partial, text)
+        .and_then(|()| std::fs::rename(&partial, &path))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&partial);
+            e.to_string()
+        })?;
     Ok(path)
 }
 
@@ -54,6 +61,14 @@ mod tests {
         let saved: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(saved["settings"]["themeMode"], "light");
+        // A second export replaces the first and leaves no temporary file behind.
+        write_backup(
+            &dir,
+            r#"{"app":"OpenTokenUsage","settings":{"themeMode":"dark"}}"#,
+        )
+        .unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("dark"));
+        assert!(!path.with_extension("json.tmp").exists());
 
         assert!(write_backup(&dir, "[1, 2]").is_err());
         assert!(write_backup(&dir, "not json").is_err());

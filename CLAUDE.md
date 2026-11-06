@@ -134,10 +134,12 @@ This file holds the project facts that are easy to get wrong.
   3.5 s, then the fill grows over it. Seen values are in memory, per plugin + line and in used terms (switching
   used/left isn't spending). "Open" is asked from the OS (`isVisible`): the hidden panel's webview reports itself
   visible before its first show.
-- Settings backup (Settings → Settings backup): `buildSettingsBackup` takes only `BACKUP_KEYS` from the store (no
-  accounts, logins, panel position, sent alerts, update/star state); `settings_backup.rs` writes it to Downloads and
-  reveals it (no dialog plugin, no webview reveal permission). Import writes those keys raw, then `relaunch()`: every
-  loader checks its value at startup. A new preference key belongs in `BACKUP_KEYS` too.
+- Settings backup (`settings-backup.ts`, Settings → Settings backup): takes only `BACKUP_KEYS` from the store (no
+  accounts, logins, panel position, sent alerts, update/star state); `settings_backup.rs` writes it to Downloads
+  (write aside, then swap) and reveals it (no dialog plugin, no webview reveal permission). Import writes those keys
+  raw and removes the ones the backup lacks (they were at their default there), then `relaunch()`: every loader checks
+  its value at startup. Kept from this PC: a custom alert sound (its WAV isn't in the backup) and its account/WSL
+  cards with their on/off state. A new preference key belongs in `BACKUP_KEYS` too.
 - Currency (`src/lib/currency.ts`, setting `currency`): providers report US dollars; the card shows `dollars`
   lines via `formatMoney` and rewrites `$<number>` in plugin text via `convertUsdText`, at a rate the user
   types (no exchange-rate service: CSP and privacy). USD renders exactly as before. Plugins and the local API stay in USD.
