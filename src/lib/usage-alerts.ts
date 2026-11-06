@@ -1,4 +1,4 @@
-import { paceElapsedFraction } from "@/lib/pace-status"
+import { timeToLimitMs } from "@/lib/pace-status"
 import { liveResetCredits, RESET_WARNING_MS } from "@/lib/reset-credits"
 import { t, tLabel } from "@/lib/i18n"
 import type { MetricLine } from "@/lib/plugin-types"
@@ -107,13 +107,11 @@ export function collectUsageAlerts(args: {
     // Pace: on track to hit the limit before this window resets.
     const periodMs = line.periodDurationMs
     if (!periodMs || !Number.isFinite(resetsAtMs) || fraction < PACE_MIN_FRACTION) continue
-    const elapsedFraction = paceElapsedFraction(resetsAtMs, periodMs, nowMs, args.workdays)
-    if (elapsedFraction <= 0 || nowMs >= resetsAtMs) continue
-    // Projected over the window's length: equals "runs out before the reset" (an ETA under the time left).
-    const projected = line.used / elapsedFraction
-    const etaMs = (line.limit - line.used) / (projected / periodMs)
+    if (nowMs >= resetsAtMs) continue
+    // The card's "Runs out in" uses the same time (work days skip weekends).
+    const etaMs = timeToLimitMs(line.used, line.limit, resetsAtMs, periodMs, nowMs, args.workdays)
     const paceKey = `${base}|pace`
-    if (projected > line.limit && etaMs > 0 && !wasSent(sent, prefix, window, "|pace")) {
+    if (etaMs !== null && etaMs < resetsAtMs - nowMs && !wasSent(sent, prefix, window, "|pace")) {
       alerts.push({
         title: t("alert.pace.title", { provider: providerName, label }),
         body: t("alert.pace.body", { time: formatCompactDuration(etaMs) ?? "" }),

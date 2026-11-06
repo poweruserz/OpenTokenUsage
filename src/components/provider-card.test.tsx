@@ -635,6 +635,38 @@ describe("ProviderCard", () => {
     vi.useRealTimers()
   })
 
+  it("times a work-day week's run-out in work days", () => {
+    vi.useFakeTimers()
+    // Saturday-to-Saturday week (local), Wednesday noon, 55% used over 2.5 work days.
+    vi.setSystemTime(new Date(2026, 10, 11, 12))
+    const saved = useAppPreferencesStore.getState().paceWorkdays
+    useAppPreferencesStore.setState({ paceWorkdays: true })
+    try {
+      render(
+        <ProviderCard
+          name="Pace"
+          displayMode="used"
+          lines={[
+            {
+              type: "progress",
+              label: "Weekly",
+              used: 55,
+              limit: 100,
+              format: { kind: "percent" },
+              resetsAt: new Date(2026, 10, 14).toISOString(),
+              periodDurationMs: 7 * 24 * 60 * 60 * 1000,
+            },
+          ]}
+        />
+      )
+      // 45% more at 22% a work day: Friday about 13:05. By the calendar it's on target, no run-out.
+      expect(screen.getByText("Runs out in 2d 1h")).toBeInTheDocument()
+    } finally {
+      useAppPreferencesStore.setState({ paceWorkdays: saved })
+      vi.useRealTimers()
+    }
+  })
+
   it("hides tiny positive deficit text that would round to zero", () => {
     vi.useFakeTimers()
     const now = new Date("2026-02-02T12:00:00.000Z")

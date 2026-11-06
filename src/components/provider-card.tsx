@@ -518,6 +518,7 @@ function MetricLineRenderer({
             resetsAtMs,
             nowMs: now,
             displayMode,
+            workdays: paceWorkdays,
           })
         : null
 
@@ -535,6 +536,7 @@ function MetricLineRenderer({
           periodDurationMs: periodDurationMs!,
           resetsAtMs,
           nowMs: now,
+          workdays: paceWorkdays,
         })
       : null
 

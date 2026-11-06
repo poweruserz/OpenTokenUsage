@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 
-import { calculateDeficit, calculatePaceStatus, paceElapsedFraction, workdayMs } from "@/lib/pace-status"
+import {
+  addWorkdayMs,
+  calculateDeficit,
+  calculatePaceStatus,
+  paceElapsedFraction,
+  timeToLimitMs,
+  workdayMs,
+} from "@/lib/pace-status"
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 
@@ -24,6 +31,20 @@ describe("work-day weekly pace", () => {
     expect(paceElapsedFraction(resetsAt, WEEK_MS, wednesday)).toBeCloseTo(4 / 7)
     // A 5-hour window is never counted in work days.
     expect(paceElapsedFraction(saturday + 5 * 3_600_000, 5 * 3_600_000, saturday + 3_600_000, true)).toBeCloseTo(0.2)
+  })
+
+  it("times the limit in work days and skips the weekend to reach it", () => {
+    const HOUR = 3_600_000
+    // Monday-to-Monday week, Tuesday 00:00, 30% used in one work day: 70% more takes 2.33 work days.
+    const mondayStart = new Date(2026, 10, 9).getTime()
+    const tuesday = new Date(2026, 10, 10).getTime()
+    expect(timeToLimitMs(30, 100, mondayStart + WEEK_MS, WEEK_MS, tuesday, true)).toBe(2 * ONE_DAY_MS + 8 * HOUR)
+    // Friday noon with a day's work left: Friday's 12 h, the weekend skipped, then Monday's first 12 h.
+    const friday = new Date(2026, 10, 13, 12).getTime()
+    expect(addWorkdayMs(friday, ONE_DAY_MS) - friday).toBe(3 * ONE_DAY_MS)
+    // Without work days, the calendar rate as before.
+    expect(timeToLimitMs(30, 100, mondayStart + WEEK_MS, WEEK_MS, tuesday)).toBeCloseTo((70 / 30) * ONE_DAY_MS)
+    expect(timeToLimitMs(0, 100, mondayStart + WEEK_MS, WEEK_MS, tuesday, true)).toBeNull()
   })
 
   it("doesn't take an unused weekend for room to spare", () => {

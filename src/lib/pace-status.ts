@@ -16,6 +16,28 @@ export function workdayMs(fromMs: number, toMs: number): number {
   return total
 }
 
+/** The instant `workMs` of Monday-to-Friday time after `fromMs` (weekends are skipped). */
+export function addWorkdayMs(fromMs: number, workMs: number): number {
+  let at = fromMs
+  let left = workMs
+  // At most ~10 years of days: the callers only care whether it lands before a reset.
+  for (let days = 0; left > 0 && days < 3660; days++) {
+    const day = new Date(at)
+    const nextMidnight = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime()
+    if (day.getDay() !== 0 && day.getDay() !== 6) {
+      if (left <= nextMidnight - at) return at + left
+      left -= nextMidnight - at
+    }
+    at = nextMidnight
+  }
+  return at
+}
+
+/** Whether a window is counted in work days: the setting is on and the window is about a week. */
+function countsWorkdays(periodDurationMs: number, workdays: boolean): boolean {
+  return workdays && Math.abs(periodDurationMs - WEEK_MS) < DAY_MS
+}
+
 /**
  * How much of a window has passed (0..1, unclamped outside it). With `workdays`, a weekly window
  * counts only Monday to Friday, so a weekend without use doesn't read as being ahead of pace.
@@ -27,11 +49,31 @@ export function paceElapsedFraction(
   workdays = false
 ): number {
   const startMs = resetsAtMs - periodDurationMs
-  if (workdays && Math.abs(periodDurationMs - WEEK_MS) < DAY_MS) {
+  if (countsWorkdays(periodDurationMs, workdays)) {
     const total = workdayMs(startMs, resetsAtMs)
     if (total > 0) return workdayMs(startMs, Math.min(Math.max(nowMs, startMs), resetsAtMs)) / total
   }
   return (nowMs - startMs) / periodDurationMs
+}
+
+/**
+ * How long until usage reaches `limit` at its rate so far (ms from now), or null when it can't be
+ * told. With work days, the rate is per work time and the time left skips weekends.
+ */
+export function timeToLimitMs(
+  used: number,
+  limit: number,
+  resetsAtMs: number,
+  periodDurationMs: number,
+  nowMs: number,
+  workdays = false
+): number | null {
+  if (!(used > 0) || !(limit > used)) return null
+  const startMs = resetsAtMs - periodDurationMs
+  const spentMs = countsWorkdays(periodDurationMs, workdays) ? workdayMs(startMs, nowMs) : nowMs - startMs
+  if (!(spentMs > 0)) return null
+  const neededMs = ((limit - used) / used) * spentMs
+  return countsWorkdays(periodDurationMs, workdays) ? addWorkdayMs(nowMs, neededMs) - nowMs : neededMs
 }
 
 export type PaceResult = {

@@ -1,4 +1,4 @@
-import type { PaceResult, PaceStatus } from "@/lib/pace-status"
+import { timeToLimitMs, type PaceResult, type PaceStatus } from "@/lib/pace-status"
 import type { ProgressFormat } from "@/lib/plugin-types"
 import type { DisplayMode } from "@/lib/settings"
 import { formatCountNumber, formatFixedPrecisionNumber } from "@/lib/utils"
@@ -23,6 +23,17 @@ export function formatCompactDuration(deltaMs: number): string | null {
   return t("duration.lt1m")
 }
 
+type RunsOutArgs = {
+  paceResult: PaceResult | null
+  used: number
+  limit: number
+  periodDurationMs: number
+  resetsAtMs: number
+  nowMs: number
+  /** Weekly pace counts Monday to Friday only (`pace-status.ts`). */
+  workdays?: boolean
+}
+
 function getRunsOutDurationText({
   paceResult,
   used,
@@ -30,20 +41,11 @@ function getRunsOutDurationText({
   periodDurationMs,
   resetsAtMs,
   nowMs,
-}: {
-  paceResult: PaceResult | null
-  used: number
-  limit: number
-  periodDurationMs: number
-  resetsAtMs: number
-  nowMs: number
-}): string | null {
+  workdays = false,
+}: RunsOutArgs): string | null {
   if (!paceResult || paceResult.status !== "behind") return null
-  const rate = paceResult.projectedUsage / periodDurationMs
-  if (rate <= 0) return null
-  const etaMs = (limit - used) / rate
-  const remainingMs = resetsAtMs - nowMs
-  if (etaMs <= 0 || etaMs >= remainingMs) return null
+  const etaMs = timeToLimitMs(used, limit, resetsAtMs, periodDurationMs, nowMs, workdays)
+  if (etaMs === null || etaMs <= 0 || etaMs >= resetsAtMs - nowMs) return null
   return formatCompactDuration(etaMs)
 }
 
@@ -51,46 +53,17 @@ function getRunsOutDurationText({
  * ETA text for when usage will hit the limit, e.g. "Runs out in 4d 5h".
  * Returns null if not behind pace or ETA can't be computed.
  */
-export function formatRunsOutText({
-  paceResult,
-  used,
-  limit,
-  periodDurationMs,
-  resetsAtMs,
-  nowMs,
-}: {
-  paceResult: PaceResult | null
-  used: number
-  limit: number
-  periodDurationMs: number
-  resetsAtMs: number
-  nowMs: number
-}): string | null {
-  const durationText = getRunsOutDurationText({ paceResult, used, limit, periodDurationMs, resetsAtMs, nowMs })
+export function formatRunsOutText(args: RunsOutArgs): string | null {
+  const durationText = getRunsOutDurationText(args)
   return durationText ? t("pace.runsOutIn", { time: durationText }) : null
 }
 
-export function buildPaceDetailText({
-  paceResult,
-  used,
-  limit,
-  periodDurationMs,
-  resetsAtMs,
-  nowMs,
-  displayMode,
-}: {
-  paceResult: PaceResult | null
-  used: number
-  limit: number
-  periodDurationMs: number
-  resetsAtMs: number
-  nowMs: number
-  displayMode: DisplayMode
-}): string | null {
+export function buildPaceDetailText(args: RunsOutArgs & { displayMode: DisplayMode }): string | null {
+  const { paceResult, limit, displayMode } = args
   if (!paceResult || !Number.isFinite(limit) || limit <= 0 || paceResult.projectedUsage === 0) return null
 
   if (paceResult.status === "behind") {
-    const durationText = getRunsOutDurationText({ paceResult, used, limit, periodDurationMs, resetsAtMs, nowMs })
+    const durationText = getRunsOutDurationText(args)
     if (durationText) return t("pace.limitIn", { time: durationText })
   }
 
