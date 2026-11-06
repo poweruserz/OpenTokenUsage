@@ -1,6 +1,7 @@
 mod accounts;
 mod alert_sound;
 mod autostart;
+mod claude_sessions;
 mod claude_statusline;
 mod config;
 mod data_dirs;
@@ -612,6 +613,7 @@ pub fn run() {
             login_stamp::login_file_stamp,
             claude_statusline::claude_statusline_state,
             claude_statusline::set_claude_statusline,
+            claude_sessions::claude_sessions,
             alert_sound::play_alert_sound,
             alert_sound::save_custom_alert_sound
         ])

@@ -1,4 +1,5 @@
 import { ResetCredits } from "@/components/reset-credits"
+import { ClaudeSessions, isClaudeLogin } from "@/components/claude-sessions"
 import { Fragment, useMemo } from "react"
 import { AlertCircle, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -17,12 +18,13 @@ import { alertLevelsFor, REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerD
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import type { ManifestLine, MetricLine, PluginLink } from "@/lib/plugin-types"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
-import { clamp01, formatCountNumber, formatFixedPrecisionNumber } from "@/lib/utils"
+import { clamp01, formatCountNumber } from "@/lib/utils"
+import { convertUsdText, formatMoney } from "@/lib/currency"
 import { getDisplayedUsage } from "@/lib/usage-display"
 import { calculateDeficit, calculatePaceStatus, paceElapsedFraction, type PaceStatus } from "@/lib/pace-status"
 import { buildPaceDetailText, formatDeficitText, formatRunsOutText, getPaceStatusText } from "@/lib/pace-tooltip"
 import { formatResetAbsoluteLabel, formatResetRelativeLabel, formatResetTooltipText } from "@/lib/reset-tooltip"
-import { t, tLabel } from "@/lib/i18n"
+import { getLocale, t, tLabel } from "@/lib/i18n"
 import { translatePluginError } from "@/lib/plugin-errors"
 
 interface ProviderCardProps {
@@ -364,6 +366,7 @@ export function ProviderCard({
           </div>
         )}
 
+        {pluginId && isClaudeLogin(pluginId) && <ClaudeSessions pluginId={pluginId} />}
       </div>
       {showSeparator && <Separator />}
     </div>
@@ -395,6 +398,10 @@ function MetricLineRenderer({
   alertLevels?: readonly number[]
 }) {
   const paceWorkdays = useAppPreferencesStore((state) => state.paceWorkdays)
+  // Costs arrive in US dollars; shown in the chosen currency (`currency.ts`).
+  const currency = useAppPreferencesStore((state) => state.currency)
+  const money = (usd: number) => formatMoney(usd, currency, getLocale())
+  const moneyText = (text: string) => convertUsdText(text, currency, getLocale())
   const isProgress = line.type === "progress"
   const unseen = useUnseenUsage(
     isProgress && pluginId ? `${pluginId}|${line.label}` : null,
@@ -414,13 +421,13 @@ function MetricLineRenderer({
           <span
             className="text-xs text-muted-foreground truncate flex-shrink-0 max-w-[45%] text-right"
             style={line.color ? { color: line.color } : undefined}
-            title={line.value}
+            title={moneyText(line.value)}
           >
-            {line.value}
+            {moneyText(line.value)}
           </span>
         </div>
         {line.subtitle && (
-          <div className="text-[10px] text-muted-foreground text-right -mt-0.5">{line.subtitle}</div>
+          <div className="text-[10px] text-muted-foreground text-right -mt-0.5">{moneyText(line.subtitle)}</div>
         )}
       </div>
     )
@@ -439,13 +446,13 @@ function MetricLineRenderer({
                 ? { color: line.color, borderColor: line.color }
                 : undefined
             }
-            title={line.text}
+            title={moneyText(line.text)}
           >
-            {line.text}
+            {moneyText(line.text)}
           </Badge>
         </div>
         {line.subtitle && (
-          <div className="text-xs text-muted-foreground text-right -mt-0.5">{line.subtitle}</div>
+          <div className="text-xs text-muted-foreground text-right -mt-0.5">{moneyText(line.subtitle)}</div>
         )}
       </div>
     )
@@ -470,7 +477,7 @@ function MetricLineRenderer({
       line.format.kind === "percent"
         ? `${Math.round(shownAmount)}%`
         : line.format.kind === "dollars"
-          ? `$${formatFixedPrecisionNumber(shownAmount)}`
+          ? money(shownAmount)
           : `${formatCountNumber(shownAmount)} ${line.format.suffix}`
     const primaryText = displayMode === "left" ? t("card.valueLeft", { value: amountText }) : amountText
 
@@ -493,7 +500,7 @@ function MetricLineRenderer({
       (line.format.kind === "percent"
         ? t("card.percentCap", { value: line.limit })
         : line.format.kind === "dollars"
-          ? t("card.amountLimit", { value: `$${formatFixedPrecisionNumber(line.limit)}` })
+          ? t("card.amountLimit", { value: money(line.limit) })
           : `${formatCountNumber(line.limit)} ${line.format.suffix}`)
 
     // Calculate pace status if we have reset time and period duration
@@ -526,7 +533,7 @@ function MetricLineRenderer({
       ? calculateDeficit(line.used, line.limit, resetsAtMs, periodDurationMs!, now, paceWorkdays)
       : null
     const deficitText = deficit !== null
-      ? formatDeficitText(deficit, line.format, displayMode)
+      ? formatDeficitText(deficit, line.format, displayMode, money)
       : null
     const runsOutText = hasPaceContext && !isLimitReached
       ? formatRunsOutText({

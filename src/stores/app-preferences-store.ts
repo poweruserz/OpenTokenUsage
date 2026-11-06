@@ -26,6 +26,7 @@ import {
   type TrayPercentColor,
   type TrayProvider,
 } from "@/lib/settings"
+import { DEFAULT_CURRENCY, type CurrencySetting } from "@/lib/currency"
 
 type AppPreferencesStore = {
   autoUpdateInterval: AutoUpdateInterval
@@ -42,6 +43,7 @@ type AppPreferencesStore = {
   trayHiddenPlugins: string[]
   usageAlerts: boolean
   alertSettings: AlertSettings
+  currency: CurrencySetting
   panelPinned: boolean
   rememberPanelPosition: boolean
   trayLogoColors: boolean
@@ -62,6 +64,7 @@ type AppPreferencesStore = {
   setTrayHiddenPlugins: (value: string[]) => void
   setUsageAlerts: (value: boolean) => void
   setAlertSettings: (value: AlertSettings) => void
+  setCurrency: (value: CurrencySetting) => void
   setPanelPinned: (value: boolean) => void
   setRememberPanelPosition: (value: boolean) => void
   setTrayLogoColors: (value: boolean) => void
@@ -86,6 +89,7 @@ const initialState = {
   trayHiddenPlugins: [] as string[],
   usageAlerts: true,
   alertSettings: DEFAULT_ALERT_SETTINGS,
+  currency: DEFAULT_CURRENCY,
   panelPinned: false,
   rememberPanelPosition: false,
   trayLogoColors: true,
@@ -110,6 +114,7 @@ export const useAppPreferencesStore = create<AppPreferencesStore>((set) => ({
   setTrayHiddenPlugins: (value) => set({ trayHiddenPlugins: value }),
   setUsageAlerts: (value) => set({ usageAlerts: value }),
   setAlertSettings: (value) => set({ alertSettings: value }),
+  setCurrency: (value) => set({ currency: value }),
   setPanelPinned: (value) => set({ panelPinned: value }),
   setRememberPanelPosition: (value) => set({ rememberPanelPosition: value }),
   setTrayLogoColors: (value) => set({ trayLogoColors: value }),

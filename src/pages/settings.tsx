@@ -27,6 +27,7 @@ import { audioFileToWav, CUSTOM_SOUND_MAX_MB, CUSTOM_SOUND_MAX_SECONDS, SoundFil
 import { getBarFillLayout, getTrayIconSizePx } from "@/lib/tray-bars-icon";
 import { bytesToBase64 } from "@/lib/tray-provider-icons";
 import { TRAY_PACE_COLOR } from "@/lib/tray-primary-progress";
+import { CURRENCIES, normalizeCurrency, type CurrencySetting } from "@/lib/currency";
 import {
   ALERT_SOUNDS,
   AUTO_UPDATE_OPTIONS,
@@ -36,6 +37,7 @@ import {
   MENUBAR_ICON_STYLE_OPTIONS,
   RESET_TIMER_DISPLAY_OPTIONS,
   saveAlertSettings,
+  saveCurrency,
   saveLanguage,
   savePaceWorkdays,
   saveRememberPanelPosition,
@@ -188,6 +190,57 @@ function PaceWorkdaysToggle() {
         <span className="block text-xs text-muted-foreground">{t("settings.usageMode.workdaysHint")}</span>
       </span>
     </label>
+  );
+}
+
+/** Costs in another currency, at a rate the user enters (no exchange-rate service is asked). */
+function CurrencySection() {
+  const currency = useAppPreferencesStore((state) => state.currency);
+  const setCurrency = useAppPreferencesStore((state) => state.setCurrency);
+  const update = (next: CurrencySetting) => {
+    setCurrency(next);
+    void saveCurrency(next).catch((error) => console.error("Failed to save the currency:", error));
+  };
+  return (
+    <SettingsSection title={t("settings.currency.title")} description={t("settings.currency.desc")}>
+      <div className="flex gap-2">
+        <select
+          aria-label={t("settings.currency.title")}
+          value={currency.code}
+          onChange={(e) => update(normalizeCurrency({ code: e.target.value, rate: currency.rate }))}
+          className="fluent-control flex-1"
+        >
+          {CURRENCIES.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </select>
+        {currency.code !== "USD" && (
+          <label className="flex flex-1 items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="shrink-0">{t("settings.currency.rate", { code: currency.code })}</span>
+            <input
+              key={currency.code}
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              defaultValue={currency.rate}
+              onChange={(e) => {
+                const rate = Number(e.target.value);
+                if (Number.isFinite(rate) && rate > 0) update({ ...currency, rate });
+              }}
+              // An empty or zero rate isn't applied: show the rate the cards still use.
+              onBlur={(e) => {
+                if (Number(e.target.value) !== currency.rate) e.target.value = String(currency.rate);
+              }}
+              className="fluent-control min-w-0 flex-1"
+            />
+          </label>
+        )}
+      </div>
+      {currency.code !== "USD" && <p className="mt-1.5 text-xs text-muted-foreground">{t("settings.currency.hint")}</p>}
+    </SettingsSection>
   );
 }
 
@@ -691,6 +744,8 @@ export function SettingsPage({
         />
         <PaceWorkdaysToggle />
       </SettingsSection>
+
+      <CurrencySection />
 
       <SettingsSection title={t("settings.resetTimers.title")} description={t("settings.resetTimers.desc")}>
         <SegmentedControl

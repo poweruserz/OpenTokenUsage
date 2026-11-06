@@ -76,7 +76,9 @@ export function buildPaceDetailText(args: RunsOutArgs & { displayMode: DisplayMo
 export function formatDeficitText(
   deficit: number,
   format: ProgressFormat,
-  displayMode: DisplayMode
+  displayMode: DisplayMode,
+  /** A dollar amount in the chosen currency (`currency.ts`). */
+  formatUsd: (usd: number) => string = (usd) => `$${formatFixedPrecisionNumber(usd)}`
 ): string | null {
   if (!Number.isFinite(deficit) || deficit <= 0) return null
 
@@ -89,6 +91,6 @@ export function formatDeficitText(
   const roundedToCents = Math.round(deficit * 100) / 100
   if (roundedToCents <= 0) return null
 
-  if (format.kind === "dollars") return withSuffix(`$${formatFixedPrecisionNumber(roundedToCents)}`)
+  if (format.kind === "dollars") return withSuffix(formatUsd(roundedToCents))
   return withSuffix(`${formatCountNumber(roundedToCents)} ${format.suffix}`)
 }

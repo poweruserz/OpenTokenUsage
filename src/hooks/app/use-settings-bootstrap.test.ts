@@ -89,6 +89,7 @@ vi.mock("@/lib/settings", () => ({
   loadUsageAlerts: vi.fn(async () => true),
   loadTrayLogoColors: vi.fn(async () => true),
   loadPaceWorkdays: vi.fn(async () => true),
+  loadCurrency: vi.fn(async () => ({ code: "TRY", rate: 40 })),
   loadTaskbarStrip: vi.fn(async () => false),
   loadTaskbarStripStyle: vi.fn(async () => ({})),
   loadTrayProvider: loadTrayProviderMock,
@@ -124,6 +125,7 @@ function createArgs() {
     setUsageAlerts: vi.fn(),
     setTrayLogoColors: vi.fn(),
     setPaceWorkdays: vi.fn(),
+    setCurrency: vi.fn(),
     setTaskbarStrip: vi.fn(),
     setTaskbarStripStyle: vi.fn(),
     setLoadingForPlugins: vi.fn(),
@@ -237,6 +239,12 @@ describe("useSettingsBootstrap", () => {
     const args = createArgs()
     renderHook(() => useSettingsBootstrap(args))
     await waitFor(() => expect(args.setPaceWorkdays).toHaveBeenCalledWith(true))
+  })
+
+  it("loads the currency setting", async () => {
+    const args = createArgs()
+    renderHook(() => useSettingsBootstrap(args))
+    await waitFor(() => expect(args.setCurrency).toHaveBeenCalledWith({ code: "TRY", rate: 40 }))
   })
 
   it("falls back to default reset timer mode when loading fails", async () => {

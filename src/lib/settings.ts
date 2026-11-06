@@ -2,6 +2,7 @@ import { LazyStore } from "@tauri-apps/plugin-store";
 import type { PluginMeta } from "@/lib/plugin-types";
 import { isLanguagePreference, type LanguagePreference } from "@/lib/i18n";
 import type { MessageKey } from "@/locales/en";
+import { normalizeCurrency, type CurrencySetting } from "@/lib/currency";
 
 // Refresh cooldown duration in milliseconds (5 minutes)
 export const REFRESH_COOLDOWN_MS = 300_000;
@@ -50,6 +51,7 @@ const TRAY_PERCENT_COLOR_KEY = "trayPercentColor";
 const TRAY_HIDDEN_PLUGINS_KEY = "trayHiddenPlugins";
 const USAGE_ALERTS_KEY = "usageAlerts";
 const ALERT_SETTINGS_KEY = "alertSettings";
+const CURRENCY_KEY = "currency";
 const PANEL_PINNED_KEY = "panelPinned";
 // Read by src-tauri/src/tray.rs, which also writes the position while the user drags the panel.
 const REMEMBER_PANEL_POSITION_KEY = "rememberPanelPosition";
@@ -452,6 +454,15 @@ export async function loadAlertSettings(): Promise<AlertSettings> {
 
 export async function saveAlertSettings(value: AlertSettings): Promise<void> {
   await store.set(ALERT_SETTINGS_KEY, value);
+  await store.save();
+}
+
+export async function loadCurrency(): Promise<CurrencySetting> {
+  return normalizeCurrency(await store.get<unknown>(CURRENCY_KEY));
+}
+
+export async function saveCurrency(value: CurrencySetting): Promise<void> {
+  await store.set(CURRENCY_KEY, value);
   await store.save();
 }
 

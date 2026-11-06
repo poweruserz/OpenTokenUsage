@@ -5,7 +5,8 @@ import { invoke } from "@tauri-apps/api/core"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { ProviderCard } from "@/components/provider-card"
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }))
+// Not in Tauri: the Claude card's live sessions stay out of these status-badge checks.
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => false }))
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(() => Promise.resolve()) }))
 
 const renderCard = (statusPageUrl: string | null = "https://status.example.com") =>

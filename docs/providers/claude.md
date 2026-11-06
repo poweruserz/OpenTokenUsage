@@ -126,6 +126,10 @@ Content-Type: application/json
 }
 ```
 
+## Live sessions
+
+The Claude card (the usual login and each extra account) lists the Claude Code sessions running on this machine, read every 5 seconds while the panel is shown. Each running `claude` keeps `sessions/<pid>.json` in its config folder (`CLAUDE_CONFIG_DIR` or `~/.claude`) with its name, folder and state (`busy`, `shell`, `idle`, `waiting`). A file is skipped when its process has ended (a crash leaves it behind) or its pid now belongs to a process started at another time than the file's `procStart`; daemon processes aren't sessions. With the status line on, each session also shows how full its context window is (`context_window.used_percentage` from its last post, kept in memory): yellow from 70%, red with "Compacts soon" from 85%. A WSL card lists none: its processes aren't Windows processes.
+
 ## WSL
 
 A login inside a running WSL distro shows as its own `Claude · WSL` card when it's a different account than the ones already shown. A stopped distro is never started; its card keeps its last data.
