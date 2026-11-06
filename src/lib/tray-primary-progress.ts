@@ -7,17 +7,24 @@ import { getDisplayedUsage } from "@/lib/usage-display"
 /** `trayPercentColor` value that colors the tray number by its line's pace. */
 export const TRAY_PACE_COLOR = "pace"
 
-/** The card's pace dot colors (green/yellow/red-500), drawn into the tray icon. */
-const PACE_COLORS: Record<PaceStatus, string> = {
-  ahead: "#22c55e",
-  "on-track": "#eab308",
-  behind: "#ef4444",
+/**
+ * The card's pace dot colors (`--green/yellow/red-500` of index.css's light and dark themes,
+ * test-synced). The tray icon is an image on the taskbar, so it takes the values of the taskbar's
+ * theme rather than the tokens, which follow the app's.
+ */
+export const PACE_COLORS: Record<"light" | "dark", Record<PaceStatus, string>> = {
+  light: { ahead: "#0f7b0f", "on-track": "#9d5d00", behind: "#c42b1c" },
+  dark: { ahead: "#6ccb5f", "on-track": "#fce100", behind: "#ff99a4" },
 }
 
 /** The tray number's color: the chosen one, or its pace's; undefined = the taskbar's text color. */
-export function trayPercentTextColor(setting: string, pace: PaceStatus | undefined): string | undefined {
+export function trayPercentTextColor(
+  setting: string,
+  pace: PaceStatus | undefined,
+  taskbarIsLight = false
+): string | undefined {
   if (setting !== TRAY_PACE_COLOR) return setting
-  return pace ? PACE_COLORS[pace] : undefined
+  return pace ? PACE_COLORS[taskbarIsLight ? "light" : "dark"][pace] : undefined
 }
 
 type PluginState = {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest"
 
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import {
   findTightestLimit,
   getTrayPrimaryBars,
+  PACE_COLORS,
   TRAY_PACE_COLOR,
   trayPercentTextColor,
 } from "@/lib/tray-primary-progress"
@@ -48,12 +51,21 @@ describe("tray pace color", () => {
     expect(barFor(70).pace).toBeUndefined()
   })
 
-  it("colors the number by pace only when asked, else keeps the chosen color", () => {
+  it("colors the number by pace only when asked, in the taskbar theme's shade", () => {
     expect(trayPercentTextColor("#ff00ff", "behind")).toBe("#ff00ff")
-    expect(trayPercentTextColor(TRAY_PACE_COLOR, "ahead")).toBe("#22c55e")
-    expect(trayPercentTextColor(TRAY_PACE_COLOR, "behind")).toBe("#ef4444")
+    expect(trayPercentTextColor(TRAY_PACE_COLOR, "ahead")).toBe(PACE_COLORS.dark.ahead)
+    expect(trayPercentTextColor(TRAY_PACE_COLOR, "behind", true)).toBe(PACE_COLORS.light.behind)
     // No pace yet: the taskbar's own text color.
     expect(trayPercentTextColor(TRAY_PACE_COLOR, undefined)).toBeUndefined()
+  })
+
+  it("uses the card's pace dot colors from index.css", () => {
+    const css = readFileSync(resolve(__dirname, "../index.css"), "utf8")
+    const tokens = (name: string) => [...css.matchAll(new RegExp(`--${name}-500:\\s*(#[0-9a-f]{6})`, "gi"))].map((m) => m[1])
+    // index.css defines :root (light) first, then :root.dark.
+    expect(tokens("green")).toEqual([PACE_COLORS.light.ahead, PACE_COLORS.dark.ahead])
+    expect(tokens("yellow")).toEqual([PACE_COLORS.light["on-track"], PACE_COLORS.dark["on-track"]])
+    expect(tokens("red")).toEqual([PACE_COLORS.light.behind, PACE_COLORS.dark.behind])
   })
 })
 
