@@ -4,15 +4,14 @@
 //! the statusLine bridge on, a session also carries the context fill Claude Code last reported.
 
 use crate::AppState;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 use std::sync::Mutex;
 
 const MAX_FILES: usize = 64;
 const MAX_FILE_BYTES: u64 = 64 * 1024;
-/// `procStart` is the process's creation time in 100 ns units. Claude Code writes it from
-/// JavaScript, whose numbers round a value this large by a few units.
-const START_TOLERANCE: f64 = 10_000.0;
+/// A number `procStart` went through JavaScript, which rounds a value this large by a few units.
+const START_TOLERANCE: u64 = 10_000;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +25,22 @@ struct SessionFile {
     kind: Option<String>,
     #[serde(default)]
     started_at: f64,
-    proc_start: Option<f64>,
+    #[serde(default, deserialize_with = "proc_start")]
+    proc_start: Option<u64>,
+}
+
+/// The process's creation time in 100 ns units (a FILETIME). Claude Code writes it as a decimal
+/// string, which a JavaScript number can't hold exactly; a number is taken too.
+fn proc_start<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    Ok(
+        match Option::<serde_json::Value>::deserialize(deserializer)? {
+            Some(serde_json::Value::String(text)) => text.trim().parse().ok(),
+            Some(serde_json::Value::Number(number)) => number
+                .as_u64()
+                .or_else(|| number.as_f64().map(|value| value as u64)),
+            _ => None,
+        },
+    )
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -41,7 +55,7 @@ pub struct LiveSession {
 }
 
 /// The sessions in one `sessions` folder whose process still runs, oldest first.
-fn read_sessions(dir: &Path, is_running: impl Fn(u32, Option<f64>) -> bool) -> Vec<LiveSession> {
+fn read_sessions(dir: &Path, is_running: impl Fn(u32, Option<u64>) -> bool) -> Vec<LiveSession> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -92,8 +106,15 @@ fn read_sessions(dir: &Path, is_running: impl Fn(u32, Option<f64>) -> bool) -> V
 
 /// Whether `pid` runs and, when the file gives one, was started at `proc_start` (else the pid was
 /// reused by another process after the session ended).
+fn process_running(pid: u32, proc_start: Option<u64>) -> bool {
+    process_start(pid).is_some_and(|created| {
+        proc_start.is_none_or(|start| created.abs_diff(start) < START_TOLERANCE)
+    })
+}
+
+/// When the running process `pid` was created (FILETIME, 100 ns units); None once it has exited.
 #[cfg(windows)]
-fn process_running(pid: u32, proc_start: Option<f64>) -> bool {
+fn process_start(pid: u32) -> Option<u64> {
     use windows_sys::Win32::Foundation::{CloseHandle, FILETIME};
     use windows_sys::Win32::System::Threading::{
         GetExitCodeProcess, GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -109,7 +130,7 @@ fn process_running(pid: u32, proc_start: Option<f64>) -> bool {
     let running = unsafe {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if handle.is_null() {
-            return false;
+            return None;
         }
         let running = GetExitCodeProcess(handle, &mut code) != 0
             && code == STILL_ACTIVE
@@ -117,13 +138,12 @@ fn process_running(pid: u32, proc_start: Option<f64>) -> bool {
         CloseHandle(handle);
         running
     };
-    let created = (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime);
-    running && proc_start.is_none_or(|start| (created as f64 - start).abs() < START_TOLERANCE)
+    running.then(|| (u64::from(created.dwHighDateTime) << 32) | u64::from(created.dwLowDateTime))
 }
 
 #[cfg(not(windows))]
-fn process_running(_pid: u32, _proc_start: Option<f64>) -> bool {
-    false
+fn process_start(_pid: u32) -> Option<u64> {
+    None
 }
 
 /// The live Claude Code sessions of a Claude card's login (the usual one or an extra account).
@@ -246,12 +266,43 @@ mod tests {
     }
 
     #[test]
+    fn reads_a_session_file_as_claude_code_writes_it() {
+        // Claude Code writes `procStart` as a decimal string: a JavaScript number can't hold a
+        // FILETIME exactly. The other fields are as in a real file.
+        let dir = temp_dir("real");
+        let me = std::process::id();
+        let started = process_start(me).expect("this process runs");
+        write(
+            &dir,
+            &format!("{me}.json"),
+            serde_json::json!({
+                "pid": me, "sessionId": "s-1", "cwd": r"C:\work\app", "startedAt": 1_762_520_000_000u64,
+                "procStart": started.to_string(), "version": "2.9.0", "kind": "interactive",
+                "entrypoint": "cli", "name": "app", "status": "busy", "updatedAt": 1_762_520_000_000u64
+            }),
+        );
+        let sessions = read_sessions(&dir, process_running);
+        assert_eq!(
+            sessions.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(),
+            ["s-1"]
+        );
+
+        // The same pid, started at another time: an earlier process's leftover.
+        write(
+            &dir,
+            &format!("{me}.json"),
+            serde_json::json!({ "pid": me, "sessionId": "s-1", "procStart": (started - 50_000).to_string() }),
+        );
+        assert!(read_sessions(&dir, process_running).is_empty());
+    }
+
+    #[test]
     fn a_reused_pid_or_a_gone_process_is_not_a_live_session() {
         let me = std::process::id();
         assert!(process_running(me, None));
         // This process started long after 1601: a file naming our pid with that start time
         // belonged to an earlier process.
-        assert!(!process_running(me, Some(1.0)));
+        assert!(!process_running(me, Some(1)));
         assert!(!process_running(0, None));
     }
 }
