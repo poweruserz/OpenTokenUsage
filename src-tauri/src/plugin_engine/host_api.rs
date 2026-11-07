@@ -425,6 +425,7 @@ fn redact_body(body: &str) -> String {
         "organization_id",
         "workspace_id",
         "guardrail_id",
+        "budget_id",
     ];
     for key in sensitive_keys {
         // Match "key": "value" or "key":"value"
@@ -3963,7 +3964,7 @@ mod tests {
 
     #[test]
     fn redact_body_redacts_openrouter_key_identity_but_not_other_labels() {
-        let body = r#"{"data":{"budgets":[{"guardrail_id":"0df9e665-d932-5740-b2c7-b52af166bc11","limit_usd":100}],"creator_user_id":"user_2dHFtVWx2n56w6HkM0000000000","label":"sk-or-v1-0e6...1c96","limit":20,"limit_remaining":15,"organization_id":"org_2dHFtVWx2n56w6HkM111111111","usage_daily":0.45,"workspace_id":"6c2e1f0a-1111-4222-8333-944455556666"}}"#;
+        let body = r#"{"data":{"budgets":[{"budget_id":"b7d1c2e3-4444-4555-8666-977788889999","guardrail_id":"0df9e665-d932-5740-b2c7-b52af166bc11","limit_usd":100}],"creator_user_id":"user_2dHFtVWx2n56w6HkM0000000000","label":"sk-or-v1-0e6...1c96","limit":20,"limit_remaining":15,"organization_id":"org_2dHFtVWx2n56w6HkM111111111","usage_daily":0.45,"workspace_id":"6c2e1f0a-1111-4222-8333-944455556666"}}"#;
         let redacted = redact_body(body);
         for secret in [
             "sk-or-v1-0e6...1c96",
@@ -3971,6 +3972,7 @@ mod tests {
             "org_2dHFtVWx2n56w6HkM111111111",
             "6c2e1f0a-1111-4222-8333-944455556666",
             "0df9e665-d932-5740-b2c7-b52af166bc11",
+            "b7d1c2e3-4444-4555-8666-977788889999",
         ] {
             assert!(!redacted.contains(secret), "{secret} in: {redacted}");
         }

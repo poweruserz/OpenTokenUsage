@@ -57,5 +57,5 @@ Today and Monthly are this key's spend, not the account's: other keys on the sam
 | Network error        | "Usage request failed. Check your connection."                     |
 | Unreadable response  | "Usage response invalid. Try again later."                         |
 
-The key's `label` (by default part of the key itself), `creator_user_id`, `organization_id`, `workspace_id` and
-`guardrail_id` are redacted from the logs.
+The key's `label` (by default part of the key itself), `creator_user_id`, `organization_id`, `workspace_id`,
+`guardrail_id` and `budget_id` are redacted from the logs.
