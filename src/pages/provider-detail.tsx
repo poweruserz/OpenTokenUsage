@@ -50,7 +50,7 @@ export function ProviderDetailPage({
         timeFormatMode={timeFormatMode}
         onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
       />
-      <UsageHeatmap pluginId={plugin.meta.id} />
+      <UsageHeatmap pluginId={plugin.meta.id} timeFormatMode={timeFormatMode} />
     </>
   )
 }

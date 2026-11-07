@@ -241,6 +241,7 @@ export const ko: Messages = {
   "heatmap.title": "시간대별 사용량(최근 4주)",
   "heatmap.peak": "가장 많이 쓴 시간: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} 토큰",
+  "heatmap.unreadable": "읽지 못한 로그 파일: {count}개",
 
   "pace.ahead": "여유 있음",
   "pace.onTrack": "적정 속도",

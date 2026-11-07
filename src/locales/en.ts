@@ -241,6 +241,7 @@ export const en = {
   "heatmap.title": "Usage by hour, last 4 weeks",
   "heatmap.peak": "Busiest: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} tokens",
+  "heatmap.unreadable": "Log files that couldn't be read: {count}",
 
   "pace.ahead": "Plenty of room",
   "pace.onTrack": "Right on target",

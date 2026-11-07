@@ -241,6 +241,7 @@ export const esES: Messages = {
   "heatmap.title": "Uso por hora, últimas 4 semanas",
   "heatmap.peak": "Hora de más uso: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} tokens",
+  "heatmap.unreadable": "Archivos de registro que no se han podido leer: {count}",
 
   "pace.ahead": "Margen de sobra",
   "pace.onTrack": "Al ritmo previsto",

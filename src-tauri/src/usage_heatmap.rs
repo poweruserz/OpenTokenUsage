@@ -1,9 +1,9 @@
-//! Tokens per hour from the CLIs' own session logs, for the heatmap on Claude and Codex detail
+//! Tokens over time from the CLIs' own session logs, for the heatmap on Claude and Codex detail
 //! pages: Claude Code's `<config dir>/projects/**/*.jsonl` and Codex's `<CODEX_HOME>/sessions/**/*.jsonl`.
 //! The logs only grow, so each file is read once and afterwards only from where the last read stopped.
 
 use crate::AppState;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -13,6 +13,9 @@ use time::format_description::well_known::Rfc3339;
 
 /// Four whole weeks, so every weekday and hour of the grid adds up the same number of days.
 const DAYS: i64 = 28;
+/// Usage is kept per quarter hour: every time zone is a whole number of them off UTC, so the
+/// frontend can put each one in the right local hour (half-hour zones included).
+const SLOT_SECS: i64 = 900;
 /// `projects/<project>/<session>/subagents/<agent>.jsonl`, `sessions/<year>/<month>/<day>/<rollout>.jsonl`.
 const MAX_DEPTH: usize = 5;
 
@@ -22,15 +25,24 @@ enum Log {
     Codex,
 }
 
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Heatmap {
+    /// `[UTC quarter hour (Unix seconds / 900), tokens]`, oldest first.
+    slots: Vec<(i64, u64)>,
+    /// Log files and folders that couldn't be read: the slots leave them out.
+    unreadable: usize,
+}
+
 /// What one file has added up so far, and where its next read starts.
 #[derive(Default)]
 struct FileScan {
     len: u64,
     offset: u64,
-    /// UTC hour (Unix seconds / 3600) → tokens.
-    hours: HashMap<i64, u64>,
+    /// Quarter hour → tokens.
+    slots: HashMap<i64, u64>,
     /// Claude writes a line per content block of a message, each with the message's usage so far:
-    /// the message being read, its hour and the tokens counted for it.
+    /// the message being read, its quarter hour and the tokens counted for it.
     message: Option<(String, i64, u64)>,
     /// Codex 0.40+ writes a `token_usage_record` per model response. Older logs only have
     /// `token_count` events, repeated with an unchanged total.
@@ -82,14 +94,22 @@ struct CodexTokens {
     total_tokens: Option<u64>,
 }
 
-fn hour_of(timestamp: &str) -> Option<i64> {
+fn slot_of(timestamp: &str) -> Option<i64> {
     let at = time::OffsetDateTime::parse(timestamp, &Rfc3339).ok()?;
-    Some(at.unix_timestamp().div_euclid(3600))
+    Some(at.unix_timestamp().div_euclid(SLOT_SECS))
 }
 
-fn bump(hours: &mut HashMap<i64, u64>, hour: i64, tokens: u64) {
+fn bump(slots: &mut HashMap<i64, u64>, slot: i64, tokens: u64) {
     if tokens > 0 {
-        *hours.entry(hour).or_default() += tokens;
+        *slots.entry(slot).or_default() += tokens;
+    }
+}
+
+/// Counts a log file or folder that couldn't be read. One that went away meanwhile isn't a failure.
+fn note(unreadable: &mut usize, path: &Path, error: &std::io::Error) {
+    if error.kind() != std::io::ErrorKind::NotFound {
+        log::warn!("usage heatmap: couldn't read {}: {error}", path.display());
+        *unreadable += 1;
     }
 }
 
@@ -106,7 +126,7 @@ impl FileScan {
         let Ok(line) = serde_json::from_str::<Line>(text) else {
             return;
         };
-        let Some(hour) = hour_of(&line.timestamp) else {
+        let Some(slot) = slot_of(&line.timestamp) else {
             return;
         };
         match log {
@@ -140,10 +160,10 @@ impl FileScan {
                 {
                     let more = tokens.saturating_sub(*counted);
                     *counted = (*counted).max(tokens);
-                    bump(&mut self.hours, *at, more);
+                    bump(&mut self.slots, *at, more);
                 } else {
-                    bump(&mut self.hours, hour, tokens);
-                    self.message = Some((id, hour, tokens));
+                    bump(&mut self.slots, slot, tokens);
+                    self.message = Some((id, slot, tokens));
                 }
             }
             Log::Codex => {
@@ -153,7 +173,7 @@ impl FileScan {
                 if line.kind == "token_usage_record" {
                     self.records = true;
                     let tokens = payload.usage.and_then(|u| u.total_tokens).unwrap_or(0);
-                    bump(&mut self.hours, hour, tokens);
+                    bump(&mut self.slots, slot, tokens);
                 } else if !self.records && payload.kind == "token_count" {
                     let Some(info) = payload.info else {
                         return;
@@ -167,62 +187,70 @@ impl FileScan {
                         .last_token_usage
                         .and_then(|t| t.total_tokens)
                         .unwrap_or(0);
-                    bump(&mut self.hours, hour, tokens);
+                    bump(&mut self.slots, slot, tokens);
                 }
             }
         }
     }
 
-    /// Reads what was added since the last read; a file that got shorter was rewritten and is read again.
-    fn update(&mut self, path: &Path, len: u64, log: Log) {
+    /// Reads what was added since the last read; a file that got shorter was rewritten and is read
+    /// again. After a failed read, the next one goes on from the last complete line.
+    fn update(&mut self, path: &Path, len: u64, log: Log) -> std::io::Result<()> {
         if len < self.len || len < self.offset {
             *self = FileScan::default();
         }
-        let Ok(mut file) = std::fs::File::open(path) else {
-            return;
-        };
-        if file.seek(SeekFrom::Start(self.offset)).is_err() {
-            return;
-        }
+        let mut file = std::fs::File::open(path)?;
+        file.seek(SeekFrom::Start(self.offset))?;
         let mut reader = BufReader::new(file);
         let mut buf = Vec::new();
         loop {
             buf.clear();
-            match reader.read_until(b'\n', &mut buf) {
-                // A line still being written is read once it's complete.
-                Ok(n) if n > 0 && buf.ends_with(b"\n") => {
-                    self.offset += n as u64;
-                    if let Ok(text) = std::str::from_utf8(&buf) {
-                        self.read_line(log, text);
-                    }
-                }
-                _ => break,
+            let read = reader.read_until(b'\n', &mut buf)?;
+            // A line still being written is read once it's complete.
+            if read == 0 || !buf.ends_with(b"\n") {
+                break;
+            }
+            self.offset += read as u64;
+            if let Ok(text) = std::str::from_utf8(&buf) {
+                self.read_line(log, text);
             }
         }
         self.len = len;
+        Ok(())
     }
 }
 
 /// The `.jsonl` files under `dir` written to since `since`, with their length.
-fn log_files(dir: &Path, depth: usize, since: SystemTime, out: &mut Vec<(PathBuf, u64)>) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
+fn log_files(
+    dir: &Path,
+    depth: usize,
+    since: SystemTime,
+    out: &mut Vec<(PathBuf, u64)>,
+    unreadable: &mut usize,
+) {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) => return note(unreadable, dir, &e),
     };
-    for entry in entries.flatten() {
-        let Ok(kind) = entry.file_type() else {
-            continue;
+    for entry in entries {
+        let (path, kind) = match entry.and_then(|entry| Ok((entry.path(), entry.file_type()?))) {
+            Ok(found) => found,
+            Err(e) => {
+                note(unreadable, dir, &e);
+                continue;
+            }
         };
-        let path = entry.path();
         if kind.is_dir() && depth > 0 {
-            log_files(&path, depth - 1, since, out);
+            log_files(&path, depth - 1, since, out, unreadable);
         } else if kind.is_file() && path.extension().is_some_and(|ext| ext == "jsonl") {
             // Not `entry.metadata()`: Windows' folder listing keeps the size and time a file had
             // when it was last closed, and a CLI can hold its log open for a whole session.
-            let Ok(meta) = std::fs::metadata(&path) else {
-                continue;
-            };
-            if meta.modified().is_ok_and(|modified| modified >= since) {
-                out.push((path, meta.len()));
+            match std::fs::metadata(&path) {
+                Ok(meta) if meta.modified().is_ok_and(|modified| modified >= since) => {
+                    out.push((path, meta.len()))
+                }
+                Ok(_) => {}
+                Err(e) => note(unreadable, &path, &e),
             }
         }
     }
@@ -234,46 +262,49 @@ fn scans() -> &'static Mutex<HashMap<PathBuf, HashMap<PathBuf, FileScan>>> {
     SCANS.get_or_init(Default::default)
 }
 
-/// Tokens per UTC hour over the last four weeks, oldest first.
-fn hourly(log: Log, dirs: &[PathBuf], now: SystemTime) -> Vec<(i64, u64)> {
+/// Tokens per quarter hour over the last four weeks, and how many logs couldn't be read.
+fn heatmap(log: Log, dirs: &[PathBuf], now: SystemTime) -> Heatmap {
     let since = now - Duration::from_secs(DAYS as u64 * 86_400);
-    let first_hour = now
+    let first_slot = now
         .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs() as i64 / 3600)
-        - DAYS * 24;
+        .map_or(0, |d| d.as_secs() as i64 / SLOT_SECS)
+        - DAYS * 86_400 / SLOT_SECS;
     let mut scans = scans().lock().unwrap_or_else(|e| e.into_inner());
     let mut totals: HashMap<i64, u64> = HashMap::new();
+    let mut unreadable = 0;
     for dir in dirs {
         let mut files = Vec::new();
-        log_files(dir, MAX_DEPTH, since, &mut files);
+        log_files(dir, MAX_DEPTH, since, &mut files, &mut unreadable);
         let mut previous = scans.remove(dir).unwrap_or_default();
         let mut current = HashMap::with_capacity(files.len());
         for (path, len) in files {
             let mut scan = previous.remove(&path).unwrap_or_default();
             if len != scan.len {
-                scan.update(&path, len, log);
+                if let Err(e) = scan.update(&path, len, log) {
+                    note(&mut unreadable, &path, &e);
+                }
             }
-            for (&hour, &tokens) in &scan.hours {
-                if hour > first_hour {
-                    *totals.entry(hour).or_default() += tokens;
+            for (&slot, &tokens) in &scan.slots {
+                if slot > first_slot {
+                    *totals.entry(slot).or_default() += tokens;
                 }
             }
             current.insert(path, scan);
         }
         scans.insert(dir.clone(), current);
     }
-    let mut hours: Vec<(i64, u64)> = totals.into_iter().collect();
-    hours.sort_unstable();
-    hours
+    let mut slots: Vec<(i64, u64)> = totals.into_iter().collect();
+    slots.sort_unstable();
+    Heatmap { slots, unreadable }
 }
 
-/// `[UTC hour, tokens]` pairs for a Claude or Codex card's login (the usual one or an extra
-/// account). Empty for other cards and for a WSL copy, whose share can start a stopped distro.
+/// The heatmap of a Claude or Codex card's login (the usual one or an extra account). Empty for
+/// other cards and for a WSL copy, whose share can start a stopped distro.
 #[tauri::command]
 pub async fn usage_heatmap(
     state: tauri::State<'_, Mutex<AppState>>,
     plugin_id: String,
-) -> Result<Vec<(i64, u64)>, String> {
+) -> Result<Heatmap, String> {
     let source = {
         let state = state.lock().map_err(|e| e.to_string())?;
         let plugin = state.plugins.iter().find(|p| p.manifest.id == plugin_id);
@@ -284,10 +315,13 @@ pub async fn usage_heatmap(
         }
     };
     let Some((log, dirs, folder)) = source else {
-        return Ok(Vec::new());
+        return Ok(Heatmap {
+            slots: Vec::new(),
+            unreadable: 0,
+        });
     };
     let dirs: Vec<PathBuf> = dirs.iter().map(|dir| dir.join(folder)).collect();
-    tauri::async_runtime::spawn_blocking(move || hourly(log, &dirs, SystemTime::now()))
+    tauri::async_runtime::spawn_blocking(move || heatmap(log, &dirs, SystemTime::now()))
         .await
         .map_err(|e| e.to_string())
 }
@@ -323,8 +357,14 @@ mod tests {
             )
     }
 
-    fn hour(timestamp: &str) -> i64 {
-        hour_of(timestamp).unwrap()
+    fn slot(timestamp: &str) -> i64 {
+        slot_of(timestamp).unwrap()
+    }
+
+    fn slots(log: Log, root: &Path, now: SystemTime) -> Vec<(i64, u64)> {
+        let read = heatmap(log, &[root.to_path_buf()], now);
+        assert_eq!(read.unreadable, 0);
+        read.slots
     }
 
     fn claude(id: &str, timestamp: &str, output: u64) -> String {
@@ -345,7 +385,7 @@ mod tests {
         let file = session.join("agent.jsonl");
         let now = at("2026-02-04T12:00:00Z");
 
-        // One message written as three blocks, its output growing; a user line mentioning usage.
+        // One message written as two blocks, its output growing; a user line mentioning usage.
         append(&file, &claude("msg_1", "2026-02-04T09:15:00Z", 5));
         append(&file, &claude("msg_1", "2026-02-04T09:15:01Z", 20));
         append(
@@ -354,32 +394,33 @@ mod tests {
         );
         append(&file, "\n");
         append(&file, &claude("msg_2", "2026-02-04T10:59:59Z", 1));
-        let first = hourly(Log::Claude, &[root.clone()], now);
         assert_eq!(
-            first,
+            slots(Log::Claude, &root, now),
             vec![
-                (hour("2026-02-04T09:00:00Z"), 1130),
-                (hour("2026-02-04T10:00:00Z"), 1111)
+                (slot("2026-02-04T09:15:00Z"), 1130),
+                (slot("2026-02-04T10:45:00Z"), 1111)
             ]
         );
 
-        // The last message grows, a new one starts, and a line still being written waits.
+        // The last message grows (counted where it started), a new one starts, and a line still
+        // being written waits.
         append(&file, &claude("msg_2", "2026-02-04T11:00:01Z", 9));
         append(&file, &claude("msg_3", "2026-02-04T11:30:00Z", 0));
         let partial = claude("msg_4", "2026-02-04T11:40:00Z", 0);
         append(&file, &partial[..40]);
-        let second = hourly(Log::Claude, &[root.clone()], now);
         assert_eq!(
-            second,
+            slots(Log::Claude, &root, now),
             vec![
-                (hour("2026-02-04T09:00:00Z"), 1130),
-                (hour("2026-02-04T10:00:00Z"), 1119),
-                (hour("2026-02-04T11:00:00Z"), 1110),
+                (slot("2026-02-04T09:15:00Z"), 1130),
+                (slot("2026-02-04T10:45:00Z"), 1119),
+                (slot("2026-02-04T11:30:00Z"), 1110),
             ]
         );
         append(&file, &partial[40..]);
-        let third = hourly(Log::Claude, &[root.clone()], now);
-        assert_eq!(third.last(), Some(&(hour("2026-02-04T11:00:00Z"), 2220)));
+        assert_eq!(
+            slots(Log::Claude, &root, now).last(),
+            Some(&(slot("2026-02-04T11:30:00Z"), 2220))
+        );
     }
 
     #[test]
@@ -390,16 +431,17 @@ mod tests {
         append(&file, &claude("new", "2026-02-03T08:00:00Z", 0));
         let now = at("2026-02-04T12:00:00Z");
         assert_eq!(
-            hourly(Log::Claude, &[root.clone()], now),
-            vec![(hour("2026-02-03T08:00:00Z"), 1110)]
+            slots(Log::Claude, &root, now),
+            vec![(slot("2026-02-03T08:00:00Z"), 1110)]
         );
 
         std::fs::write(&file, claude("other", "2026-02-02T08:00:00Z", 0)).unwrap();
         assert_eq!(
-            hourly(Log::Claude, &[root.clone()], now),
-            vec![(hour("2026-02-02T08:00:00Z"), 1110)]
+            slots(Log::Claude, &root, now),
+            vec![(slot("2026-02-02T08:00:00Z"), 1110)]
         );
-        assert!(hourly(Log::Claude, &[root.join("missing")], now).is_empty());
+        // No log folder yet is no usage, not a failure.
+        assert!(slots(Log::Claude, &root.join("missing"), now).is_empty());
     }
 
     fn codex_record(timestamp: &str, total: u64) -> String {
@@ -428,7 +470,7 @@ mod tests {
         let current = day.join("rollout-new.jsonl");
         append(&current, &codex_record("2026-02-04T09:00:00Z", 300));
         append(&current, &codex_count("2026-02-04T09:00:00Z", 300, 300));
-        append(&current, &codex_record("2026-02-04T09:30:00Z", 200));
+        append(&current, &codex_record("2026-02-04T09:05:00Z", 200));
         // An older log: each token_count once, a repeat with an unchanged total skipped.
         let older = day.join("rollout-old.jsonl");
         append(&older, &codex_count("2026-02-04T10:00:00Z", 50, 50));
@@ -436,10 +478,10 @@ mod tests {
         append(&older, &codex_count("2026-02-04T10:02:00Z", 80, 30));
 
         assert_eq!(
-            hourly(Log::Codex, &[root.clone()], now),
+            slots(Log::Codex, &root, now),
             vec![
-                (hour("2026-02-04T09:00:00Z"), 500),
-                (hour("2026-02-04T10:00:00Z"), 80)
+                (slot("2026-02-04T09:00:00Z"), 500),
+                (slot("2026-02-04T10:00:00Z"), 80)
             ]
         );
     }
@@ -453,14 +495,50 @@ mod tests {
         file.write_all(codex_record("2026-02-04T09:00:00Z", 300).as_bytes())
             .unwrap();
         assert_eq!(
-            hourly(Log::Codex, &[root.clone()], now),
-            vec![(hour("2026-02-04T09:00:00Z"), 300)]
+            slots(Log::Codex, &root, now),
+            vec![(slot("2026-02-04T09:00:00Z"), 300)]
         );
         file.write_all(codex_record("2026-02-04T10:00:00Z", 5).as_bytes())
             .unwrap();
         assert_eq!(
-            hourly(Log::Codex, &[root.clone()], now).last(),
-            Some(&(hour("2026-02-04T10:00:00Z"), 5))
+            slots(Log::Codex, &root, now).last(),
+            Some(&(slot("2026-02-04T10:00:00Z"), 5))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn counts_a_log_it_cannot_open_and_reads_it_once_it_can() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let root = temp_dir("locked");
+        let locked = root.join("locked.jsonl");
+        append(&locked, &claude("a", "2026-02-04T09:00:00Z", 0));
+        append(
+            &root.join("free.jsonl"),
+            &claude("b", "2026-02-04T10:00:00Z", 0),
+        );
+        let now = at("2026-02-04T12:00:00Z");
+
+        // Opened without sharing: nobody else can read it while this handle lives.
+        let handle = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&locked)
+            .unwrap();
+        assert_eq!(
+            heatmap(Log::Claude, &[root.clone()], now),
+            Heatmap {
+                slots: vec![(slot("2026-02-04T10:00:00Z"), 1110)],
+                unreadable: 1
+            }
+        );
+        drop(handle);
+        assert_eq!(
+            slots(Log::Claude, &root, now),
+            vec![
+                (slot("2026-02-04T09:00:00Z"), 1110),
+                (slot("2026-02-04T10:00:00Z"), 1110)
+            ]
         );
     }
 }

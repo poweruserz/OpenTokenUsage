@@ -241,6 +241,7 @@ export const tr: Messages = {
   "heatmap.title": "Saate göre kullanım, son 4 hafta",
   "heatmap.peak": "En yoğun: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} token",
+  "heatmap.unreadable": "Okunamayan günlük dosyası: {count}",
 
   "pace.ahead": "Bol pay var",
   "pace.onTrack": "Tam hedefte",

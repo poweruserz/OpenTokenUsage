@@ -40,8 +40,10 @@ This file holds the project facts that are easy to get wrong.
   takes seconds on GBs of logs). A file's size comes from `fs::metadata`, not the folder listing: Windows' listing keeps
   the size a file had when last closed, and a CLI can hold its log open. Claude writes a line per content block, each
   with the message's usage so far: a message counts once, at its largest. Codex counts `token_usage_record` lines (one
-  per response); older logs only have `token_count`, a repeat with an unchanged total skipped. The detail page reuses
-  the component across cards, so its data is kept with the card id it was read for.
+  per response); older logs only have `token_count`, a repeat with an unchanged total skipped. Usage is kept per UTC
+  quarter hour so half-hour time zones land in the right local hour; logs it can't read are counted under the grid.
+  The detail page reuses the component across cards, so its data is kept with the card id it was read for. The grid
+  is an ARIA grid: one tab stop, arrow keys move, the focused cell's tokens show in the header.
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);

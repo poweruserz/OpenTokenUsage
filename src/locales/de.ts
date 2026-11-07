@@ -241,6 +241,7 @@ export const de: Messages = {
   "heatmap.title": "Nutzung nach Uhrzeit, letzte 4 Wochen",
   "heatmap.peak": "Am meisten: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} Tokens",
+  "heatmap.unreadable": "Nicht lesbare Protokolldateien: {count}",
 
   "pace.ahead": "Viel Spielraum",
   "pace.onTrack": "Genau im Plan",

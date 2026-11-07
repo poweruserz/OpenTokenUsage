@@ -241,6 +241,7 @@ export const ja: Messages = {
   "heatmap.title": "時間帯別の使用量（過去 4 週間）",
   "heatmap.peak": "最も多い時間帯: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} トークン",
+  "heatmap.unreadable": "読み取れなかったログファイル: {count}",
 
   "pace.ahead": "余裕あり",
   "pace.onTrack": "ペースどおり",

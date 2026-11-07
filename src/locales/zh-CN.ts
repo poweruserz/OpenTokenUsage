@@ -241,6 +241,7 @@ export const zhCN: Messages = {
   "heatmap.title": "按小时统计的用量（最近 4 周）",
   "heatmap.peak": "最忙时段：{day} {hour}",
   "heatmap.cell": "{day} {hour}：{tokens} 个 Token",
+  "heatmap.unreadable": "无法读取的日志文件：{count} 个",
 
   "pace.ahead": "余量充足",
   "pace.onTrack": "进度正常",

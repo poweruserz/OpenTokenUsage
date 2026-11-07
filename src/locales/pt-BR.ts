@@ -241,6 +241,7 @@ export const ptBR: Messages = {
   "heatmap.title": "Uso por hora, últimas 4 semanas",
   "heatmap.peak": "Horário de maior uso: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} tokens",
+  "heatmap.unreadable": "Arquivos de log que não puderam ser lidos: {count}",
 
   "pace.ahead": "Folga de sobra",
   "pace.onTrack": "Dentro do previsto",
