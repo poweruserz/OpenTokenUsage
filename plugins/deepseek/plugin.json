@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "deepseek",
+  "name": "DeepSeek",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#4D6BFE",
+  "links": [
+    { "label": "API keys", "url": "https://platform.deepseek.com/api_keys" },
+    { "label": "Usage dashboard", "url": "https://platform.deepseek.com/usage" }
+  ],
+  "lines": [
+    { "type": "text", "label": "Balance", "scope": "overview" }
+  ]
+}

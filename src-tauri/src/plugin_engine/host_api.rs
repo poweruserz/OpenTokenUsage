@@ -25,7 +25,7 @@ pub(crate) fn silent_command(program: &str) -> Command {
     cmd
 }
 
-const WHITELISTED_ENV_VARS: [&str; 17] = [
+const WHITELISTED_ENV_VARS: [&str; 19] = [
     "GH_HOST",
     "CODEX_HOME",
     "CLAUDE_CONFIG_DIR",
@@ -43,6 +43,8 @@ const WHITELISTED_ENV_VARS: [&str; 17] = [
     "MINIMAX_CN_API_KEY",
     "SYNTHETIC_API_KEY",
     "PI_CODING_AGENT_DIR",
+    "OPENROUTER_API_KEY",
+    "DEEPSEEK_API_KEY",
 ];
 const MIN_BLOCKING_TIMEOUT: Duration = Duration::from_millis(1);
 
@@ -419,6 +421,10 @@ fn redact_body(body: &str) -> String {
         "analytics_tracking_id",
         "uuid",
         "full_name",
+        "creator_user_id",
+        "organization_id",
+        "workspace_id",
+        "guardrail_id",
     ];
     for key in sensitive_keys {
         // Match "key": "value" or "key":"value"
@@ -464,6 +470,19 @@ fn redact_body(body: &str) -> String {
                     .to_string()
             })
             .to_string();
+    }
+
+    // [openrouter] /key's `label` is the key's name, by default part of the key itself. Other
+    // providers use `label` for model names (Antigravity), so only a body with /key's
+    // `limit_remaining` loses it.
+    if result.contains("\"limit_remaining\"") {
+        if let Ok(label_re) = regex_lite::Regex::new(r#""label":\s*"([^"]+)""#) {
+            result = label_re
+                .replace_all(&result, |c: &regex_lite::Captures| {
+                    format!("\"label\": \"{}\"", redact_value(&c[1]))
+                })
+                .to_string();
+        }
     }
 
     if let Ok(path_re) =
@@ -3940,6 +3959,28 @@ mod tests {
             "email should show first4...last4, got: {}",
             redacted
         );
+    }
+
+    #[test]
+    fn redact_body_redacts_openrouter_key_identity_but_not_other_labels() {
+        let body = r#"{"data":{"budgets":[{"guardrail_id":"0df9e665-d932-5740-b2c7-b52af166bc11","limit_usd":100}],"creator_user_id":"user_2dHFtVWx2n56w6HkM0000000000","label":"sk-or-v1-0e6...1c96","limit":20,"limit_remaining":15,"organization_id":"org_2dHFtVWx2n56w6HkM111111111","usage_daily":0.45,"workspace_id":"6c2e1f0a-1111-4222-8333-944455556666"}}"#;
+        let redacted = redact_body(body);
+        for secret in [
+            "sk-or-v1-0e6...1c96",
+            "user_2dHFtVWx2n56w6HkM0000000000",
+            "org_2dHFtVWx2n56w6HkM111111111",
+            "6c2e1f0a-1111-4222-8333-944455556666",
+            "0df9e665-d932-5740-b2c7-b52af166bc11",
+        ] {
+            assert!(!redacted.contains(secret), "{secret} in: {redacted}");
+        }
+        assert!(
+            redacted.contains(r#""usage_daily":0.45"#),
+            "got: {redacted}"
+        );
+        // Antigravity names its models in `label`.
+        let models = r#"{"models":[{"label":"Gemini 3.1 Pro (High)","remainingFraction":0.5}]}"#;
+        assert!(redact_body(models).contains("Gemini 3.1 Pro (High)"));
     }
 
     #[test]

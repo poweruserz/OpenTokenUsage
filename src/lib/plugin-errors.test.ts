@@ -112,6 +112,12 @@ const FIXTURES: [string, PluginErrorKey][] = [
   ["OpenCode Go not detected. Log in with OpenCode Go first.", "notDetectedLogIn"],
   ["OpenCode Go key was rejected. Log into OpenCode Go again.", "keyRejected"],
   ["No OpenCode Go subscription on this key.", "noSubscriptionOnKey"],
+  // openrouter
+  ["No OPENROUTER_API_KEY found. Set up environment variable first.", "envKeyNotFound"],
+  ["API key invalid. Check your OpenRouter API key.", "apiKeyInvalid"],
+  // deepseek
+  ["No DEEPSEEK_API_KEY found. Set up environment variable first.", "envKeyNotFound"],
+  ["API key invalid. Check your DeepSeek API key.", "apiKeyInvalid"],
   // synthetic
   [
     "Synthetic API key not found. Set SYNTHETIC_API_KEY or add key to ~/.pi/agent/auth.json",
@@ -228,6 +234,10 @@ describe("getPluginErrorAction", () => {
     expect(getPluginErrorAction("No ZAI_API_KEY found. Set up environment variable first.")).toEqual({
       kind: "env",
       names: ["ZAI_API_KEY"],
+    })
+    expect(getPluginErrorAction("No OPENROUTER_API_KEY found. Set up environment variable first.")).toEqual({
+      kind: "env",
+      names: ["OPENROUTER_API_KEY"],
     })
     expect(getPluginErrorAction("MiniMax API key missing. Set MINIMAX_API_KEY or MINIMAX_CN_API_KEY.")).toEqual({
       kind: "env",
