@@ -238,6 +238,9 @@ export const esES: Messages = {
   "card.sessions.waiting": "Te está esperando",
   "card.sessions.context": "Contexto al {percent}%",
   "card.sessions.compactSoon": "Se compactará pronto",
+  "heatmap.title": "Uso por hora, últimas 4 semanas",
+  "heatmap.peak": "Hora de más uso: {day} {hour}",
+  "heatmap.cell": "{day} {hour}: {tokens} tokens",
 
   "pace.ahead": "Margen de sobra",
   "pace.onTrack": "Al ritmo previsto",

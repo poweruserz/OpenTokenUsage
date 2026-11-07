@@ -1,4 +1,5 @@
 import { ProviderCard } from "@/components/provider-card"
+import { UsageHeatmap } from "@/components/usage-heatmap"
 import type { PluginDisplayState } from "@/lib/plugin-types"
 import type { DisplayMode, ResetTimerDisplayMode, TimeFormatMode } from "@/lib/settings"
 
@@ -28,25 +29,28 @@ export function ProviderDetailPage({
   }
 
   return (
-    <ProviderCard
-      name={plugin.meta.name}
-      pluginId={plugin.meta.id}
-      statusPageUrl={plugin.meta.statusPageUrl}
-      plan={plugin.data?.plan}
-      links={plugin.meta.links}
-      showSeparator={false}
-      loading={plugin.loading}
-      error={plugin.error}
-      lines={plugin.data?.lines ?? []}
-      skeletonLines={plugin.meta.lines}
-      lastManualRefreshAt={plugin.lastManualRefreshAt}
-      lastUpdatedAt={plugin.lastUpdatedAt}
-      onRetry={onRetry}
-      scopeFilter="all"
-      displayMode={displayMode}
-      resetTimerDisplayMode={resetTimerDisplayMode}
-      timeFormatMode={timeFormatMode}
-      onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
-    />
+    <>
+      <ProviderCard
+        name={plugin.meta.name}
+        pluginId={plugin.meta.id}
+        statusPageUrl={plugin.meta.statusPageUrl}
+        plan={plugin.data?.plan}
+        links={plugin.meta.links}
+        showSeparator={false}
+        loading={plugin.loading}
+        error={plugin.error}
+        lines={plugin.data?.lines ?? []}
+        skeletonLines={plugin.meta.lines}
+        lastManualRefreshAt={plugin.lastManualRefreshAt}
+        lastUpdatedAt={plugin.lastUpdatedAt}
+        onRetry={onRetry}
+        scopeFilter="all"
+        displayMode={displayMode}
+        resetTimerDisplayMode={resetTimerDisplayMode}
+        timeFormatMode={timeFormatMode}
+        onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
+      />
+      <UsageHeatmap pluginId={plugin.meta.id} />
+    </>
   )
 }

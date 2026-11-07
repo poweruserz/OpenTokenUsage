@@ -238,6 +238,9 @@ export const ptBR: Messages = {
   "card.sessions.waiting": "Esperando você",
   "card.sessions.context": "{percent}% do contexto",
   "card.sessions.compactSoon": "Compacta em breve",
+  "heatmap.title": "Uso por hora, últimas 4 semanas",
+  "heatmap.peak": "Horário de maior uso: {day} {hour}",
+  "heatmap.cell": "{day} {hour}: {tokens} tokens",
 
   "pace.ahead": "Folga de sobra",
   "pace.onTrack": "Dentro do previsto",

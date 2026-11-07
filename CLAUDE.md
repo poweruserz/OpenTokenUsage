@@ -33,6 +33,15 @@ This file holds the project facts that are easy to get wrong.
 - Live Claude sessions (`claude_sessions.rs`, `claude-sessions.tsx`): Claude cards list `<config dir>/sessions/*.json`
   whose pid still runs with the file's `procStart` (FILETIME; guards against a reused pid), polled every 5 s while
   shown. The config dir comes from `login_stamp::cli_dirs` (extra accounts use their own; never a WSL copy).
+- Usage heatmap (`usage_heatmap.rs`, `usage-heatmap.tsx`): a Claude or Codex login's detail page shows tokens per
+  weekday × local hour over 4 weeks (whole weeks: every cell adds up as many days), from the CLI's own logs
+  (`projects/**/*.jsonl`, `sessions/**/*.jsonl`) in the `cli_dirs` folders. Only usage and timestamps are read. Logs
+  only grow, so each file is read once and then from its last offset (kept in memory: the first read after a start
+  takes seconds on GBs of logs). A file's size comes from `fs::metadata`, not the folder listing: Windows' listing keeps
+  the size a file had when last closed, and a CLI can hold its log open. Claude writes a line per content block, each
+  with the message's usage so far: a message counts once, at its largest. Codex counts `token_usage_record` lines (one
+  per response); older logs only have `token_count`, a repeat with an unchanged total skipped. The detail page reuses
+  the component across cards, so its data is kept with the card id it was read for.
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);

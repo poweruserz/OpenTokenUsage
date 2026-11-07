@@ -238,6 +238,9 @@ export const zhCN: Messages = {
   "card.sessions.waiting": "等待你操作",
   "card.sessions.context": "上下文 {percent}%",
   "card.sessions.compactSoon": "即将压缩",
+  "heatmap.title": "按小时统计的用量（最近 4 周）",
+  "heatmap.peak": "最忙时段：{day} {hour}",
+  "heatmap.cell": "{day} {hour}：{tokens} 个 Token",
 
   "pace.ahead": "余量充足",
   "pace.onTrack": "进度正常",

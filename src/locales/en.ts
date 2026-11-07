@@ -238,6 +238,9 @@ export const en = {
   "card.sessions.waiting": "Waiting for you",
   "card.sessions.context": "{percent}% context",
   "card.sessions.compactSoon": "Compacts soon",
+  "heatmap.title": "Usage by hour, last 4 weeks",
+  "heatmap.peak": "Busiest: {day} {hour}",
+  "heatmap.cell": "{day} {hour}: {tokens} tokens",
 
   "pace.ahead": "Plenty of room",
   "pace.onTrack": "Right on target",
