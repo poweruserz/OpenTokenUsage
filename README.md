@@ -68,6 +68,7 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits, banked resets with expiry countdowns
 - [**Copilot**](docs/providers/copilot.md) / credits, extra usage, chat, completions
 - [**Cursor**](docs/providers/cursor.md) / credits, total usage, requests, auto usage, API usage, Grok Bot, on-demand, bonus spend, CLI auth
+- [**DeepSeek**](docs/providers/deepseek.md) / API balance
 - [**Factory / Droid**](docs/providers/factory.md) / standard, premium tokens
 - [**Grok**](docs/providers/grok.md) / weekly limit, credits used, pay-as-you-go cap
 - [**JetBrains AI Assistant**](docs/providers/jetbrains-ai-assistant.md) / quota, remaining
@@ -75,6 +76,7 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Kimi Code**](docs/providers/kimi.md) / session, weekly
 - [**MiniMax**](docs/providers/minimax.md) / coding plan session
 - [**OpenCode Go**](docs/providers/opencode-go.md) / 5h, weekly, monthly usage limits
+- [**OpenRouter**](docs/providers/openrouter.md) / credits, API key spending cap, daily and monthly spend
 - [**Devin**](docs/providers/devin.md) / weekly and daily quota, extra usage
 - [**Synthetic**](docs/providers/synthetic.md) / 5-hour rate limit, subscription, tool calls, search
 - [**Z.ai**](docs/providers/zai.md) / session, weekly, web searches

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "openrouter",
+  "name": "OpenRouter",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#6467F2",
+  "links": [
+    { "label": "API keys", "url": "https://openrouter.ai/settings/keys" },
+    { "label": "Usage dashboard", "url": "https://openrouter.ai/activity" }
+  ],
+  "lines": [
+    { "type": "progress", "label": "Credits", "scope": "overview", "primaryOrder": 1 },
+    { "type": "progress", "label": "API usage", "scope": "overview", "primaryOrder": 2 },
+    { "type": "text", "label": "Today", "scope": "overview" },
+    { "type": "text", "label": "Monthly", "scope": "detail" }
+  ]
+}
