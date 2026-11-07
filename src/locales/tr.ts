@@ -238,6 +238,10 @@ export const tr: Messages = {
   "card.sessions.waiting": "Seni bekliyor",
   "card.sessions.context": "Bağlam %{percent}",
   "card.sessions.compactSoon": "Yakında sıkıştırılacak",
+  "heatmap.title": "Saate göre kullanım, son 4 hafta",
+  "heatmap.peak": "En yoğun: {day} {hour}",
+  "heatmap.cell": "{day} {hour}: {tokens} token",
+  "heatmap.unreadable": "Okunamayan günlük dosyası: {count}",
 
   "pace.ahead": "Bol pay var",
   "pace.onTrack": "Tam hedefte",

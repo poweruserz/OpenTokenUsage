@@ -143,3 +143,7 @@ Usage notifications also remind you during the final seven days and final 24 hou
 `cedar_ember.grants[].ends_at` supplies expiry dates; `resets_left` supplies counts. Spent, expired, paused, and explicitly unusable grants are excluded.
 
 Implementation reference: [T3 Code Claude reset credits](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/claudeResetCredits.ts). T3 Code also implements explicit redemption; OpenTokenUsage opens the provider’s usage page instead.
+
+## Usage by hour
+
+The Claude detail page shows a 7 × 24 grid of tokens per weekday and local hour over the last 4 weeks (input, output, cache writes and cache reads), read from Claude Code's own transcripts: `projects/**/*.jsonl` in `CLAUDE_CONFIG_DIR` or `~/.claude`, extra accounts in their own folders, never a WSL copy. Only usage and timestamps are read, and nothing leaves the PC. Claude Code writes a line per content block of a message, each with the message's usage so far; a message counts once, at its largest usage. Each file is read once and afterwards only from where the last read stopped (the first read after the app starts can take a few seconds on gigabytes of transcripts); the grid refreshes every 5 minutes while it's shown. A log it can't read is left out and counted under the grid. Arrow keys move between cells; the header then reads out the focused hour.

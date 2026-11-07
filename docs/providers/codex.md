@@ -149,3 +149,7 @@ Usage notifications also remind you during the final seven days and final 24 hou
 When the usage summary reports resets, `GET /backend-api/wham/rate-limit-reset-credits` reads `credits[].status` and `expires_at` using the same account credentials. Only available entries are shown. If this request fails, the summary count remains visible with expiry unavailable.
 
 Implementation reference: [T3 Code Codex usage mapping](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/codexUsageLimits.ts). This app uses its existing read-only HTTP integration rather than starting a Codex app-server.
+
+## Usage by hour
+
+The Codex detail page shows a 7 × 24 grid of tokens per weekday and local hour over the last 4 weeks, read from Codex's own session logs: `sessions/**/*.jsonl` in `CODEX_HOME` (or `~/.codex` and `~/.config/codex`), extra accounts in their own folders, never a WSL copy. Only usage and timestamps are read, and nothing leaves the PC. Current logs have a `token_usage_record` line per model response, which is what's counted. Older logs only have `token_count` events, and a repeat with an unchanged total is skipped. Each file is read once and afterwards only from where the last read stopped; the grid refreshes every 5 minutes while it's shown. A log it can't read is left out and counted under the grid. Arrow keys move between cells; the header then reads out the focused hour.

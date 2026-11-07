@@ -238,6 +238,10 @@ export const ko: Messages = {
   "card.sessions.waiting": "입력 대기 중",
   "card.sessions.context": "컨텍스트 {percent}%",
   "card.sessions.compactSoon": "곧 압축됨",
+  "heatmap.title": "시간대별 사용량(최근 4주)",
+  "heatmap.peak": "가장 많이 쓴 시간: {day} {hour}",
+  "heatmap.cell": "{day} {hour}: {tokens} 토큰",
+  "heatmap.unreadable": "읽지 못한 로그 파일: {count}개",
 
   "pace.ahead": "여유 있음",
   "pace.onTrack": "적정 속도",

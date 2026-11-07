@@ -238,6 +238,10 @@ export const de: Messages = {
   "card.sessions.waiting": "Wartet auf Sie",
   "card.sessions.context": "Kontext {percent} %",
   "card.sessions.compactSoon": "Wird bald komprimiert",
+  "heatmap.title": "Nutzung nach Uhrzeit, letzte 4 Wochen",
+  "heatmap.peak": "Am meisten: {day} {hour}",
+  "heatmap.cell": "{day} {hour}: {tokens} Tokens",
+  "heatmap.unreadable": "Nicht lesbare Protokolldateien: {count}",
 
   "pace.ahead": "Viel Spielraum",
   "pace.onTrack": "Genau im Plan",
