@@ -46,6 +46,16 @@ This file holds the project facts that are easy to get wrong.
   quarter hour so half-hour time zones land in the right local hour; logs it can't read are counted under the grid.
   The detail page reuses the component across cards, so its data is kept with the card id it was read for. The grid
   is an ARIA grid: one tab stop, arrow keys move, the focused cell's tokens show in the header.
+- Usage by project (`usage_projects.rs`, `usage-projects.tsx`): the same scan (`scan_logs`, shared cache) keeps each
+  message's tokens by kind with its model, folder (`cwd`) and git branch (Claude: per line; Codex: the log's *first*
+  `session_meta` (a sub-agent's log repeats its parent's after its own), model and folder per `turn_context`, a record
+  going with its `turn_id`). Dollars are ccusage's daily report for the month (`host_api::ccusage_daily`: its own lock,
+  never the probes' guard, one cached report per month for 15 min; pointed where the card's last probe pointed it,
+  `last_ccusage_home`, since the plugin knows which login folder works), shared
+  out per model (Codex's report has only day totals: pooled) by tokens weighted at the providers' price ratios, so
+  projects add up to ccusage's total. A folder maps to its repository (walk up to `.git`; a `.git` file's `gitdir`,
+  normalized, to the checkout holding it), looked up once per folder; network paths (`\\…`) are never looked into.
+  Month bounds come from the frontend (local time); `HEAD` means no branch.
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);

@@ -54,7 +54,7 @@ pub(crate) struct ProbeDeadline {
 }
 
 impl ProbeDeadline {
-    #[cfg(test)]
+    /// No probe deadline: work outside a probe (`ccusage_daily`) keeps only ccusage's own timeout.
     pub(crate) fn none() -> Self {
         Self { expires_at: None }
     }
@@ -2746,6 +2746,78 @@ where
     serde_json::json!({ "status": "runner_failed" }).to_string()
 }
 
+/// The folder each card's last probe pointed ccusage at (expanded; None for ccusage's defaults). The
+/// plugin knows which login folder works (Codex tries its folders in order, past a stale one), so
+/// the projects list asks ccusage about that same folder.
+static CCUSAGE_HOMES: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+
+fn remember_ccusage_home(plugin_id: &str, home: Option<&str>) {
+    CCUSAGE_HOMES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(plugin_id.to_string(), home.map(expand_path));
+}
+
+/// Where the card's last probe pointed ccusage: None before its first query, `Some(None)` for
+/// ccusage's own defaults.
+pub(crate) fn last_ccusage_home(plugin_id: &str) -> Option<Option<String>> {
+    CCUSAGE_HOMES
+        .get()?
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(plugin_id)
+        .cloned()
+}
+
+/// ccusage's daily report for a Claude or Codex login outside a probe (the projects list on a detail
+/// page), as `ctx.host.ccusage.query` answers it: `{"status":"ok","data":{...}}` or another status.
+/// A report is reused for 15 minutes; `home` is an extra account's folder.
+pub(crate) fn ccusage_daily(
+    cache_id: &str,
+    plugin_id: &str,
+    provider: &str,
+    since: &str,
+    until: &str,
+    home: Option<&str>,
+) -> String {
+    let opts = CcusageQueryOpts {
+        provider: Some(provider.to_string()),
+        since: Some(since.to_string()),
+        until: Some(until.to_string()),
+        home_path: home.map(str::to_string),
+        claude_path: None,
+    };
+    let options =
+        serde_json::json!({ "provider": provider, "since": since, "until": until, "home": home });
+    // Its own lock, not the probes' guard: loading the list must never cost a probe its ccusage
+    // run. A second caller (the list and the budget check) waits, then reuses the cached report.
+    static PROJECT_QUERIES: OnceLock<Mutex<()>> = OnceLock::new();
+    let _one_at_a_time = PROJECT_QUERIES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    super::ccusage_cache::query(cache_id, &options.to_string(), true, || {
+        let provider = resolve_ccusage_provider(&opts, plugin_id);
+        run_ccusage_query_with_runners(
+            collect_ccusage_runners(),
+            &opts,
+            provider,
+            plugin_id,
+            |kind, program, opts, provider, plugin_id| {
+                run_ccusage_with_runner_deadline(
+                    kind,
+                    program,
+                    opts,
+                    provider,
+                    plugin_id,
+                    ProbeDeadline::none(),
+                )
+            },
+        )
+    })
+}
+
 fn inject_ccusage<'js>(
     ctx: &Ctx<'js>,
     host: &Object<'js>,
@@ -2774,6 +2846,11 @@ fn inject_ccusage<'js>(
                         CcusageQueryOpts::default()
                     }
                 };
+                // Under the card's own id: an extra account's `pid` is its base plugin's.
+                remember_ccusage_home(
+                    &cache_id,
+                    ccusage_home_override(&opts, resolve_ccusage_provider(&opts, &pid)),
+                );
                 Ok(super::ccusage_cache::query(
                     &cache_id,
                     &opts_json,
@@ -5522,6 +5599,20 @@ wait
     }
 
     #[test]
+    fn remembers_where_each_cards_probe_pointed_ccusage() {
+        assert_eq!(last_ccusage_home("remember-test"), None);
+        remember_ccusage_home("remember-test", Some("~/codex-home"));
+        assert_eq!(
+            last_ccusage_home("remember-test"),
+            Some(Some(expand_path("~/codex-home")))
+        );
+        // ccusage's own defaults.
+        remember_ccusage_home("remember-test", None);
+        assert_eq!(last_ccusage_home("remember-test"), Some(None));
+        assert_eq!(last_ccusage_home("another-card"), None);
+    }
+
+    #[test]
     fn a_wsl_copy_sees_no_environment_and_no_ccusage() {
         let account = crate::plugin_engine::manifest::AccountBinding {
             base_id: "claude".to_string(),
@@ -5552,6 +5643,38 @@ wait
                 .expect("ccusage");
             assert_eq!(status, "no_runner");
         });
+    }
+
+    #[test]
+    fn an_extra_accounts_probe_remembers_its_ccusage_folder_under_its_own_card() {
+        let card = "claude-0badc0de";
+        super::super::ccusage_cache::query(card, r#"{"homePath":"C:/acct"}"#, false, || {
+            r#"{"status":"ok","data":{"daily":[]}}"#.to_string()
+        });
+        let account = crate::plugin_engine::manifest::AccountBinding {
+            base_id: "claude".into(),
+            ..Default::default()
+        };
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            inject_host_api_with_deadline(
+                &ctx,
+                card,
+                &std::env::temp_dir(),
+                "0.0.0",
+                ProbeDeadline::none(),
+                Some(&account),
+                true,
+            )
+            .expect("inject host api");
+            patch_ccusage_wrapper(&ctx).expect("ccusage wrapper");
+            let status: String = ctx
+                .eval(r#"__openusage_ctx.host.ccusage.query({ homePath: "C:/acct" }).status"#)
+                .expect("cached ccusage");
+            assert_eq!(status, "ok");
+        });
+        assert_eq!(last_ccusage_home(card), Some(Some(expand_path("C:/acct"))));
     }
 
     #[test]
