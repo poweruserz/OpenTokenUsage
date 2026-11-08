@@ -618,6 +618,7 @@ pub fn run() {
             claude_sessions::claude_sessions,
             usage_heatmap::usage_heatmap,
             usage_projects::usage_projects,
+            usage_projects::export_projects_csv,
             settings_backup::export_settings,
             alert_sound::play_alert_sound,
             alert_sound::save_custom_alert_sound

@@ -73,8 +73,10 @@ describe("settings backup", () => {
     storeState.set("alertSettings", { levels: [80, 95], providerLevels: { "claude-1a2b3c4d": [] } })
     storeState.set("taskbarStripStyle", { providers: ["claude-1a2b3c4d", "claude"], lineModes: { "claude-1a2b3c4d": "weekly" } })
     storeState.set("trayProvider", "claude-1a2b3c4d")
+    storeState.set("projectBudgets", { "claude-1a2b3c4d": { "C:/work/mine": 20 } })
     await restoreSettingsBackup(
       backup({
+        projectBudgets: { claude: { "C:/work/shop": 50 }, "claude-99999999": { "C:/work/theirs": 10 } },
         trayHiddenPlugins: ["cursor", "claude-99999999"],
         alertSettings: { levels: [70], sound: "chime", providerLevels: { cursor: [90], "claude-99999999": [50] } },
         taskbarStripStyle: { providers: ["codex", "claude-99999999"], lineModes: { codex: "session", "claude-99999999": "both" } },
@@ -88,6 +90,7 @@ describe("settings backup", () => {
       lineModes: { codex: "session", "claude-1a2b3c4d": "weekly" },
     })
     expect(storeState.get("trayProvider")).toBe("claude-1a2b3c4d")
+    expect(storeState.get("projectBudgets")).toEqual({ claude: { "C:/work/shop": 50 }, "claude-1a2b3c4d": { "C:/work/mine": 20 } })
 
     // A backup that never changed these keeps this PC's cards in them too.
     await restoreSettingsBackup(backup({ themeMode: "light" }))

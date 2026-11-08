@@ -52,6 +52,7 @@ const TRAY_HIDDEN_PLUGINS_KEY = "trayHiddenPlugins";
 const USAGE_ALERTS_KEY = "usageAlerts";
 const ALERT_SETTINGS_KEY = "alertSettings";
 const CURRENCY_KEY = "currency";
+const PROJECT_BUDGETS_KEY = "projectBudgets";
 const PANEL_PINNED_KEY = "panelPinned";
 // Read by src-tauri/src/tray.rs, which also writes the position while the user drags the panel.
 const REMEMBER_PANEL_POSITION_KEY = "rememberPanelPosition";
@@ -61,6 +62,7 @@ const PACE_WORKDAYS_KEY = "paceWorkdays";
 const TASKBAR_STRIP_KEY = "taskbarStrip";
 const TASKBAR_STRIP_STYLE_KEY = "taskbarStripStyle";
 const SENT_USAGE_ALERTS_KEY = "sentUsageAlerts";
+const SENT_PROJECT_ALERTS_KEY = "sentProjectAlerts";
 /** Enough for every provider x line x level for a few windows; oldest keys drop off first. */
 const MAX_SENT_USAGE_ALERTS = 300;
 const GLOBAL_SHORTCUT_KEY = "globalShortcut";
@@ -466,6 +468,31 @@ export async function saveCurrency(value: CurrencySetting): Promise<void> {
   await store.save();
 }
 
+/** Monthly US-dollar budgets per card (plugin id) and project folder, from the projects list. */
+export type ProjectBudgets = Record<string, Record<string, number>>;
+
+export function normalizeProjectBudgets(value: unknown): ProjectBudgets {
+  const budgets: ProjectBudgets = {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return budgets;
+  for (const [pluginId, projects] of Object.entries(value)) {
+    if (!projects || typeof projects !== "object" || Array.isArray(projects)) continue;
+    const kept = Object.entries(projects).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0
+    );
+    if (kept.length > 0) budgets[pluginId] = Object.fromEntries(kept);
+  }
+  return budgets;
+}
+
+export async function loadProjectBudgets(): Promise<ProjectBudgets> {
+  return normalizeProjectBudgets(await store.get<unknown>(PROJECT_BUDGETS_KEY));
+}
+
+export async function saveProjectBudgets(value: ProjectBudgets): Promise<void> {
+  await store.set(PROJECT_BUDGETS_KEY, value);
+  await store.save();
+}
+
 async function loadBoolean(key: string, fallback: boolean): Promise<boolean> {
   const stored = await store.get<unknown>(key);
   return typeof stored === "boolean" ? stored : fallback;
@@ -731,6 +758,17 @@ export async function loadSentUsageAlerts(): Promise<string[]> {
 
 export async function saveSentUsageAlerts(keys: string[]): Promise<void> {
   await store.set(SENT_USAGE_ALERTS_KEY, keys.slice(-MAX_SENT_USAGE_ALERTS));
+  await store.save();
+}
+
+/** Project budget notifications already shown; kept apart from the usage ones, which have their own writer. */
+export async function loadSentProjectAlerts(): Promise<string[]> {
+  const stored = await store.get<unknown>(SENT_PROJECT_ALERTS_KEY);
+  return Array.isArray(stored) ? stored.filter((key): key is string => typeof key === "string") : [];
+}
+
+export async function saveSentProjectAlerts(keys: string[]): Promise<void> {
+  await store.set(SENT_PROJECT_ALERTS_KEY, keys.slice(-MAX_SENT_USAGE_ALERTS));
   await store.save();
 }
 

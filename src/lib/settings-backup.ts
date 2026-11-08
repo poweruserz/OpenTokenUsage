@@ -17,6 +17,7 @@ export const BACKUP_KEYS = [
   "paceWorkdays",
   "panelPinned",
   "plugins",
+  "projectBudgets",
   "rememberPanelPosition",
   "resetTimerDisplayMode",
   "startOnLogin",
@@ -119,6 +120,8 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
     }
     case "trayHiddenPlugins":
       return mergeCardList(has ? imported : [], local)
+    case "projectBudgets":
+      return mergeCardMap(has ? imported : {}, local)
     case "taskbarStripStyle": {
       const base = has && Object.keys(asObject(imported)).length > 0 ? asObject(imported) : DEFAULT_TASKBAR_STRIP_STYLE
       const localStyle = asObject(local)
