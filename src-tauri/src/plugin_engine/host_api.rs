@@ -2846,8 +2846,9 @@ fn inject_ccusage<'js>(
                         CcusageQueryOpts::default()
                     }
                 };
+                // Under the card's own id: an extra account's `pid` is its base plugin's.
                 remember_ccusage_home(
-                    &pid,
+                    &cache_id,
                     ccusage_home_override(&opts, resolve_ccusage_provider(&opts, &pid)),
                 );
                 Ok(super::ccusage_cache::query(
@@ -5642,6 +5643,38 @@ wait
                 .expect("ccusage");
             assert_eq!(status, "no_runner");
         });
+    }
+
+    #[test]
+    fn an_extra_accounts_probe_remembers_its_ccusage_folder_under_its_own_card() {
+        let card = "claude-0badc0de";
+        super::super::ccusage_cache::query(card, r#"{"homePath":"C:/acct"}"#, false, || {
+            r#"{"status":"ok","data":{"daily":[]}}"#.to_string()
+        });
+        let account = crate::plugin_engine::manifest::AccountBinding {
+            base_id: "claude".into(),
+            ..Default::default()
+        };
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            inject_host_api_with_deadline(
+                &ctx,
+                card,
+                &std::env::temp_dir(),
+                "0.0.0",
+                ProbeDeadline::none(),
+                Some(&account),
+                true,
+            )
+            .expect("inject host api");
+            patch_ccusage_wrapper(&ctx).expect("ccusage wrapper");
+            let status: String = ctx
+                .eval(r#"__openusage_ctx.host.ccusage.query({ homePath: "C:/acct" }).status"#)
+                .expect("cached ccusage");
+            assert_eq!(status, "ok");
+        });
+        assert_eq!(last_ccusage_home(card), Some(Some(expand_path("C:/acct"))));
     }
 
     #[test]
