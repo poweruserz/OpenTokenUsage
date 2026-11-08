@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.1
+
+What each project costs on Claude and Codex, with monthly budgets, and fewer Claude rate limits.
+
+### New Features
+- Claude and Codex detail pages list this month's or last month's projects: each repository's share and its cost at API prices, in your currency, with its git branches and any ticket key in the branch name. They are read from the CLIs' own logs on this PC; the dollars come from the same ccusage report as the card's totals (#70)
+- A project can have a monthly budget: its bar turns yellow at 80% and red at 100%, and a notification comes at each, also with the panel closed. The list shows where this month's spend is heading by its end, and Export CSV saves the month to Downloads, one row per branch (#71)
+
+### Changes
+- Claude: the app reads Anthropic's usage at most every 10 minutes (was 5), and a restart, the panel opening or a manual refresh in between shows the last answer with its time. Anthropic shares that limit with Claude Code and answers a read over it with an hour's wait. A rate limit now shows as a grey note over the last bars instead of a red error (#69)
+
 ## v0.8.0
 
 Two new providers, your live Claude Code sessions, usage by hour, your own alert levels per provider, costs in your currency, and settings you can take to another PC.
