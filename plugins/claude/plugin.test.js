@@ -26,6 +26,13 @@ const usageRequestCount = (ctx) =>
   ctx.host.http.request.mock.calls.filter((call) => isUsagePoll(call[0]?.url)).length
 const grantsCheckCount = (ctx) =>
   ctx.host.http.request.mock.calls.filter((call) => isGrantsCheck(call[0]?.url)).length
+// Moves the kept usage answer past the 10-minute read gap, as if the next probe came a poll later.
+const ageLastRead = (ctx, ms = 10 * 60 * 1000) => {
+  const path = "/tmp/openusage-test/plugin/last-usage.json"
+  if (!ctx.host.fs.exists(path)) return
+  const saved = JSON.parse(ctx.host.fs.readText(path))
+  ctx.host.fs.writeText(path, JSON.stringify({ ...saved, at: saved.at - ms }))
+}
 
 const okUsageResponse = (body) => ({ status: 200, bodyText: JSON.stringify(body), headers: {} })
 
@@ -2247,6 +2254,7 @@ describe("claude plugin", () => {
       ctx.host.fs.writeText("~/.claude/.credentials.json", STORED)
       routeRequests(ctx, () => ({ status: 500, bodyText: "" }))
       ;(await loadPlugin()).probe(ctx)
+      ageLastRead(ctx)
       const result = (await loadPlugin()).probe(ctx) // fresh runtime: only pluginDataDir carries over
       expect(ctx.host.fs.readText("/tmp/openusage-test/plugin/live-plan.json")).toContain('"plan":null')
       expect(usageRequestCount(ctx)).toBe(2)
@@ -2299,6 +2307,7 @@ describe("claude plugin", () => {
         return ctx
       }
       const probe = async (ctx) => {
+        ageLastRead(ctx) // each probe is a poll later
         const result = (await loadPlugin()).probe(ctx) // fresh runtime: only pluginDataDir carries over
         return { session: result.lines.find((l) => l.label === "Session"), resets: result.lines.find((l) => l.label === "Rate Limit Resets") }
       }
@@ -2508,6 +2517,8 @@ describe("claude plugin", () => {
       postStatusLine(ctx, 60_000)
       expect(await probe(ctx)).toEqual({ session: 17, weekly: 19, fable: 40 })
       expect(usageRequestCount(ctx)).toBe(1)
+      // Live numbers, not a kept answer.
+      expect((await loadPlugin()).probe(ctx).staleSince).toBeUndefined()
     })
 
     it("still reads the endpoint every 30 minutes for the rows it lacks", async () => {
@@ -2529,6 +2540,7 @@ describe("claude plugin", () => {
     it("ignores one older than 5 minutes, or the last answer of another account", async () => {
       const ctx = await setup()
       postStatusLine(ctx, 5 * 60_000)
+      ageLastRead(ctx)
       expect((await probe(ctx)).session).toBe(5)
       expect(usageRequestCount(ctx)).toBe(2)
 
@@ -2543,6 +2555,7 @@ describe("claude plugin", () => {
       postStatusLine(ctx, 60_000, { fiveHour: { usedPercent: 90, resetsAtMs: Date.parse(RESETS) } })
       ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-2" } }))
       expect((await probe(ctx)).session).toBe(5)
+      ageLastRead(ctx)
       expect((await probe(ctx)).session).toBe(5)
       expect(usageRequestCount(ctx)).toBe(3)
     })
@@ -2562,6 +2575,70 @@ describe("claude plugin", () => {
       const ctx = await setup({ ...API, five_hour: { utilization: 80, resets_at: "2020-01-01T00:00:00Z" } })
       postStatusLine(ctx, 60_000, { sevenDay: LIVE.sevenDay })
       expect(await probe(ctx)).toEqual({ session: 0, weekly: 19, fable: 40 })
+    })
+  })
+
+  describe("at most one read of the usage endpoint per 10 minutes", () => {
+    const setup = (accountUuid = "acc-1") => {
+      const ctx = makeCtx()
+      ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "token" } }))
+      ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid } }))
+      ctx.host.http.request.mockImplementation(() => okUsageResponse({
+        five_hour: { utilization: 30, resets_at: "2020-01-01T00:00:00Z" },
+        seven_day: { utilization: 12, resets_at: "2099-01-01T00:00:00Z" },
+        seven_day_sonnet: { utilization: 100, resets_at: "2020-01-01T00:00:00Z" },
+        limits: [
+          { kind: "weekly_scoped", group: "weekly", percent: 100, resets_at: "2020-01-01T00:00:00Z", scope: { model: { display_name: "Fable" } } },
+        ],
+      }))
+      return ctx
+    }
+    const used = (result, label) => result.lines.find((l) => l.label === label)?.used
+
+    it("shows the kept answer, with its time, to a probe within the gap (a restart, the panel, a refresh)", async () => {
+      const ctx = setup()
+      const first = (await loadPlugin()).probe(ctx)
+      expect(first.staleSince).toBeUndefined()
+      const readAt = JSON.parse(ctx.host.fs.readText("/tmp/openusage-test/plugin/last-usage.json")).at
+
+      ageLastRead(ctx, 9 * 60 * 1000)
+      const kept = (await loadPlugin()).probe(ctx)
+      expect(usageRequestCount(ctx)).toBe(1)
+      expect(kept.staleSince).toBe(readAt - 9 * 60 * 1000)
+      expect(used(kept, "Weekly")).toBe(12)
+      // Windows whose reset has passed since, per-model ones included, read as reset.
+      expect(used(kept, "Session")).toBe(0)
+      expect(used(kept, "Sonnet")).toBe(0)
+      expect(used(kept, "Fable")).toBe(0)
+    })
+
+    it("reads again once the gap has passed, and never takes another login's answer", async () => {
+      const ctx = setup()
+      ;(await loadPlugin()).probe(ctx)
+      ageLastRead(ctx)
+      expect((await loadPlugin()).probe(ctx).staleSince).toBeUndefined()
+      expect(usageRequestCount(ctx)).toBe(2)
+
+      ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-2" } }))
+      ;(await loadPlugin()).probe(ctx)
+      expect(usageRequestCount(ctx)).toBe(3)
+    })
+
+    it("reads when the clock went back, or when a status line posted since is newer than the answer", async () => {
+      const ctx = setup()
+      ;(await loadPlugin()).probe(ctx)
+      ageLastRead(ctx, -60 * 1000)
+      expect((await loadPlugin()).probe(ctx).staleSince).toBeUndefined()
+      expect(usageRequestCount(ctx)).toBe(2)
+
+      // Posted after that read and gone stale since (older than 5 minutes): not a live snapshot,
+      // but newer than the kept answer.
+      ageLastRead(ctx, 8 * 60 * 1000)
+      ctx.host.fs.writeText("/tmp/openusage-test/plugin/statusline.json", JSON.stringify({
+        capturedAt: Date.now() - 6 * 60 * 1000, fiveHour: { usedPercent: 50, resetsAtMs: Date.now() + 3600_000 },
+      }))
+      ;(await loadPlugin()).probe(ctx)
+      expect(usageRequestCount(ctx)).toBe(3)
     })
   })
 

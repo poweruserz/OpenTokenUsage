@@ -675,6 +675,9 @@
   // most every 30 minutes, for the rows the status line lacks (model limits, extra usage).
   const STATUS_LINE_FRESH_MS = 5 * 60 * 1000
   const LIVE_API_INTERVAL_MS = 30 * 60 * 1000
+  // Fewest minutes between two reads of the endpoint, whatever asks (an app restart or update, the
+  // panel opening, a manual refresh): Anthropic answers a read over its budget with a 1-hour wait.
+  const MIN_READ_GAP_MS = 10 * 60 * 1000
 
   function liveWindow(w) {
     return w && typeof w.usedPercent === "number" && typeof w.resetsAtMs === "number" ? w : null
@@ -692,6 +695,17 @@
       ctx.host.log.warn("account change check failed: " + String(e))
     }
     return nowMs
+  }
+
+  // When Claude Code's status line last posted, fresh or not (0 when it never did).
+  function statusLineCapturedAt(ctx) {
+    const path = ctx.app.pluginDataDir + "/statusline.json"
+    try {
+      const saved = ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
+      return saved && typeof saved.capturedAt === "number" ? saved.capturedAt : 0
+    } catch (e) {
+      return 0
+    }
   }
 
   function loadLiveLimits(ctx, nowMs, since) {
@@ -763,6 +777,23 @@
       } else if (base[key] && Date.parse(base[key].resets_at) <= nowMs) {
         data[key] = Object.assign({}, base[key], { utilization: 0, resets_at: null })
       }
+    }
+    return data
+  }
+
+  // The kept answer as it stands now: every window whose reset has passed since (the 5-hour and
+  // weekly ones, the per-model ones, and `limits[]`) reads as reset.
+  function withResetsPassed(base, nowMs) {
+    const passed = (at) => typeof at === "string" && Date.parse(at) <= nowMs
+    const data = Object.assign({}, base)
+    for (const key of Object.keys(data)) {
+      const w = data[key]
+      if (w && typeof w.utilization === "number" && passed(w.resets_at)) {
+        data[key] = Object.assign({}, w, { utilization: 0, resets_at: null })
+      }
+    }
+    if (Array.isArray(data.limits)) {
+      data.limits = data.limits.map((l) => (l && passed(l.resets_at) ? Object.assign({}, l, { percent: 0, resets_at: null }) : l))
     }
     return data
   }
@@ -1194,13 +1225,22 @@
     let data = null
     let lines = []
     let usageFetched = false
+    let staleSince = null
     if (canFetchLiveUsage) {
       const account = usageAccount(ctx, creds)
       const live = account ? loadLiveLimits(ctx, nowMs, accountSince(ctx, account, nowMs)) : null
-      const last = live ? loadLastUsage(ctx, account) : null
-      if (live && last && nowMs - last.at < LIVE_API_INTERVAL_MS) {
+      const last = account ? loadLastUsage(ctx, account) : null
+      const lastAge = last ? nowMs - last.at : Infinity
+      // The kept answer stands in for a read inside the gap, unless a status line posted since is
+      // newer than it (going back to the answer would undo what the card showed).
+      const keep = !live && lastAge >= 0 && lastAge < MIN_READ_GAP_MS && statusLineCapturedAt(ctx) <= last.at
+      if (live && last && lastAge < LIVE_API_INTERVAL_MS) {
         ctx.host.log.info("usage from Claude Code's status line")
         data = withLiveLimits(last.data, live, nowMs)
+      } else if (keep) {
+        ctx.host.log.info("usage from the answer read " + Math.round(lastAge / 1000) + "s ago")
+        data = withResetsPassed(last.data, nowMs)
+        staleSince = last.at
       } else {
         // Proactively refresh if token is expired or about to expire
         if (needsRefresh(ctx, creds.oauth, nowMs)) {
@@ -1357,7 +1397,7 @@
       lines.push(ctx.line.badge({ label: "Status", text: "No usage data", color: "#a3a3a3" }))
     }
 
-    return { plan: plan, lines: lines }
+    return staleSince === null ? { plan: plan, lines: lines } : { plan: plan, lines: lines, staleSince: staleSince }
   }
 
   // Who is signed in, for the WSL same-account check (wsl.rs). Claude Code keeps the account in

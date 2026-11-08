@@ -6,10 +6,10 @@ export const MINUTE = 60_000
 export const ACTIVE_MINUTES = 2
 const IDLE_MINUTES = [2, 5, 10, 15]
 
-/** Fewest minutes between an account's checks. Anthropic allows about 30 usage reads an hour per
- *  login, shared with Claude Code and other monitors, so Claude's cards (extra accounts and WSL
- *  logins too) ask at most every 5 minutes instead of 2. */
-export const smartFloorMinutes = (pluginId: string): number => (/^claude(-|$)/.test(pluginId) ? 5 : 0)
+/** Fewest minutes between an account's checks. Anthropic budgets usage reads per login, shared with
+ *  Claude Code's own reads and other monitors, and answers a read over it with a 1-hour wait; so
+ *  Claude's cards (extra accounts and WSL logins too) ask at most every 10 minutes. */
+export const smartFloorMinutes = (pluginId: string): number => (/^claude(-|$)/.test(pluginId) ? 10 : 0)
 
 export type SmartSchedule = {
   signature: string | null
@@ -41,7 +41,13 @@ export function completeSmartCheck(schedule: SmartSchedule, output: PluginOutput
   if (error || !output || output.staleSince != null) {
     const failures = schedule.failures + 1
     const minutes = Math.max(IDLE_MINUTES[Math.min(failures - 1, 3)], schedule.floorMinutes)
-    return { ...schedule, failures, completedAt: now, nextAt: now + minutes * MINUTE }
+    // An answer kept from a read inside the floor (Claude reads at most every 10 minutes): ask
+    // again once the floor has passed since that read, not since this probe.
+    const floorAfterRead = !error && output?.staleSince != null && schedule.floorMinutes > 0
+      ? output.staleSince + schedule.floorMinutes * MINUTE
+      : 0
+    const nextAt = floorAfterRead > now ? floorAfterRead : now + minutes * MINUTE
+    return { ...schedule, failures, completedAt: now, nextAt }
   }
   const signature = quotaSignature(output)
   const changed = signature !== schedule.signature

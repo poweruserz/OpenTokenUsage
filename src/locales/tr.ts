@@ -290,7 +290,7 @@ export const tr: Messages = {
   "faq.notDetected.q": "Bir sağlayıcı algılanmadı diyor. Ne yapmalıyım?",
   "faq.notDetected.a": "OpenTokenUsage, sağlayıcının kendi uygulamasının veya CLI'ının bu bilgisayara kaydettiği oturumu okur. Orada oturum açın ya da kartta bir düğme görünüyorsa ona basın (oturum açma komutunu bir terminalde çalıştırır), ardından yenileyin.",
   "faq.refresh.q": "Kullanım ne sıklıkla yenileniyor?",
-  "faq.refresh.a": "{settings} → {autoRefresh} bölümünden ayarlanır. {smart}, kullanım değiştikçe 2 dakikada bir (Claude'da 5 dakikada bir) bakar; değişmediğinde 15 dakikaya kadar yavaşlar. Sağ alttaki geri sayıma tıklamak hemen yeniler; elle yenilenen bir sağlayıcı bir sonrakine kadar 5 dakika bekler.",
+  "faq.refresh.a": "{settings} → {autoRefresh} bölümünden ayarlanır. {smart}, kullanım değiştikçe 2 dakikada bir (Claude'da 10 dakikada bir) bakar; değişmediğinde 15 dakikaya kadar yavaşlar. Sağ alttaki geri sayıma tıklamak hemen yeniler; elle yenilenen bir sağlayıcı bir sonrakine kadar 5 dakika bekler.",
   "faq.rateLimited.q": "Claude neden hız sınırına ulaşıldı diyor?",
   "faq.rateLimited.a": "Anthropic, oturum başına saatte yaklaşık 30 kullanım okumasına izin verir; bu hak Claude Code ve kullanımınızı gösteren diğer araçlarla paylaşılır. Hak bitince Anthropic bir saate kadar beklemeyi ister ve uygulama, yeniden başlatılsa bile buna uyar. Daha seyrek sormak için {settings} → {claudeCode} seçeneğini açın: Claude Code o zaman kendi kullanımını uygulamaya iletir.",
   "faq.accounts.q": "İkinci bir Claude veya Codex hesabını izleyebilir miyim?",

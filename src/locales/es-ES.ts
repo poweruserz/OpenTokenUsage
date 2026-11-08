@@ -290,7 +290,7 @@ export const esES: Messages = {
   "faq.notDetected.q": "Un proveedor dice que no se detecta. ¿Qué hago?",
   "faq.notDetected.a": "OpenTokenUsage lee la sesión que la aplicación o la CLI del proveedor guardó en este ordenador. Inicia sesión ahí o usa el botón de la tarjeta cuando aparezca (ejecuta el comando de inicio de sesión en un terminal) y luego actualiza.",
   "faq.refresh.q": "¿Cada cuánto se actualiza el uso?",
-  "faq.refresh.a": "Se configura en {settings} → {autoRefresh}. {smart} comprueba cada 2 minutos mientras el uso cambia (Claude cada 5) y baja a 15 minutos cuando no cambia. Al hacer clic en la cuenta atrás de abajo a la derecha se actualiza en el momento; un proveedor actualizado a mano espera 5 minutos hasta la siguiente vez.",
+  "faq.refresh.a": "Se configura en {settings} → {autoRefresh}. {smart} comprueba cada 2 minutos mientras el uso cambia (Claude cada 10) y baja a 15 minutos cuando no cambia. Al hacer clic en la cuenta atrás de abajo a la derecha se actualiza en el momento; un proveedor actualizado a mano espera 5 minutos hasta la siguiente vez.",
   "faq.rateLimited.q": "¿Por qué Claude dice que ha alcanzado el límite de solicitudes?",
   "faq.rateLimited.a": "Anthropic permite unas 30 lecturas de uso por hora por sesión, compartidas con Claude Code y cualquier otra herramienta que muestre tu uso. Cuando se agotan, Anthropic pide esperar hasta una hora, y la aplicación lo respeta, incluso tras reiniciar. Para consultar con menos frecuencia, activa {settings} → {claudeCode}: Claude Code le pasa entonces su propio uso a la aplicación.",
   "faq.accounts.q": "¿Puedo seguir una segunda cuenta de Claude o Codex?",

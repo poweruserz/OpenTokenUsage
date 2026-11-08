@@ -290,7 +290,7 @@ export const en = {
   "faq.notDetected.q": "A provider says it isn't detected. What now?",
   "faq.notDetected.a": "OpenTokenUsage reads the login that the provider's own app or CLI saved on this PC. Sign in there, or use the button on the card when it shows one (it runs the login command in a terminal), then refresh.",
   "faq.refresh.q": "How often is usage refreshed?",
-  "faq.refresh.a": "{settings} → {autoRefresh} sets it. {smart} checks every 2 minutes while usage changes (Claude every 5) and slows to 15 minutes when it doesn't. Clicking the countdown at the bottom right refreshes now; a provider refreshed by hand waits 5 minutes before the next one.",
+  "faq.refresh.a": "{settings} → {autoRefresh} sets it. {smart} checks every 2 minutes while usage changes (Claude every 10) and slows to 15 minutes when it doesn't. Clicking the countdown at the bottom right refreshes now; a provider refreshed by hand waits 5 minutes before the next one.",
   "faq.rateLimited.q": "Why does Claude say it's rate limited?",
   "faq.rateLimited.a": "Anthropic allows about 30 usage reads an hour per login, shared with Claude Code and any other tool that shows your usage. When they run out, Anthropic asks for a wait of up to an hour, and the app keeps to it, even across a restart. To ask less often, turn on {settings} → {claudeCode}: Claude Code then hands its own usage to the app.",
   "faq.accounts.q": "Can I track a second Claude or Codex account?",

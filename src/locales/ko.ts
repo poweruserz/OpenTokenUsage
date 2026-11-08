@@ -290,7 +290,7 @@ export const ko: Messages = {
   "faq.notDetected.q": "제공업체가 검색되지 않는다고 나옵니다. 어떻게 해야 하나요?",
   "faq.notDetected.a": "OpenTokenUsage는 제공업체의 앱이나 CLI가 이 PC에 저장한 로그인 정보를 읽습니다. 그곳에서 로그인하거나, 카드에 버튼이 보이면 그 버튼을 사용한 뒤(터미널에서 로그인 명령을 실행합니다) 새로 고침하세요.",
   "faq.refresh.q": "사용량은 얼마나 자주 새로 고쳐지나요?",
-  "faq.refresh.a": "{settings} → {autoRefresh}에서 설정합니다. {smart}는 사용량이 바뀌는 동안 2분마다(Claude는 5분마다) 확인하고, 바뀌지 않으면 15분까지 간격을 늘립니다. 오른쪽 아래의 카운트다운을 클릭하면 바로 새로 고칩니다. 직접 새로 고친 제공업체는 다음 새로 고침까지 5분을 기다립니다.",
+  "faq.refresh.a": "{settings} → {autoRefresh}에서 설정합니다. {smart}는 사용량이 바뀌는 동안 2분마다(Claude는 10분마다) 확인하고, 바뀌지 않으면 15분까지 간격을 늘립니다. 오른쪽 아래의 카운트다운을 클릭하면 바로 새로 고칩니다. 직접 새로 고친 제공업체는 다음 새로 고침까지 5분을 기다립니다.",
   "faq.rateLimited.q": "Claude에 요청 한도에 도달했다고 나오는 이유는 무엇인가요?",
   "faq.rateLimited.a": "Anthropic은 로그인당 시간당 약 30회의 사용량 조회를 허용하며, 이 횟수는 Claude Code 및 사용량을 표시하는 다른 도구와 함께 쓰입니다. 모두 쓰면 Anthropic이 최대 1시간 기다리도록 요청하고, 앱은 다시 시작한 뒤에도 이를 지킵니다. 요청을 줄이려면 {settings} → {claudeCode}을(를) 켜세요. 그러면 Claude Code가 자체 사용량을 앱에 전달합니다.",
   "faq.accounts.q": "두 번째 Claude 또는 Codex 계정도 추적할 수 있나요?",

@@ -1,7 +1,7 @@
 import { ResetCredits } from "@/components/reset-credits"
 import { ClaudeSessions, isClaudeLogin } from "@/components/claude-sessions"
 import { Fragment, useMemo } from "react"
-import { AlertCircle, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
+import { AlertCircle, Clock, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,10 @@ import { calculateDeficit, calculatePaceStatus, paceElapsedFraction, type PaceSt
 import { buildPaceDetailText, formatDeficitText, formatRunsOutText, getPaceStatusText } from "@/lib/pace-tooltip"
 import { formatResetAbsoluteLabel, formatResetRelativeLabel, formatResetTooltipText } from "@/lib/reset-tooltip"
 import { getLocale, t, tLabel } from "@/lib/i18n"
-import { translatePluginError } from "@/lib/plugin-errors"
+import { matchPluginError, translatePluginError } from "@/lib/plugin-errors"
+
+// A provider's rate limit is a wait, not a fault: over the last good bars it reads as a quiet note.
+const isRateLimitWait = (error: string) => /^rateLimited/.test(matchPluginError(error)?.key ?? "")
 
 interface ProviderCardProps {
   name: string
@@ -305,9 +308,11 @@ export function ProviderCard({
               render={(props) => (
                 <div
                   {...props}
-                  className="flex items-center gap-1.5 mb-2 text-xs text-destructive"
+                  className={`flex items-center gap-1.5 mb-2 text-xs ${isRateLimitWait(error) ? "text-muted-foreground" : "text-destructive"}`}
                 >
-                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                  {isRateLimitWait(error)
+                    ? <Clock className="h-3 w-3 flex-shrink-0" />
+                    : <AlertCircle className="h-3 w-3 flex-shrink-0" />}
                   <span className="truncate">{translatePluginError(error)}</span>
                 </div>
               )}
