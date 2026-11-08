@@ -366,9 +366,95 @@ pub async fn usage_projects(
     .map_err(|e| e.to_string())
 }
 
+/// A month's projects CSV may be at most this big (a few thousand branches).
+const MAX_CSV_BYTES: usize = 4 * 1024 * 1024;
+
+/// Writes `csv` as `OpenTokenUsage-projects-<card>-<YYYY-MM>.csv` in `dir` (write aside, then swap),
+/// with a byte-order mark so Excel reads it as UTF-8.
+fn write_csv(dir: &Path, plugin_id: &str, month: &str, csv: &str) -> Result<PathBuf, String> {
+    let card = !plugin_id.is_empty()
+        && plugin_id.len() <= 64
+        && plugin_id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+    let month_ok = month.len() == 7
+        && month.bytes().enumerate().all(|(i, b)| {
+            if i == 4 {
+                b == b'-'
+            } else {
+                b.is_ascii_digit()
+            }
+        });
+    if !card || !month_ok {
+        return Err("invalid file name".into());
+    }
+    if csv.len() > MAX_CSV_BYTES {
+        return Err("too large".into());
+    }
+    let path = dir.join(format!("OpenTokenUsage-projects-{plugin_id}-{month}.csv"));
+    let partial = path.with_extension("csv.tmp");
+    std::fs::write(&partial, format!("\u{FEFF}{csv}"))
+        .and_then(|()| std::fs::rename(&partial, &path))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&partial);
+            e.to_string()
+        })?;
+    Ok(path)
+}
+
+/// Saves a month's projects (the frontend builds the CSV: it has the currency) to Downloads, the
+/// home folder without one, and selects the file in Explorer.
+#[tauri::command]
+pub fn export_projects_csv(
+    app: tauri::AppHandle,
+    plugin_id: String,
+    month: String,
+    csv: String,
+) -> Result<String, String> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .ok_or_else(|| "no Downloads folder".to_string())?;
+    let path = write_csv(&dir, &plugin_id, &month, &csv)?;
+    if let Err(e) = app.opener().reveal_item_in_dir(&path) {
+        log::warn!("projects CSV saved but not shown in Explorer: {e}");
+    }
+    Ok(path.display().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writes_the_csv_under_a_fixed_name_and_refuses_other_names() {
+        let dir = std::env::temp_dir().join(format!("openusage-csv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = write_csv(&dir, "claude-1a2b3c4d", "2026-11", "Month\r\n").unwrap();
+        assert_eq!(
+            path,
+            dir.join("OpenTokenUsage-projects-claude-1a2b3c4d-2026-11.csv")
+        );
+        // Written again over the last one.
+        write_csv(&dir, "claude-1a2b3c4d", "2026-11", "Month,Project\r\n").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "\u{FEFF}Month,Project\r\n"
+        );
+
+        for (id, month) in [
+            ("../x", "2026-11"),
+            ("Claude", "2026-11"),
+            ("", "2026-11"),
+            ("claude", "2026-1"),
+            ("claude", "2026/11"),
+            ("claude", r"..\..\.."),
+        ] {
+            assert!(write_csv(&dir, id, month, "x").is_err(), "{id} {month}");
+        }
+        assert!(write_csv(&dir, "claude", "2026-11", &"x".repeat(MAX_CSV_BYTES + 1)).is_err());
+    }
 
     fn parts(input: u64, output: u64, cache_write: u64, cache_read: u64) -> Parts {
         Parts {

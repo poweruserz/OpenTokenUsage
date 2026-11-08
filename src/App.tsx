@@ -21,6 +21,7 @@ import { t, useLocaleStore } from "@/lib/i18n"
 import { invoke } from "@tauri-apps/api/core"
 import { useAppUpdate } from "@/hooks/use-app-update"
 import { useUsageAlerts } from "@/hooks/app/use-usage-alerts"
+import { useProjectBudgetAlerts } from "@/hooks/app/use-project-budget-alerts"
 import { useLoginRecovery } from "@/hooks/app/use-login-recovery"
 import { useProviderTrayIcons } from "@/hooks/app/use-provider-tray-icons"
 import { useTaskbarStrip } from "@/hooks/app/use-taskbar-strip"
@@ -159,6 +160,7 @@ function App() {
 
   useUsageAlerts({ pluginStates, pluginsMeta, pluginSettings, enabled: usageAlerts, settings: alertSettings, displayMode })
   const enabledIds = useMemo(() => (pluginSettings ? getEnabledPluginIds(pluginSettings) : []), [pluginSettings])
+  useProjectBudgetAlerts({ pluginsMeta, enabledIds, enabled: usageAlerts, settings: alertSettings })
   useLoginRecovery({
     pluginStates,
     pluginsMeta,

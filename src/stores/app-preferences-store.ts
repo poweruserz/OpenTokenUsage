@@ -24,6 +24,7 @@ import {
   type TimeFormatMode,
   type TrayMetric,
   type TrayPercentColor,
+  type ProjectBudgets,
   type TrayProvider,
 } from "@/lib/settings"
 import { DEFAULT_CURRENCY, type CurrencySetting } from "@/lib/currency"
@@ -44,6 +45,7 @@ type AppPreferencesStore = {
   usageAlerts: boolean
   alertSettings: AlertSettings
   currency: CurrencySetting
+  projectBudgets: ProjectBudgets
   panelPinned: boolean
   rememberPanelPosition: boolean
   trayLogoColors: boolean
@@ -65,6 +67,7 @@ type AppPreferencesStore = {
   setUsageAlerts: (value: boolean) => void
   setAlertSettings: (value: AlertSettings) => void
   setCurrency: (value: CurrencySetting) => void
+  setProjectBudgets: (value: ProjectBudgets) => void
   setPanelPinned: (value: boolean) => void
   setRememberPanelPosition: (value: boolean) => void
   setTrayLogoColors: (value: boolean) => void
@@ -90,6 +93,7 @@ const initialState = {
   usageAlerts: true,
   alertSettings: DEFAULT_ALERT_SETTINGS,
   currency: DEFAULT_CURRENCY,
+  projectBudgets: {} as ProjectBudgets,
   panelPinned: false,
   rememberPanelPosition: false,
   trayLogoColors: true,
@@ -115,6 +119,7 @@ export const useAppPreferencesStore = create<AppPreferencesStore>((set) => ({
   setUsageAlerts: (value) => set({ usageAlerts: value }),
   setAlertSettings: (value) => set({ alertSettings: value }),
   setCurrency: (value) => set({ currency: value }),
+  setProjectBudgets: (value) => set({ projectBudgets: value }),
   setPanelPinned: (value) => set({ panelPinned: value }),
   setRememberPanelPosition: (value) => set({ rememberPanelPosition: value }),
   setTrayLogoColors: (value) => set({ trayLogoColors: value }),

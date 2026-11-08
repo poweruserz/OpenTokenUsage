@@ -56,6 +56,16 @@ This file holds the project facts that are easy to get wrong.
   projects add up to ccusage's total. A folder maps to its repository (walk up to `.git`; a `.git` file's `gitdir`,
   normalized, to the checkout holding it), looked up once per folder; network paths (`\\…`) are never looked into.
   Month bounds come from the frontend (local time); `HEAD` means no branch.
+  Budgets (`project-budgets.ts`, setting `projectBudgets`: USD per card id and project path, in `BACKUP_KEYS` via
+  `mergeCardMap`): the bar turns yellow at 80% and red at 100%; `use-project-budget-alerts.ts` checks enabled cards
+  with a budget every 15 min, panel open or not, and notifies at 80% and 100% once per project and month (keys in
+  `sentProjectAlerts`, apart from `sentUsageAlerts`, which `use-usage-alerts.ts` rewrites from memory; the key holds
+  the budget, so a corrected one alerts again). A typed budget is read in the app language's style (`parseAmount`:
+  `5.000` is five thousand in Turkish), and Save re-reads the budgets from disk before writing. Forecast = spend ×
+  month length ÷ time elapsed, after the first day. CSV: built in the frontend (it has the currency), written by
+  `export_projects_csv` to Downloads under a validated fixed name, with a BOM; formula-like cells start with `'`; `;`
+  and decimal commas when the language writes decimals with a comma (Excel splits on the system list separator);
+  costs empty when the month is unpriced.
 - Paths: `~/Library/Application Support/<X>` is mapped to `%APPDATA%\<X>` by `expand_path`.
   SQLite goes through bundled `rusqlite` (no `sqlite3` CLI); no `ps`/`lsof`/`security` on Windows.
 - Release builds run only the bundled plugins (copied to `%APPDATA%\com.poweruserz.opentokenusage\plugins`);

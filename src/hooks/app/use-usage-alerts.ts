@@ -18,7 +18,7 @@ import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 // The toasts stay silent (an unpackaged app can't give them its own sound); one sound per batch
 // is played by the host, which also keeps quiet during Do Not Disturb.
-async function showNotifications(alerts: UsageAlert[], settings: AlertSettings) {
+export async function showNotifications(alerts: { title: string; body: string }[], settings: AlertSettings) {
   let granted = await isPermissionGranted()
   if (!granted) granted = (await requestPermission()) === "granted"
   if (!granted) return false

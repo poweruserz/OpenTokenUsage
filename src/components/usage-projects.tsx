@@ -5,6 +5,8 @@ import { hasUsageLogs } from "@/components/usage-heatmap"
 import { usePanelOpen } from "@/hooks/use-unseen-usage"
 import { formatMoney } from "@/lib/currency"
 import { getLocale, t } from "@/lib/i18n"
+import { budgetLevel, monthEndForecast, monthKey, parseAmount, projectsCsv } from "@/lib/project-budgets"
+import { loadProjectBudgets, saveProjectBudgets, type ProjectBudgets } from "@/lib/settings"
 import { cn } from "@/lib/utils"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
@@ -44,34 +46,79 @@ export function monthRange(now: Date, back: number) {
 /** Claude Code writes `HEAD` when it can't name the branch (detached, or not a repository). */
 const branchLabel = (name: string) => (name && name !== "HEAD" ? name : t("projects.noBranch"))
 
+// Budget saves run one after another: each reads the budgets on disk and writes them back, so two
+// at once would keep only the later one's edit.
+let budgetSaves: Promise<void> = Promise.resolve()
+
+/**
+ * Sets or clears one project's budget, from the budgets on disk rather than the store's copy (one
+ * that never loaded must not wipe the rest); the store follows once it's saved. A failed save is
+ * logged, like every other setting's.
+ */
+function saveBudget(pluginId: string, path: string, usd: number | null, saved: (budgets: ProjectBudgets) => void) {
+  budgetSaves = budgetSaves.then(async () => {
+    try {
+      const next = await loadProjectBudgets()
+      const card = { ...(next[pluginId] ?? {}) }
+      if (usd === null) delete card[path]
+      else card[path] = usd
+      if (Object.keys(card).length > 0) next[pluginId] = card
+      else delete next[pluginId]
+      await saveProjectBudgets(next)
+      saved(next)
+    } catch (error) {
+      console.error("Failed to save project budgets:", error)
+    }
+  })
+  return budgetSaves
+}
+
 /** What each project and branch cost a Claude or Codex login this month or last, read every few minutes while shown. */
 export function UsageProjects({ pluginId }: { pluginId: string }) {
   const open = usePanelOpen()
   const currency = useAppPreferencesStore((state) => state.currency)
+  const budgets = useAppPreferencesStore((state) => state.projectBudgets)
+  const setProjectBudgets = useAppPreferencesStore((state) => state.setProjectBudgets)
   const [back, setBack] = useState(0)
-  // Kept with the card and month it belongs to: the detail page reuses this component.
-  const [read, setRead] = useState<{ key: string; projects: Projects } | null>(null)
+  // Kept with the card, the toggle and the month it was read for: the detail page reuses this
+  // component, and a month that ends while it's open keeps its own rows until the next read.
+  const [read, setRead] = useState<{ key: string; range: ReturnType<typeof monthRange>; projects: Projects } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [all, setAll] = useState(false)
   // The card and month whose last read failed: said beside the month toggle.
   const [failed, setFailed] = useState<string | null>(null)
+  // The budget being typed for the open project, in the chosen currency, and whether Save refused it.
+  const [draft, setDraft] = useState("")
+  const [invalid, setInvalid] = useState(false)
+  const [exported, setExported] = useState<{ key: string; message: string; failed: boolean } | null>(null)
   const key = `${pluginId}|${back}`
+  const cardBudgets = budgets[pluginId] ?? {}
+
+  const toggle = (path: string) => {
+    const opening = expanded !== path
+    setExpanded(opening ? path : null)
+    setInvalid(false)
+    const budget = cardBudgets[path]
+    if (opening) setDraft(budget ? String(Math.round(budget * currency.rate * 100) / 100) : "")
+  }
 
   useEffect(() => {
     if (!open || !isTauri() || !hasUsageLogs(pluginId)) return
     let live = true
     const loading = `${pluginId}|${back}`
-    const load = () =>
-      invoke<Projects>("usage_projects", { pluginId, ...monthRange(new Date(), back) })
+    const load = () => {
+      const range = monthRange(new Date(), back)
+      return invoke<Projects>("usage_projects", { pluginId, ...range })
         .then((projects) => {
           if (!live) return
-          setRead({ key: loading, projects })
+          setRead({ key: loading, range, projects })
           setFailed(null)
         })
         .catch((error) => {
           console.error("Failed to read the usage by project:", error)
           if (live) setFailed(loading)
         })
+    }
     void load()
     const timer = setInterval(() => void load(), PROJECTS_REFRESH_MS)
     return () => {
@@ -89,6 +136,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   if (!hasUsageLogs(pluginId) || (!data && read === null && failed !== key)) return null
   // No project rows can still be a priced month: logs it couldn't read, or dollars it couldn't place.
   const empty = !data || (data.projects.length === 0 && !(data.priced && data.totalCost >= 0.005))
+  // The month the rows were read for (not today's: a month can end while the list is open).
+  const range = read?.key === key ? read.range : monthRange(new Date(), back)
 
   const locale = getLocale()
   const tokens = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
@@ -98,6 +147,18 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   const share = (project: Project) =>
     data?.priced && data.totalCost > 0 ? project.cost / data.totalCost : data && data.totalTokens > 0 ? project.tokens / data.totalTokens : 0
   const rows = data ? (all ? data.projects : data.projects.slice(0, FIRST_ROWS)) : []
+  const forecast = (spent: number) => (data?.priced ? monthEndForecast(spent, range.startMs, range.endMs, Date.now()) : null)
+  const money = (usd: number) => formatMoney(usd, currency, locale)
+  const exportCsv = () => {
+    if (!data) return
+    const month = monthKey(range.startMs)
+    invoke<string>("export_projects_csv", { pluginId, month, csv: projectsCsv(data, month, currency, locale) })
+      .then((path) => setExported({ key, message: t("projects.saved", { path }), failed: false }))
+      .catch((error) => {
+        console.error("Failed to export the projects:", error)
+        setExported({ key, message: t("projects.exportFailed"), failed: true })
+      })
+  }
 
   return (
     <section className="pb-3">
@@ -132,16 +193,24 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
             <span className="text-muted-foreground">{t("projects.total")}</span>
             <span className="font-medium tabular-nums">{amount(data.totalCost, data.totalTokens)}</span>
           </div>
+          {forecast(data.totalCost) !== null && (
+            <p className="-mt-0.5 mb-1 text-right text-[10px] tabular-nums text-muted-foreground">
+              {t("projects.forecast", { cost: money(forecast(data.totalCost) ?? 0) })}
+            </p>
+          )}
           <ul className="flex flex-col gap-0.5">
             {rows.map((project) => {
               const isOpen = expanded === project.path
               const name = project.name || t("projects.unknown")
+              const budget = data.priced ? cardBudgets[project.path] : undefined
+              const level = budget ? budgetLevel(project.cost, budget) : 0
+              const fill = budget ? Math.min(1, project.cost / budget) : share(project)
               return (
                 <li key={project.path}>
                   <button
                     type="button"
                     aria-expanded={isOpen}
-                    onClick={() => setExpanded(isOpen ? null : project.path)}
+                    onClick={() => toggle(project.path)}
                     title={project.path || undefined}
                     className="group w-full rounded px-1 py-0.5 text-left outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
                   >
@@ -152,7 +221,13 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                       <span className="w-16 text-right tabular-nums">{amount(project.cost, project.tokens)}</span>
                     </span>
                     <span className="ml-4 mt-0.5 block h-1 rounded-full bg-foreground/5">
-                      <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.max(1, share(project) * 100)}%` }} />
+                      <span
+                        className={cn(
+                          "block h-full rounded-full",
+                          level === 100 ? "bg-destructive" : level === 80 ? "bg-yellow-500" : "bg-primary"
+                        )}
+                        style={{ width: `${Math.max(1, fill * 100)}%` }}
+                      />
                     </span>
                   </button>
                   {isOpen && (
@@ -167,6 +242,66 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {isOpen && data.priced && project.path && (
+                    <div className="mb-1.5 ml-5 flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                      {budget && (
+                        <p className={cn("tabular-nums", level === 100 && "text-destructive")}>
+                          {t("projects.budgetUsed", {
+                            percent: percent.format(project.cost / budget),
+                            spent: money(project.cost),
+                            budget: money(budget),
+                          })}
+                          {back === 0 && forecast(project.cost) !== null && (
+                            <> · {t("projects.forecast", { cost: money(forecast(project.cost) ?? 0) })}</>
+                          )}
+                        </p>
+                      )}
+                      <form
+                        className="flex items-center gap-1"
+                        onSubmit={(event) => {
+                          event.preventDefault()
+                          const value = parseAmount(draft, locale)
+                          setInvalid(value === null)
+                          if (value !== null) void saveBudget(pluginId, project.path, value / currency.rate, setProjectBudgets)
+                        }}
+                      >
+                        <label htmlFor={`budget-${project.path}`}>{t("projects.budget")}</label>
+                        <input
+                          id={`budget-${project.path}`}
+                          inputMode="decimal"
+                          value={draft}
+                          aria-invalid={invalid}
+                          aria-describedby={invalid ? `budget-note-${project.path}` : undefined}
+                          onChange={(event) => {
+                            setDraft(event.target.value)
+                            setInvalid(false)
+                          }}
+                          className="w-16 rounded border border-border bg-transparent px-1 py-0.5 text-right tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                        <span>{currency.code}</span>
+                        <button type="submit" className="rounded px-1 text-foreground outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring">
+                          {t("projects.budgetSave")}
+                        </button>
+                        {budget && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void saveBudget(pluginId, project.path, null, setProjectBudgets)
+                              setDraft("")
+                            }}
+                            className="rounded px-1 outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {t("projects.budgetRemove")}
+                          </button>
+                        )}
+                      </form>
+                      {invalid && (
+                        <p id={`budget-note-${project.path}`} role="alert" className="text-destructive">
+                          {t("projects.budgetInvalid")}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </li>
               )
@@ -189,6 +324,24 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
           <p className="mt-1 text-[10px] text-muted-foreground">
             {data.priced ? t("projects.apiPrices") : data.noRunner ? t("projects.unpriced") : t("projects.unpricedFailed")}
           </p>
+          <div className="mt-1 flex items-center gap-2 text-[10px]">
+            <button
+              type="button"
+              onClick={exportCsv}
+              className="rounded border border-border px-1.5 py-0.5 text-foreground outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {t("projects.export")}
+            </button>
+            {exported?.key === key && (
+              <span
+                role="status"
+                title={exported.message}
+                className={cn("min-w-0 truncate", exported.failed ? "text-destructive" : "text-muted-foreground")}
+              >
+                {exported.message}
+              </span>
+            )}
+          </div>
         </>
       )}
       {data && data.unreadable > 0 && (

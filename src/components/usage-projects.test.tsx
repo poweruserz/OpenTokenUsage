@@ -2,10 +2,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { invoke } from "@tauri-apps/api/core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { monthRange, UsageProjects, type Project, type Projects } from "@/components/usage-projects"
+import { loadProjectBudgets, saveProjectBudgets } from "@/lib/settings"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }))
 vi.mock("@/hooks/use-unseen-usage", () => ({ usePanelOpen: () => true }))
+vi.mock("@/lib/settings", async (original) => ({
+  ...(await original<typeof import("@/lib/settings")>()),
+  loadProjectBudgets: vi.fn(),
+  saveProjectBudgets: vi.fn(),
+}))
 
 const project = (name: string, cost: number, tokens: number, branches: Project["branches"] = []): Project => ({
   name, path: `C:/work/${name}`, cost, tokens, branches,
@@ -24,7 +30,9 @@ const projects = (list: Project[], over: Partial<Projects> = {}): Projects => ({
 describe("usage by project", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockReset()
-    useAppPreferencesStore.setState({ currency: { code: "USD", rate: 1 } })
+    vi.mocked(saveProjectBudgets).mockResolvedValue()
+    vi.mocked(loadProjectBudgets).mockImplementation(async () => structuredClone(useAppPreferencesStore.getState().projectBudgets))
+    useAppPreferencesStore.setState({ currency: { code: "USD", rate: 1 }, projectBudgets: {} })
   })
 
   it("asks for this local month, or the last one, with ccusage's first and last day", () => {
@@ -104,6 +112,82 @@ describe("usage by project", () => {
     expect(await screen.findByText(/^\$12(\.00)?$/)).toBeInTheDocument()
     expect(screen.getByText(/couldn't be matched to a project/)).toBeInTheDocument()
     expect(screen.queryByText("No usage in this month.")).toBeNull()
+  })
+
+  it("keeps a monthly budget per project in the chosen currency and colors the bar from 80%", async () => {
+    useAppPreferencesStore.setState({ currency: { code: "EUR", rate: 0.5 } })
+    vi.mocked(invoke).mockResolvedValue(projects([project("shop", 41, 10)]))
+    render(<UsageProjects pluginId="claude" />)
+    fireEvent.click(await screen.findByRole("button", { name: /shop/ }))
+    // Not an amount: said, and nothing saved.
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "lots" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    expect(screen.getByRole("alert")).toHaveTextContent(/Type an amount/)
+    expect(saveProjectBudgets).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "25" } })
+    expect(screen.queryByRole("alert")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+
+    // 25 EUR at 0.5 EUR a dollar is a $50 budget, of which $41 is 82%.
+    const budgets = { claude: { "C:/work/shop": 50 } }
+    await waitFor(() => expect(useAppPreferencesStore.getState().projectBudgets).toEqual(budgets))
+    expect(saveProjectBudgets).toHaveBeenCalledWith(budgets)
+    expect(screen.getByText(/82% of the budget used/)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /shop/ }).querySelector(".bg-yellow-500")).not.toBeNull()
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    await waitFor(() => expect(useAppPreferencesStore.getState().projectBudgets).toEqual({}))
+  })
+
+  it("keeps the other budgets on disk when the store never loaded them, and queues quick saves", async () => {
+    vi.mocked(loadProjectBudgets).mockResolvedValue({ codex: { "C:/work/api": 30 } })
+    vi.mocked(invoke).mockResolvedValue(projects([project("shop", 10, 10)]))
+    render(<UsageProjects pluginId="claude" />)
+    fireEvent.click(await screen.findByRole("button", { name: /shop/ }))
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "1,000" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() =>
+      expect(saveProjectBudgets).toHaveBeenCalledWith({ codex: { "C:/work/api": 30 }, claude: { "C:/work/shop": 1000 } })
+    )
+
+
+    // Two saves at once: the second reads what the first wrote, so neither edit is lost.
+    let disk: Record<string, Record<string, number>> = { codex: { "C:/work/api": 30 } }
+    vi.mocked(loadProjectBudgets).mockImplementation(async () => structuredClone(disk))
+    vi.mocked(saveProjectBudgets).mockImplementation(async (next) => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      disk = structuredClone(next)
+    })
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "70" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "80" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(disk).toEqual({ codex: { "C:/work/api": 30 }, claude: { "C:/work/shop": 80 } }))
+
+    // A save that fails is logged, as for every setting, and keeps what was there.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.mocked(loadProjectBudgets).mockRejectedValue(new Error("store"))
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(error).toHaveBeenCalledWith("Failed to save project budgets:", expect.any(Error)))
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(disk.claude).toEqual({ "C:/work/shop": 80 })
+    error.mockRestore()
+  })
+
+  it("saves the month as CSV and says where", async () => {
+    vi.mocked(invoke).mockImplementation(async (command) =>
+      command === "export_projects_csv" ? "C:/Users/me/Downloads/OpenTokenUsage-projects-claude-2026-11.csv" : projects([project("shop", 5, 10, [
+        { name: "main", ticket: null, cost: 5, tokens: 10 },
+      ])])
+    )
+    render(<UsageProjects pluginId="claude" />)
+    fireEvent.click(await screen.findByRole("button", { name: "Export CSV" }))
+    expect(await screen.findByRole("status")).toHaveTextContent(/Saved to .*OpenTokenUsage-projects-claude/)
+    const [, args] = vi.mocked(invoke).mock.calls.find(([command]) => command === "export_projects_csv")!
+    expect(args).toMatchObject({ pluginId: "claude", month: expect.stringMatching(/^\d{4}-\d{2}$/) })
+    expect((args as { csv: string }).csv).toMatch(/^Month,Project,Folder,Branch,Ticket,Tokens,Cost \(USD\)\r\n.*,shop,C:\/work\/shop,main,,10,5\.0000\r\n$/)
   })
 
   it("is not shown for cards without local logs", () => {
