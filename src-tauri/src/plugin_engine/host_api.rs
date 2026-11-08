@@ -2746,6 +2746,30 @@ where
     serde_json::json!({ "status": "runner_failed" }).to_string()
 }
 
+/// The folder each card's last probe pointed ccusage at (expanded; None for ccusage's defaults). The
+/// plugin knows which login folder works (Codex tries its folders in order, past a stale one), so
+/// the projects list asks ccusage about that same folder.
+static CCUSAGE_HOMES: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+
+fn remember_ccusage_home(plugin_id: &str, home: Option<&str>) {
+    CCUSAGE_HOMES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(plugin_id.to_string(), home.map(expand_path));
+}
+
+/// Where the card's last probe pointed ccusage: None before its first query, `Some(None)` for
+/// ccusage's own defaults.
+pub(crate) fn last_ccusage_home(plugin_id: &str) -> Option<Option<String>> {
+    CCUSAGE_HOMES
+        .get()?
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(plugin_id)
+        .cloned()
+}
+
 /// ccusage's daily report for a Claude or Codex login outside a probe (the projects list on a detail
 /// page), as `ctx.host.ccusage.query` answers it: `{"status":"ok","data":{...}}` or another status.
 /// A report is reused for 15 minutes; `home` is an extra account's folder.
@@ -2822,6 +2846,10 @@ fn inject_ccusage<'js>(
                         CcusageQueryOpts::default()
                     }
                 };
+                remember_ccusage_home(
+                    &pid,
+                    ccusage_home_override(&opts, resolve_ccusage_provider(&opts, &pid)),
+                );
                 Ok(super::ccusage_cache::query(
                     &cache_id,
                     &opts_json,
@@ -5567,6 +5595,20 @@ wait
             expand_path_in("~/../secret", Some(&home)),
             home.to_string_lossy()
         );
+    }
+
+    #[test]
+    fn remembers_where_each_cards_probe_pointed_ccusage() {
+        assert_eq!(last_ccusage_home("remember-test"), None);
+        remember_ccusage_home("remember-test", Some("~/codex-home"));
+        assert_eq!(
+            last_ccusage_home("remember-test"),
+            Some(Some(expand_path("~/codex-home")))
+        );
+        // ccusage's own defaults.
+        remember_ccusage_home("remember-test", None);
+        assert_eq!(last_ccusage_home("remember-test"), Some(None));
+        assert_eq!(last_ccusage_home("another-card"), None);
     }
 
     #[test]

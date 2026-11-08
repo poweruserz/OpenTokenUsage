@@ -153,24 +153,24 @@ fn repository_cached(cwd: &str) -> PathBuf {
     root
 }
 
-/// The folder ccusage is pointed at, as the plugins point it: Codex at the folder its login is in,
-/// Claude at a folder set apart from the usual `~/.claude` (`CLAUDE_CONFIG_DIR`, an extra account).
-/// None leaves ccusage to its own defaults. With a login in both Codex folders, the plugin goes on
-/// to the second when the first is stale; the one written last is the one in use.
-fn ccusage_home(log: Log, dirs: &[PathBuf], login_file: &str) -> Option<PathBuf> {
+/// The folder ccusage is pointed at: where the card's last probe pointed it (the plugin knows which
+/// login works), else as the plugins usually do: Codex at the first folder holding its login (else
+/// at its own default home, the last folder), Claude at a folder set apart from the usual
+/// `~/.claude` (`CLAUDE_CONFIG_DIR`, an extra account). None leaves ccusage to its own defaults.
+fn ccusage_home(
+    log: Log,
+    dirs: &[PathBuf],
+    login_file: &str,
+    probed: Option<Option<String>>,
+) -> Option<PathBuf> {
+    if let Some(home) = probed {
+        return home.map(PathBuf::from);
+    }
     match log {
         Log::Codex => dirs
             .iter()
-            .filter_map(|dir| {
-                let written = std::fs::metadata(dir.join(login_file))
-                    .ok()?
-                    .modified()
-                    .ok()?;
-                Some((written, dir))
-            })
-            .max_by_key(|(written, _)| *written)
-            .map(|(_, dir)| dir)
-            .or(dirs.first())
+            .find(|dir| dir.join(login_file).is_file())
+            .or(dirs.last())
             .cloned(),
         Log::Claude => {
             let usual = dirs::home_dir().map(|home| home.join(".claude"));
@@ -337,8 +337,9 @@ pub async fn usage_projects(
     let Some((log, dirs, login_file, folder, provider)) = source else {
         return Ok(Projects::default());
     };
+    let probed = crate::plugin_engine::host_api::last_ccusage_home(&plugin_id);
     tauri::async_runtime::spawn_blocking(move || {
-        let home = ccusage_home(log, &dirs, login_file);
+        let home = ccusage_home(log, &dirs, login_file, probed);
         // The logs ccusage prices: the folder it is pointed at, else the CLI's own.
         let logs: Vec<PathBuf> = match &home {
             Some(home) => vec![home.join(folder)],
@@ -550,34 +551,22 @@ mod tests {
         std::fs::create_dir_all(&config).unwrap();
         std::fs::create_dir_all(&dot).unwrap();
         std::fs::write(dot.join("auth.json"), "{}").unwrap();
-        // Codex: the folder its login is in, else the first.
         let codex = [config.clone(), dot.clone()];
-        assert_eq!(
-            ccusage_home(Log::Codex, &codex, "auth.json"),
-            Some(dot.clone())
-        );
-        // A login in both: the one written last (a stale first one is skipped by the plugin).
-        std::fs::write(config.join("auth.json"), "{}").unwrap();
-        let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
-        std::fs::File::options()
-            .write(true)
-            .open(config.join("auth.json"))
-            .unwrap()
-            .set_modified(hour_ago)
-            .unwrap();
-        assert_eq!(ccusage_home(Log::Codex, &codex, "auth.json"), Some(dot));
-        assert_eq!(
-            ccusage_home(Log::Codex, &codex, "missing.json"),
-            Some(config)
-        );
+        // Where the card's probe pointed ccusage wins: the plugin knows which login works.
+        let probed = Some(Some(config.to_string_lossy().into_owned()));
+        assert_eq!(ccusage_home(Log::Codex, &codex, "auth.json", probed), Some(config.clone()));
+        assert_eq!(ccusage_home(Log::Codex, &codex, "auth.json", Some(None)), None);
+        // Before any probe: the first folder holding the login, else Codex's own home (the last).
+        assert_eq!(ccusage_home(Log::Codex, &codex, "auth.json", None), Some(dot.clone()));
+        assert_eq!(ccusage_home(Log::Codex, &codex, "missing.json", None), Some(dot));
         // Claude: only a folder other than the usual ~/.claude.
         let usual = dirs::home_dir().unwrap().join(".claude");
         assert_eq!(
-            ccusage_home(Log::Claude, &[usual], ".credentials.json"),
+            ccusage_home(Log::Claude, &[usual], ".credentials.json", None),
             None
         );
         assert_eq!(
-            ccusage_home(Log::Claude, &[root.clone()], ".credentials.json"),
+            ccusage_home(Log::Claude, &[root.clone()], ".credentials.json", None),
             Some(root)
         );
     }

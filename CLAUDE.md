@@ -50,7 +50,8 @@ This file holds the project facts that are easy to get wrong.
   message's tokens by kind with its model, folder (`cwd`) and git branch (Claude: per line; Codex: the log's *first*
   `session_meta` (a sub-agent's log repeats its parent's after its own), model and folder per `turn_context`, a record
   going with its `turn_id`). Dollars are ccusage's daily report for the month (`host_api::ccusage_daily`: its own lock,
-  never the probes' guard, one cached report per month for 15 min; pointed at the folder the plugins point it at), shared
+  never the probes' guard, one cached report per month for 15 min; pointed where the card's last probe pointed it,
+  `last_ccusage_home`, since the plugin knows which login folder works), shared
   out per model (Codex's report has only day totals: pooled) by tokens weighted at the providers' price ratios, so
   projects add up to ccusage's total. A folder maps to its repository (walk up to `.git`; a `.git` file's `gitdir`,
   normalized, to the checkout holding it), looked up once per folder; network paths (`\\…`) are never looked into.
