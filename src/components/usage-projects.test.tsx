@@ -93,6 +93,19 @@ describe("usage by project", () => {
     expect(asked.since).toBe(monthRange(new Date(), 1).since)
   })
 
+  it("says when the projects couldn't be read, and shows a priced month whose dollars no project took", async () => {
+    vi.mocked(invoke).mockRejectedValue("scan failed")
+    const { unmount } = render(<UsageProjects pluginId="claude" />)
+    expect(await screen.findByText(/Couldn't read the projects/)).toBeInTheDocument()
+    unmount()
+
+    vi.mocked(invoke).mockResolvedValue(projects([], { totalCost: 12, unattributedCost: 12, unreadable: 3 }))
+    render(<UsageProjects pluginId="claude" />)
+    expect(await screen.findByText(/^\$12(\.00)?$/)).toBeInTheDocument()
+    expect(screen.getByText(/couldn't be matched to a project/)).toBeInTheDocument()
+    expect(screen.queryByText("No usage in this month.")).toBeNull()
+  })
+
   it("is not shown for cards without local logs", () => {
     const { container } = render(<UsageProjects pluginId="cursor" />)
     expect(container).toBeEmptyDOMElement()

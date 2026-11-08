@@ -256,6 +256,7 @@ export const fr: Messages = {
   "projects.apiPrices": "Aux prix catalogue de l'API : ce que cette utilisation coûterait via l'API, pas ce que facture votre forfait.",
   "projects.unpriced": "Les coûts demandent bun ou Node.js (pour ccusage), donc les tokens sont affichés.",
   "projects.unpricedFailed": "ccusage n'a pas pu chiffrer ce mois pour l'instant, donc les tokens sont affichés ; nouvel essai dans quelques minutes.",
+  "projects.loadFailed": "Impossible de lire les projets. Nouvel essai dans quelques minutes.",
 
   "pace.ahead": "Marge confortable",
   "pace.onTrack": "Dans les temps",

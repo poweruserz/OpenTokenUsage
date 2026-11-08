@@ -256,6 +256,7 @@ export const ko: Messages = {
   "projects.apiPrices": "API 정가 기준: 이 사용량을 API로 썼을 때의 금액이며, 요금제 청구액이 아닙니다.",
   "projects.unpriced": "금액을 보려면 bun 또는 Node.js(ccusage용)가 필요해 토큰 수를 표시합니다.",
   "projects.unpricedFailed": "ccusage가 지금 이번 달 금액을 계산하지 못해 토큰 수를 표시합니다. 몇 분 뒤 다시 시도합니다.",
+  "projects.loadFailed": "프로젝트를 읽지 못했습니다. 몇 분 뒤 다시 시도합니다.",
 
   "pace.ahead": "여유 있음",
   "pace.onTrack": "적정 속도",

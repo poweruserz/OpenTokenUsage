@@ -256,6 +256,7 @@ export const ptBR: Messages = {
   "projects.apiPrices": "A preços de tabela da API: quanto este uso custaria pela API, não o que o seu plano cobra.",
   "projects.unpriced": "Os custos precisam de bun ou Node.js (para o ccusage), então são mostrados tokens.",
   "projects.unpricedFailed": "O ccusage não conseguiu calcular o custo deste mês agora, então são mostrados tokens; ele tenta de novo em alguns minutos.",
+  "projects.loadFailed": "Não foi possível ler os projetos. Nova tentativa em alguns minutos.",
 
   "pace.ahead": "Folga de sobra",
   "pace.onTrack": "Dentro do previsto",

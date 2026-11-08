@@ -256,6 +256,7 @@ export const en = {
   "projects.apiPrices": "At API list prices: what this usage would cost through the API, not what your plan bills.",
   "projects.unpriced": "Costs need bun or Node.js (for ccusage), so tokens are shown.",
   "projects.unpricedFailed": "ccusage couldn't price this month just now, so tokens are shown; it tries again in a few minutes.",
+  "projects.loadFailed": "Couldn't read the projects. Trying again in a few minutes.",
 
   "pace.ahead": "Plenty of room",
   "pace.onTrack": "Right on target",

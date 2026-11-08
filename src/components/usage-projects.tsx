@@ -53,17 +53,25 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   const [read, setRead] = useState<{ key: string; projects: Projects } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [all, setAll] = useState(false)
+  // The card and month whose last read failed: said beside the month toggle.
+  const [failed, setFailed] = useState<string | null>(null)
   const key = `${pluginId}|${back}`
 
   useEffect(() => {
     if (!open || !isTauri() || !hasUsageLogs(pluginId)) return
     let live = true
+    const loading = `${pluginId}|${back}`
     const load = () =>
       invoke<Projects>("usage_projects", { pluginId, ...monthRange(new Date(), back) })
         .then((projects) => {
-          if (live) setRead({ key: `${pluginId}|${back}`, projects })
+          if (!live) return
+          setRead({ key: loading, projects })
+          setFailed(null)
         })
-        .catch((error) => console.error("Failed to read the usage by project:", error))
+        .catch((error) => {
+          console.error("Failed to read the usage by project:", error)
+          if (live) setFailed(loading)
+        })
     void load()
     const timer = setInterval(() => void load(), PROJECTS_REFRESH_MS)
     return () => {
@@ -78,7 +86,9 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   }, [key])
 
   const data = read?.key === key ? read.projects : null
-  if (!hasUsageLogs(pluginId) || (!data && read === null)) return null
+  if (!hasUsageLogs(pluginId) || (!data && read === null && failed !== key)) return null
+  // No project rows can still be a priced month: logs it couldn't read, or dollars it couldn't place.
+  const empty = !data || (data.projects.length === 0 && !(data.priced && data.totalCost >= 0.005))
 
   const locale = getLocale()
   const tokens = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
@@ -111,7 +121,10 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
         </div>
       </div>
 
-      {!data ? null : data.projects.length === 0 ? (
+      {failed === key && (
+        <p role="status" className="mb-1 text-[11px] text-destructive">{t("projects.loadFailed")}</p>
+      )}
+      {!data ? null : empty ? (
         <p className="text-[11px] text-muted-foreground">{t("projects.empty")}</p>
       ) : (
         <>

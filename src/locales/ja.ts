@@ -256,6 +256,7 @@ export const ja: Messages = {
   "projects.apiPrices": "API の定価で計算: この使用を API で使った場合の金額で、プランの請求額ではありません。",
   "projects.unpriced": "金額の表示には bun または Node.js（ccusage 用）が必要なため、トークン数を表示しています。",
   "projects.unpricedFailed": "ccusage が今月の金額を今は計算できなかったため、トークン数を表示しています。数分後にもう一度試します。",
+  "projects.loadFailed": "プロジェクトを読み取れませんでした。数分後にもう一度試します。",
 
   "pace.ahead": "余裕あり",
   "pace.onTrack": "ペースどおり",

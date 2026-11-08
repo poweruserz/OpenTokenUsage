@@ -256,6 +256,7 @@ export const tr: Messages = {
   "projects.apiPrices": "API liste fiyatlarıyla: bu kullanım API üzerinden ne tutardı; planınızın faturası değil.",
   "projects.unpriced": "Maliyet için bun veya Node.js (ccusage) gerekir; bu yüzden token gösteriliyor.",
   "projects.unpricedFailed": "ccusage bu ayı şu an fiyatlayamadı, bu yüzden token gösteriliyor; birkaç dakika içinde yeniden dener.",
+  "projects.loadFailed": "Projeler okunamadı. Birkaç dakika içinde yeniden denenecek.",
 
   "pace.ahead": "Bol pay var",
   "pace.onTrack": "Tam hedefte",

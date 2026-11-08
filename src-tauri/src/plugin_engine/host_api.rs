@@ -54,7 +54,7 @@ pub(crate) struct ProbeDeadline {
 }
 
 impl ProbeDeadline {
-    #[cfg(test)]
+    /// No probe deadline: work outside a probe (`ccusage_daily`) keeps only ccusage's own timeout.
     pub(crate) fn none() -> Self {
         Self { expires_at: None }
     }

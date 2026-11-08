@@ -82,8 +82,12 @@ fn month_costs(report: &serde_json::Value) -> Option<HashMap<String, f64>> {
                         model["cost"].as_f64().unwrap_or(0.0);
                 }
             }
+            // Codex's day total, or a Claude report without its per-model rows.
             None => {
-                *costs.entry(String::new()).or_default() += day["costUSD"].as_f64().unwrap_or(0.0)
+                *costs.entry(String::new()).or_default() += day["costUSD"]
+                    .as_f64()
+                    .or(day["totalCost"].as_f64())
+                    .unwrap_or(0.0)
             }
         }
     }
@@ -151,12 +155,21 @@ fn repository_cached(cwd: &str) -> PathBuf {
 
 /// The folder ccusage is pointed at, as the plugins point it: Codex at the folder its login is in,
 /// Claude at a folder set apart from the usual `~/.claude` (`CLAUDE_CONFIG_DIR`, an extra account).
-/// None leaves ccusage to its own defaults.
+/// None leaves ccusage to its own defaults. With a login in both Codex folders, the plugin goes on
+/// to the second when the first is stale; the one written last is the one in use.
 fn ccusage_home(log: Log, dirs: &[PathBuf], login_file: &str) -> Option<PathBuf> {
     match log {
         Log::Codex => dirs
             .iter()
-            .find(|dir| dir.join(login_file).is_file())
+            .filter_map(|dir| {
+                let written = std::fs::metadata(dir.join(login_file))
+                    .ok()?
+                    .modified()
+                    .ok()?;
+                Some((written, dir))
+            })
+            .max_by_key(|(written, _)| *written)
+            .map(|(_, dir)| dir)
             .or(dirs.first())
             .cloned(),
         Log::Claude => {
@@ -471,6 +484,9 @@ mod tests {
             { "date": "2026-09-21", "costUSD": 0.5 },
         ] } });
         assert_eq!(month_costs(&codex).unwrap()[""], 2.0);
+        // A Claude report without per-model rows: its day totals, pooled.
+        let totals = serde_json::json!({ "status": "ok", "data": { "daily": [{ "date": "2026-11-01", "totalCost": 4.5 }] } });
+        assert_eq!(month_costs(&totals).unwrap()[""], 4.5);
         assert!(month_costs(&serde_json::json!({ "status": "no_runner" })).is_none());
     }
 
@@ -536,6 +552,19 @@ mod tests {
         std::fs::write(dot.join("auth.json"), "{}").unwrap();
         // Codex: the folder its login is in, else the first.
         let codex = [config.clone(), dot.clone()];
+        assert_eq!(
+            ccusage_home(Log::Codex, &codex, "auth.json"),
+            Some(dot.clone())
+        );
+        // A login in both: the one written last (a stale first one is skipped by the plugin).
+        std::fs::write(config.join("auth.json"), "{}").unwrap();
+        let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        std::fs::File::options()
+            .write(true)
+            .open(config.join("auth.json"))
+            .unwrap()
+            .set_modified(hour_ago)
+            .unwrap();
         assert_eq!(ccusage_home(Log::Codex, &codex, "auth.json"), Some(dot));
         assert_eq!(
             ccusage_home(Log::Codex, &codex, "missing.json"),

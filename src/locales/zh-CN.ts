@@ -256,6 +256,7 @@ export const zhCN: Messages = {
   "projects.apiPrices": "按 API 标价计算：这些用量通过 API 使用时的费用，不是你的套餐账单。",
   "projects.unpriced": "显示费用需要 bun 或 Node.js（用于 ccusage），因此显示 token 数。",
   "projects.unpricedFailed": "ccusage 暂时无法计算本月费用，因此显示 token 数；几分钟后会再试。",
+  "projects.loadFailed": "无法读取项目。几分钟后会再试。",
 
   "pace.ahead": "余量充足",
   "pace.onTrack": "进度正常",

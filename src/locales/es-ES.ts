@@ -256,6 +256,7 @@ export const esES: Messages = {
   "projects.apiPrices": "A precios de tarifa de la API: lo que costaría este uso por la API, no lo que factura tu plan.",
   "projects.unpriced": "Los costes necesitan bun o Node.js (para ccusage), así que se muestran tokens.",
   "projects.unpricedFailed": "ccusage no ha podido calcular el coste de este mes ahora, así que se muestran tokens; lo vuelve a intentar en unos minutos.",
+  "projects.loadFailed": "No se han podido leer los proyectos. Se volverá a intentar en unos minutos.",
 
   "pace.ahead": "Margen de sobra",
   "pace.onTrack": "Al ritmo previsto",
