@@ -781,6 +781,23 @@
     return data
   }
 
+  // The kept answer as it stands now: every window whose reset has passed since (the 5-hour and
+  // weekly ones, the per-model ones, and `limits[]`) reads as reset.
+  function withResetsPassed(base, nowMs) {
+    const passed = (at) => typeof at === "string" && Date.parse(at) <= nowMs
+    const data = Object.assign({}, base)
+    for (const key of Object.keys(data)) {
+      const w = data[key]
+      if (w && typeof w.utilization === "number" && passed(w.resets_at)) {
+        data[key] = Object.assign({}, w, { utilization: 0, resets_at: null })
+      }
+    }
+    if (Array.isArray(data.limits)) {
+      data.limits = data.limits.map((l) => (l && passed(l.resets_at) ? Object.assign({}, l, { percent: 0, resets_at: null }) : l))
+    }
+    return data
+  }
+
   function parseRetryAfterSeconds(headers) {
     if (!headers) return null
     const raw = headers["retry-after"] ?? headers["Retry-After"]
@@ -1222,7 +1239,7 @@
         data = withLiveLimits(last.data, live, nowMs)
       } else if (keep) {
         ctx.host.log.info("usage from the answer read " + Math.round(lastAge / 1000) + "s ago")
-        data = withLiveLimits(last.data, {}, nowMs)
+        data = withResetsPassed(last.data, nowMs)
         staleSince = last.at
       } else {
         // Proactively refresh if token is expired or about to expire

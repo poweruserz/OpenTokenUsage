@@ -2586,6 +2586,10 @@ describe("claude plugin", () => {
       ctx.host.http.request.mockImplementation(() => okUsageResponse({
         five_hour: { utilization: 30, resets_at: "2020-01-01T00:00:00Z" },
         seven_day: { utilization: 12, resets_at: "2099-01-01T00:00:00Z" },
+        seven_day_sonnet: { utilization: 100, resets_at: "2020-01-01T00:00:00Z" },
+        limits: [
+          { kind: "weekly_scoped", group: "weekly", percent: 100, resets_at: "2020-01-01T00:00:00Z", scope: { model: { display_name: "Fable" } } },
+        ],
       }))
       return ctx
     }
@@ -2602,7 +2606,10 @@ describe("claude plugin", () => {
       expect(usageRequestCount(ctx)).toBe(1)
       expect(kept.staleSince).toBe(readAt - 9 * 60 * 1000)
       expect(used(kept, "Weekly")).toBe(12)
-      expect(used(kept, "Session")).toBe(0) // its reset has passed since
+      // Windows whose reset has passed since, per-model ones included, read as reset.
+      expect(used(kept, "Session")).toBe(0)
+      expect(used(kept, "Sonnet")).toBe(0)
+      expect(used(kept, "Fable")).toBe(0)
     })
 
     it("reads again once the gap has passed, and never takes another login's answer", async () => {
