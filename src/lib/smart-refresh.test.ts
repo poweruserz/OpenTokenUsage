@@ -48,6 +48,17 @@ describe("Smart refresh schedule", () => {
     }
   })
 
+  it("asks Claude again 10 minutes after the read a kept answer came from, not after the probe", () => {
+    const now = 100_000_000
+    const kept = { ...output(), staleSince: now - 9 * MINUTE }
+    expect(completeSmartCheck(newSmartSchedule(now, 10), kept, false, now).nextAt).toBe(now + MINUTE)
+    // A card without a floor (a stopped WSL distro's cached data) backs off as before.
+    expect(completeSmartCheck(newSmartSchedule(now), kept, false, now).nextAt).toBe(now + 2 * MINUTE)
+    // Data kept longer ago than the floor backs off too.
+    const old = { ...output(), staleSince: now - 60 * MINUTE }
+    expect(completeSmartCheck(newSmartSchedule(now, 10), old, false, now).nextAt).toBe(now + 10 * MINUTE)
+  })
+
   it("compares raw numbers independently of text, countdowns, charts and ordering", () => {
     const data = output()
     const other: PluginOutput = { ...data, lines: [

@@ -370,11 +370,10 @@ async fn start_probe_batch(
                 });
                 if has_error {
                     log::warn!("probe {} completed with error", plugin_id);
-                } else if output.stale_since.is_some() {
-                    log::info!(
-                        "probe {} skipped: its WSL distro is stopped (cached data shown)",
-                        plugin_id
-                    );
+                } else if let Some(at) = output.stale_since {
+                    // A stopped WSL distro's card, or an answer the plugin kept (Claude reads its
+                    // usage endpoint at most every 10 minutes).
+                    log::info!("probe {} showed data kept from {} (unix ms)", plugin_id, at);
                 } else {
                     log::info!(
                         "probe {} completed ok ({} lines)",

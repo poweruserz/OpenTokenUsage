@@ -697,6 +697,17 @@
     return nowMs
   }
 
+  // When Claude Code's status line last posted, fresh or not (0 when it never did).
+  function statusLineCapturedAt(ctx) {
+    const path = ctx.app.pluginDataDir + "/statusline.json"
+    try {
+      const saved = ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
+      return saved && typeof saved.capturedAt === "number" ? saved.capturedAt : 0
+    } catch (e) {
+      return 0
+    }
+  }
+
   function loadLiveLimits(ctx, nowMs, since) {
     const path = ctx.app.pluginDataDir + "/statusline.json"
     try {
@@ -1203,10 +1214,13 @@
       const live = account ? loadLiveLimits(ctx, nowMs, accountSince(ctx, account, nowMs)) : null
       const last = account ? loadLastUsage(ctx, account) : null
       const lastAge = last ? nowMs - last.at : Infinity
+      // The kept answer stands in for a read inside the gap, unless a status line posted since is
+      // newer than it (going back to the answer would undo what the card showed).
+      const keep = !live && lastAge >= 0 && lastAge < MIN_READ_GAP_MS && statusLineCapturedAt(ctx) <= last.at
       if (live && last && lastAge < LIVE_API_INTERVAL_MS) {
         ctx.host.log.info("usage from Claude Code's status line")
         data = withLiveLimits(last.data, live, nowMs)
-      } else if (!live && lastAge >= 0 && lastAge < MIN_READ_GAP_MS) {
+      } else if (keep) {
         ctx.host.log.info("usage from the answer read " + Math.round(lastAge / 1000) + "s ago")
         data = withLiveLimits(last.data, {}, nowMs)
         staleSince = last.at

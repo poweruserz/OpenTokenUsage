@@ -41,7 +41,13 @@ export function completeSmartCheck(schedule: SmartSchedule, output: PluginOutput
   if (error || !output || output.staleSince != null) {
     const failures = schedule.failures + 1
     const minutes = Math.max(IDLE_MINUTES[Math.min(failures - 1, 3)], schedule.floorMinutes)
-    return { ...schedule, failures, completedAt: now, nextAt: now + minutes * MINUTE }
+    // An answer kept from a read inside the floor (Claude reads at most every 10 minutes): ask
+    // again once the floor has passed since that read, not since this probe.
+    const floorAfterRead = !error && output?.staleSince != null && schedule.floorMinutes > 0
+      ? output.staleSince + schedule.floorMinutes * MINUTE
+      : 0
+    const nextAt = floorAfterRead > now ? floorAfterRead : now + minutes * MINUTE
+    return { ...schedule, failures, completedAt: now, nextAt }
   }
   const signature = quotaSignature(output)
   const changed = signature !== schedule.signature

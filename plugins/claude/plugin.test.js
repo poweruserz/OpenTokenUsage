@@ -2517,6 +2517,8 @@ describe("claude plugin", () => {
       postStatusLine(ctx, 60_000)
       expect(await probe(ctx)).toEqual({ session: 17, weekly: 19, fable: 40 })
       expect(usageRequestCount(ctx)).toBe(1)
+      // Live numbers, not a kept answer.
+      expect((await loadPlugin()).probe(ctx).staleSince).toBeUndefined()
     })
 
     it("still reads the endpoint every 30 minutes for the rows it lacks", async () => {
@@ -2611,6 +2613,23 @@ describe("claude plugin", () => {
       expect(usageRequestCount(ctx)).toBe(2)
 
       ctx.host.fs.writeText("~/.claude.json", JSON.stringify({ oauthAccount: { accountUuid: "acc-2" } }))
+      ;(await loadPlugin()).probe(ctx)
+      expect(usageRequestCount(ctx)).toBe(3)
+    })
+
+    it("reads when the clock went back, or when a status line posted since is newer than the answer", async () => {
+      const ctx = setup()
+      ;(await loadPlugin()).probe(ctx)
+      ageLastRead(ctx, -60 * 1000)
+      expect((await loadPlugin()).probe(ctx).staleSince).toBeUndefined()
+      expect(usageRequestCount(ctx)).toBe(2)
+
+      // Posted after that read and gone stale since (older than 5 minutes): not a live snapshot,
+      // but newer than the kept answer.
+      ageLastRead(ctx, 8 * 60 * 1000)
+      ctx.host.fs.writeText("/tmp/openusage-test/plugin/statusline.json", JSON.stringify({
+        capturedAt: Date.now() - 6 * 60 * 1000, fiveHour: { usedPercent: 50, resetsAtMs: Date.now() + 3600_000 },
+      }))
       ;(await loadPlugin()).probe(ctx)
       expect(usageRequestCount(ctx)).toBe(3)
     })
