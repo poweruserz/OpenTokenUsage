@@ -2746,6 +2746,54 @@ where
     serde_json::json!({ "status": "runner_failed" }).to_string()
 }
 
+/// ccusage's daily report for a Claude or Codex login outside a probe (the projects list on a detail
+/// page), as `ctx.host.ccusage.query` answers it: `{"status":"ok","data":{...}}` or another status.
+/// A report is reused for 15 minutes; `home` is an extra account's folder.
+pub(crate) fn ccusage_daily(
+    cache_id: &str,
+    plugin_id: &str,
+    provider: &str,
+    since: &str,
+    until: &str,
+    home: Option<&str>,
+) -> String {
+    let opts = CcusageQueryOpts {
+        provider: Some(provider.to_string()),
+        since: Some(since.to_string()),
+        until: Some(until.to_string()),
+        home_path: home.map(str::to_string),
+        claude_path: None,
+    };
+    let options =
+        serde_json::json!({ "provider": provider, "since": since, "until": until, "home": home });
+    // Its own lock, not the probes' guard: loading the list must never cost a probe its ccusage
+    // run. A second caller (the list and the budget check) waits, then reuses the cached report.
+    static PROJECT_QUERIES: OnceLock<Mutex<()>> = OnceLock::new();
+    let _one_at_a_time = PROJECT_QUERIES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    super::ccusage_cache::query(cache_id, &options.to_string(), true, || {
+        let provider = resolve_ccusage_provider(&opts, plugin_id);
+        run_ccusage_query_with_runners(
+            collect_ccusage_runners(),
+            &opts,
+            provider,
+            plugin_id,
+            |kind, program, opts, provider, plugin_id| {
+                run_ccusage_with_runner_deadline(
+                    kind,
+                    program,
+                    opts,
+                    provider,
+                    plugin_id,
+                    ProbeDeadline::none(),
+                )
+            },
+        )
+    })
+}
+
 fn inject_ccusage<'js>(
     ctx: &Ctx<'js>,
     host: &Object<'js>,
