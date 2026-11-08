@@ -66,3 +66,20 @@ it("stays quiet for a disabled card, with notifications off, or once the alert w
   await new Promise((resolve) => setTimeout(resolve, 20))
   expect(sendNotification).not.toHaveBeenCalled()
 })
+
+it("doesn't notify twice when a setting changes while a notification is on its way", async () => {
+  const grants: ((granted: boolean) => void)[] = []
+  vi.mocked(isPermissionGranted).mockImplementation(() => new Promise((resolve) => { grants.push(resolve) }))
+  vi.mocked(invoke).mockImplementation(async (command) => (command === "usage_projects" ? projects(41) : undefined))
+  const { rerender } = run(["claude"])
+  await waitFor(() => expect(isPermissionGranted).toHaveBeenCalledTimes(1))
+  // A budget edit (the same budgets, a new object) starts a new check while the first waits.
+  useAppPreferencesStore.setState({ projectBudgets: { claude: { [SHOP]: 50 } } })
+  rerender()
+  await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
+  grants.forEach((grant) => grant(true))
+  await waitFor(() => expect(sendNotification).toHaveBeenCalledTimes(1))
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(sendNotification).toHaveBeenCalledTimes(1)
+  expect(isPermissionGranted).toHaveBeenCalledTimes(1)
+})

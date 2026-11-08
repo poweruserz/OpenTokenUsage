@@ -262,7 +262,6 @@ export const ko: Messages = {
   "projects.budgetSave": "저장",
   "projects.budgetRemove": "삭제",
   "projects.budgetInvalid": "50 또는 1,250.50처럼 금액을 입력하세요.",
-  "projects.budgetFailed": "예산을 저장하지 못했습니다.",
   "projects.budgetUsed": "예산의 {percent} 사용({budget} 중 {spent})",
   "projects.export": "CSV로 내보내기",
   "projects.saved": "{path}에 저장했습니다",

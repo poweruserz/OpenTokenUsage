@@ -262,7 +262,6 @@ export const ptBR: Messages = {
   "projects.budgetSave": "Salvar",
   "projects.budgetRemove": "Remover",
   "projects.budgetInvalid": "Digite um valor, como 50 ou 1.250,50.",
-  "projects.budgetFailed": "Não foi possível salvar o orçamento.",
   "projects.budgetUsed": "{percent} do orçamento usado ({spent} de {budget})",
   "projects.export": "Exportar CSV",
   "projects.saved": "Salvo em {path}",

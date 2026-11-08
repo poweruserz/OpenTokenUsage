@@ -262,7 +262,6 @@ export const tr: Messages = {
   "projects.budgetSave": "Kaydet",
   "projects.budgetRemove": "Kaldır",
   "projects.budgetInvalid": "50 veya 1.250,50 gibi bir tutar yazın.",
-  "projects.budgetFailed": "Bütçe kaydedilemedi.",
   "projects.budgetUsed": "Bütçenin {percent} kadarı kullanıldı ({spent} / {budget})",
   "projects.export": "CSV olarak dışa aktar",
   "projects.saved": "Kaydedildi: {path}",

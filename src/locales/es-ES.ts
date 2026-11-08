@@ -262,7 +262,6 @@ export const esES: Messages = {
   "projects.budgetSave": "Guardar",
   "projects.budgetRemove": "Quitar",
   "projects.budgetInvalid": "Escribe un importe, como 50 o 1.250,50.",
-  "projects.budgetFailed": "No se ha podido guardar el presupuesto.",
   "projects.budgetUsed": "{percent} del presupuesto usado ({spent} de {budget})",
   "projects.export": "Exportar CSV",
   "projects.saved": "Guardado en {path}",

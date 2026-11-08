@@ -262,7 +262,6 @@ export const zhCN: Messages = {
   "projects.budgetSave": "保存",
   "projects.budgetRemove": "移除",
   "projects.budgetInvalid": "请输入金额，例如 50 或 1,250.50。",
-  "projects.budgetFailed": "无法保存预算。",
   "projects.budgetUsed": "已用预算的 {percent}（{budget} 中的 {spent}）",
   "projects.export": "导出 CSV",
   "projects.saved": "已保存到 {path}",

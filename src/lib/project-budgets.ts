@@ -76,31 +76,53 @@ export function collectBudgetAlerts({
   return alerts
 }
 
-/** The locale's decimal and grouping marks (`.`/`,` in English, `,`/`.` in Turkish). */
+/**
+ * The locale's decimal and grouping marks (`.`/`,` in English, `,`/`.` in Turkish), read from a
+ * seven-digit number: Spanish (Spain) doesn't group four digits.
+ */
 function numberMarks(locale: string) {
-  const parts = new Intl.NumberFormat(locale).formatToParts(1234.5)
+  const parts = new Intl.NumberFormat(locale).formatToParts(1234567.5)
   return {
     decimal: parts.find((part) => part.type === "decimal")?.value ?? ".",
     group: parts.find((part) => part.type === "group")?.value ?? ",",
   }
 }
 
+/** `1.234.567`: one to three digits, then groups of exactly three. */
+const groupedBy = (digits: string, mark: string) => {
+  const groups = digits.split(mark)
+  return /^\d{1,3}$/.test(groups[0]) && groups.slice(1).every((group) => /^\d{3}$/.test(group))
+}
+
 /**
  * An amount typed in the locale's style (`1,000.50` in English, `1.000,50` in Turkish; `12.5` and
- * `12,5` both work), or null when it isn't a positive amount. With both marks the last one is the
- * decimal point; one mark alone is grouping only where the locale groups with it and three digits follow.
+ * `12,5` both work), or null when it isn't a positive amount or its marks don't make sense
+ * (`12.5.5`). With both marks the last one is the decimal point and the other must group by three;
+ * one mark alone groups only in threes, and alone once only where the locale groups with it.
  */
 export function parseAmount(text: string, locale: string): number | null {
   const compact = text.replace(/[\s  ']/g, "")
   if (!/^[0-9.,]+$/.test(compact)) return null
   const last = Math.max(compact.lastIndexOf("."), compact.lastIndexOf(","))
   let normalized = compact
-  if (compact.includes(".") && compact.includes(",")) {
-    normalized = compact.slice(0, last).replace(/[.,]/g, "") + "." + compact.slice(last + 1)
-  } else if (last >= 0) {
+  if (last >= 0) {
     const mark = compact[last]
-    const grouping = compact.split(mark).length > 2 || (mark === numberMarks(locale).group && /^\d{3}$/.test(compact.slice(last + 1)))
-    normalized = grouping ? compact.split(mark).join("") : compact.replace(mark, ".")
+    const whole = compact.slice(0, last)
+    const fraction = compact.slice(last + 1)
+    const other = mark === "." ? "," : "."
+    if (whole.includes(other)) {
+      // Both marks: `1.250,50`.
+      if (whole.includes(mark) || !groupedBy(whole, other) || !/^\d+$/.test(fraction)) return null
+      normalized = whole.split(other).join("") + "." + fraction
+    } else if (whole.includes(mark)) {
+      // The one mark more than once: grouping only.
+      if (!groupedBy(compact, mark)) return null
+      normalized = compact.split(mark).join("")
+    } else {
+      if (!/^\d+$/.test(whole) || !/^\d+$/.test(fraction)) return null
+      const grouping = mark === numberMarks(locale).group && groupedBy(compact, mark)
+      normalized = grouping ? whole + fraction : whole + "." + fraction
+    }
   }
   const value = Number(normalized)
   return Number.isFinite(value) && value > 0 ? value : null

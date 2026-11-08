@@ -6,7 +6,7 @@ import { usePanelOpen } from "@/hooks/use-unseen-usage"
 import { formatMoney } from "@/lib/currency"
 import { getLocale, t } from "@/lib/i18n"
 import { budgetLevel, monthEndForecast, monthKey, parseAmount, projectsCsv } from "@/lib/project-budgets"
-import { loadProjectBudgets, saveProjectBudgets } from "@/lib/settings"
+import { loadProjectBudgets, saveProjectBudgets, type ProjectBudgets } from "@/lib/settings"
 import { cn } from "@/lib/utils"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
@@ -46,6 +46,33 @@ export function monthRange(now: Date, back: number) {
 /** Claude Code writes `HEAD` when it can't name the branch (detached, or not a repository). */
 const branchLabel = (name: string) => (name && name !== "HEAD" ? name : t("projects.noBranch"))
 
+// Budget saves run one after another: each reads the budgets on disk and writes them back, so two
+// at once would keep only the later one's edit.
+let budgetSaves: Promise<void> = Promise.resolve()
+
+/**
+ * Sets or clears one project's budget, from the budgets on disk rather than the store's copy (one
+ * that never loaded must not wipe the rest); the store follows once it's saved. A failed save is
+ * logged, like every other setting's.
+ */
+function saveBudget(pluginId: string, path: string, usd: number | null, saved: (budgets: ProjectBudgets) => void) {
+  budgetSaves = budgetSaves.then(async () => {
+    try {
+      const next = await loadProjectBudgets()
+      const card = { ...(next[pluginId] ?? {}) }
+      if (usd === null) delete card[path]
+      else card[path] = usd
+      if (Object.keys(card).length > 0) next[pluginId] = card
+      else delete next[pluginId]
+      await saveProjectBudgets(next)
+      saved(next)
+    } catch (error) {
+      console.error("Failed to save project budgets:", error)
+    }
+  })
+  return budgetSaves
+}
+
 /** What each project and branch cost a Claude or Codex login this month or last, read every few minutes while shown. */
 export function UsageProjects({ pluginId }: { pluginId: string }) {
   const open = usePanelOpen()
@@ -62,32 +89,15 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   const [failed, setFailed] = useState<string | null>(null)
   // The budget being typed for the open project, in the chosen currency, and whether Save refused it.
   const [draft, setDraft] = useState("")
-  const [budgetNote, setBudgetNote] = useState<"invalid" | "failed" | null>(null)
+  const [invalid, setInvalid] = useState(false)
   const [exported, setExported] = useState<{ key: string; message: string; failed: boolean } | null>(null)
   const key = `${pluginId}|${back}`
   const cardBudgets = budgets[pluginId] ?? {}
 
-  // From the budgets on disk, not the store's copy: one that never loaded must not wipe the rest.
-  const saveBudget = async (path: string, usd: number | null) => {
-    try {
-      const next = await loadProjectBudgets()
-      const card = { ...(next[pluginId] ?? {}) }
-      if (usd === null) delete card[path]
-      else card[path] = usd
-      if (Object.keys(card).length > 0) next[pluginId] = card
-      else delete next[pluginId]
-      await saveProjectBudgets(next)
-      setProjectBudgets(next)
-      setBudgetNote(null)
-    } catch (error) {
-      console.error("Failed to save project budgets:", error)
-      setBudgetNote("failed")
-    }
-  }
   const toggle = (path: string) => {
     const opening = expanded !== path
     setExpanded(opening ? path : null)
-    setBudgetNote(null)
+    setInvalid(false)
     const budget = cardBudgets[path]
     if (opening) setDraft(budget ? String(Math.round(budget * currency.rate * 100) / 100) : "")
   }
@@ -252,8 +262,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                         onSubmit={(event) => {
                           event.preventDefault()
                           const value = parseAmount(draft, locale)
-                          if (value === null) setBudgetNote("invalid")
-                          else void saveBudget(project.path, value / currency.rate)
+                          setInvalid(value === null)
+                          if (value !== null) void saveBudget(pluginId, project.path, value / currency.rate, setProjectBudgets)
                         }}
                       >
                         <label htmlFor={`budget-${project.path}`}>{t("projects.budget")}</label>
@@ -261,11 +271,11 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                           id={`budget-${project.path}`}
                           inputMode="decimal"
                           value={draft}
-                          aria-invalid={budgetNote === "invalid"}
-                          aria-describedby={budgetNote ? `budget-note-${project.path}` : undefined}
+                          aria-invalid={invalid}
+                          aria-describedby={invalid ? `budget-note-${project.path}` : undefined}
                           onChange={(event) => {
                             setDraft(event.target.value)
-                            setBudgetNote(null)
+                            setInvalid(false)
                           }}
                           className="w-16 rounded border border-border bg-transparent px-1 py-0.5 text-right tabular-nums text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         />
@@ -277,7 +287,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                           <button
                             type="button"
                             onClick={() => {
-                              void saveBudget(project.path, null)
+                              void saveBudget(pluginId, project.path, null, setProjectBudgets)
                               setDraft("")
                             }}
                             className="rounded px-1 outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
@@ -286,9 +296,9 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                           </button>
                         )}
                       </form>
-                      {budgetNote && (
+                      {invalid && (
                         <p id={`budget-note-${project.path}`} role="alert" className="text-destructive">
-                          {budgetNote === "invalid" ? t("projects.budgetInvalid") : t("projects.budgetFailed")}
+                          {t("projects.budgetInvalid")}
                         </p>
                       )}
                     </div>

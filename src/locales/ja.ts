@@ -262,7 +262,6 @@ export const ja: Messages = {
   "projects.budgetSave": "保存",
   "projects.budgetRemove": "削除",
   "projects.budgetInvalid": "50 や 1,250.50 のように金額を入力してください。",
-  "projects.budgetFailed": "予算を保存できませんでした。",
   "projects.budgetUsed": "予算の {percent} を使用（{budget} のうち {spent}）",
   "projects.export": "CSV に書き出す",
   "projects.saved": "{path} に保存しました",

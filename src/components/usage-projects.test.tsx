@@ -140,7 +140,7 @@ describe("usage by project", () => {
     await waitFor(() => expect(useAppPreferencesStore.getState().projectBudgets).toEqual({}))
   })
 
-  it("keeps the other budgets on disk when the store never loaded them, and says when saving fails", async () => {
+  it("keeps the other budgets on disk when the store never loaded them, and queues quick saves", async () => {
     vi.mocked(loadProjectBudgets).mockResolvedValue({ codex: { "C:/work/api": 30 } })
     vi.mocked(invoke).mockResolvedValue(projects([project("shop", 10, 10)]))
     render(<UsageProjects pluginId="claude" />)
@@ -151,10 +151,29 @@ describe("usage by project", () => {
       expect(saveProjectBudgets).toHaveBeenCalledWith({ codex: { "C:/work/api": 30 }, claude: { "C:/work/shop": 1000 } })
     )
 
+
+    // Two saves at once: the second reads what the first wrote, so neither edit is lost.
+    let disk: Record<string, Record<string, number>> = { codex: { "C:/work/api": 30 } }
+    vi.mocked(loadProjectBudgets).mockImplementation(async () => structuredClone(disk))
+    vi.mocked(saveProjectBudgets).mockImplementation(async (next) => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      disk = structuredClone(next)
+    })
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "70" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }))
+    fireEvent.change(screen.getByLabelText("Monthly budget"), { target: { value: "80" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(disk).toEqual({ codex: { "C:/work/api": 30 }, claude: { "C:/work/shop": 80 } }))
+
+    // A save that fails is logged, as for every setting, and keeps what was there.
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
     vi.mocked(loadProjectBudgets).mockRejectedValue(new Error("store"))
     fireEvent.click(screen.getByRole("button", { name: "Save" }))
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't save the budget/)
-    expect(saveProjectBudgets).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(error).toHaveBeenCalledWith("Failed to save project budgets:", expect.any(Error)))
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(disk.claude).toEqual({ "C:/work/shop": 80 })
+    error.mockRestore()
   })
 
   it("saves the month as CSV and says where", async () => {

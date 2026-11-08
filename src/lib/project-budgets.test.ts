@@ -77,6 +77,10 @@ describe("project budgets", () => {
       ["50", "en", 50], ["12.5", "en", 12.5], ["12,5", "en", 12.5], ["1,000", "en", 1000], ["1,250.50", "en", 1250.5],
       ["5.000", "tr", 5000], ["12,5", "tr", 12.5], ["12.5", "tr", 12.5], ["1.250,50", "tr", 1250.5], ["1 000", "fr", 1000],
       ["1.234.567", "en", 1234567], ["0", "en", null], ["-5", "en", null], ["abc", "en", null], ["", "en", null], ["1e3", "en", null],
+      // Spanish (Spain) groups only from five digits, but a typed "10.000" is still ten thousand.
+      ["10.000", "es-ES", 10000], ["1.250", "es-ES", 1250], ["2,500", "es-ES", 2.5],
+      // Marks that don't make sense are refused rather than read as some other amount.
+      ["12.5.5", "en", null], ["1,2,3", "en", null], ["1.2,3", "tr", null], ["1,250.5.0", "en", null], ["5.", "en", null],
     ]
     for (const [text, locale, value] of cases) expect([text, locale, parseAmount(text, locale)]).toEqual([text, locale, value])
   })

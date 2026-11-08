@@ -262,7 +262,6 @@ export const en = {
   "projects.budgetSave": "Save",
   "projects.budgetRemove": "Remove",
   "projects.budgetInvalid": "Type an amount, like 50 or 1,250.50.",
-  "projects.budgetFailed": "Couldn't save the budget.",
   "projects.budgetUsed": "{percent} of the budget used ({spent} of {budget})",
   "projects.export": "Export CSV",
   "projects.saved": "Saved to {path}",
