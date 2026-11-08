@@ -986,6 +986,25 @@ describe("ProviderCard", () => {
     // in both the trigger and the tooltip content via our mocked Tooltip
     expect(screen.getAllByText("Couldn't update data. Try again?").length).toBeGreaterThan(0)
     expect(screen.queryByRole("alert")).toBeNull()
+    expect(screen.getAllByText("Couldn't update data. Try again?")[0].closest("div")).toHaveClass("text-destructive")
+  })
+
+  it("shows a rate limit over the last bars as a quiet wait, not a fault", () => {
+    render(
+      <ProviderCard
+        name="Waiting"
+        displayMode="used"
+        error="Rate limited by Anthropic, retry in ~40m"
+        lastUpdatedAt={Date.now() - 60_000}
+        lines={[
+          { type: "progress", label: "Session", used: 40, limit: 100, format: { kind: "percent" } },
+        ]}
+      />
+    )
+    expect(screen.getByText("40%")).toBeInTheDocument()
+    const note = screen.getAllByText(/Anthropic/)[0].closest("div")
+    expect(note).toHaveClass("text-muted-foreground")
+    expect(note).not.toHaveClass("text-destructive")
   })
 
   it("shows full PluginError when errored without stale data", () => {

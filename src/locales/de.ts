@@ -290,7 +290,7 @@ export const de: Messages = {
   "faq.notDetected.q": "Ein Anbieter wird nicht erkannt. Was nun?",
   "faq.notDetected.a": "OpenTokenUsage liest die Anmeldung, die die App oder CLI des Anbieters auf diesem PC gespeichert hat. Melden Sie sich dort an oder verwenden Sie die Schaltfläche auf der Karte, falls sie angezeigt wird (sie führt den Anmeldebefehl in einem Terminal aus), und aktualisieren Sie dann.",
   "faq.refresh.q": "Wie oft wird die Nutzung aktualisiert?",
-  "faq.refresh.a": "Das legen Sie unter {settings} → {autoRefresh} fest. {smart} prüft alle 2 Minuten, solange sich die Nutzung ändert (Claude alle 5), und verlangsamt auf 15 Minuten, wenn nicht. Ein Klick auf den Countdown unten rechts aktualisiert sofort; ein von Hand aktualisierter Anbieter wartet 5 Minuten bis zum nächsten Mal.",
+  "faq.refresh.a": "Das legen Sie unter {settings} → {autoRefresh} fest. {smart} prüft alle 2 Minuten, solange sich die Nutzung ändert (Claude alle 10), und verlangsamt auf 15 Minuten, wenn nicht. Ein Klick auf den Countdown unten rechts aktualisiert sofort; ein von Hand aktualisierter Anbieter wartet 5 Minuten bis zum nächsten Mal.",
   "faq.rateLimited.q": "Warum meldet Claude ein Ratenlimit?",
   "faq.rateLimited.a": "Anthropic erlaubt pro Anmeldung etwa 30 Nutzungsabfragen pro Stunde, geteilt mit Claude Code und jedem anderen Tool, das Ihre Nutzung anzeigt. Sind sie aufgebraucht, verlangt Anthropic eine Wartezeit von bis zu einer Stunde, und die App hält sich daran, auch nach einem Neustart. Um seltener abzufragen, aktivieren Sie {settings} → {claudeCode}: Claude Code übergibt dann seine eigene Nutzung an die App.",
   "faq.accounts.q": "Kann ich ein zweites Claude- oder Codex-Konto verfolgen?",

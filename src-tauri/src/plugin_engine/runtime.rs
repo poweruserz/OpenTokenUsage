@@ -306,13 +306,20 @@ fn run_probe_with_timeout(
             Err(msg) => vec![error_line(msg)],
         };
 
+        // A plugin showing an answer it kept instead of asking again says when it was fetched.
+        let stale_since = result
+            .get::<_, f64>("staleSince")
+            .ok()
+            .filter(|ms| ms.is_finite() && *ms > 0.0)
+            .map(|ms| ms as i64);
+
         PluginOutput {
             provider_id: plugin_id,
             display_name,
             plan,
             lines,
             icon_url,
-            stale_since: None,
+            stale_since,
         }
     })
 }
@@ -1089,6 +1096,25 @@ mod tests {
                 "{script}"
             );
         }
+    }
+
+    #[test]
+    fn a_probe_can_say_its_answer_was_kept() {
+        let probe = |stale: &str| {
+            let script = format!(
+                r#"globalThis.__openusage_plugin = {{ id: "test", probe: function () {{
+                    return {{ lines: [{{ type: "text", label: "A", value: "1" }}]{stale} }}
+                }} }}"#
+            );
+            run_probe(&test_plugin(&script), &temp_app_dir("stale"), "0.0.0").stale_since
+        };
+        assert_eq!(
+            probe(", staleSince: 1700000000000"),
+            Some(1_700_000_000_000)
+        );
+        assert_eq!(probe(""), None);
+        assert_eq!(probe(", staleSince: -5"), None);
+        assert_eq!(probe(r#", staleSince: "soon""#), None);
     }
 
     #[test]

@@ -290,7 +290,7 @@ export const zhCN: Messages = {
   "faq.notDetected.q": "某个服务商显示未检测到，怎么办？",
   "faq.notDetected.a": "OpenTokenUsage 读取服务商自己的应用或 CLI 保存在这台电脑上的登录信息。请在那里登录；如果卡片上出现按钮，也可以用它（它会在终端中运行登录命令），然后刷新。",
   "faq.refresh.q": "用量多久刷新一次？",
-  "faq.refresh.a": "在 {settings} → {autoRefresh} 中设置。{smart} 在用量变化时每 2 分钟检查一次（Claude 每 5 分钟），不变时逐渐放慢到 15 分钟。点击右下角的倒计时会立即刷新；手动刷新过的服务商要等 5 分钟才能再次刷新。",
+  "faq.refresh.a": "在 {settings} → {autoRefresh} 中设置。{smart} 在用量变化时每 2 分钟检查一次（Claude 每 10 分钟），不变时逐渐放慢到 15 分钟。点击右下角的倒计时会立即刷新；手动刷新过的服务商要等 5 分钟才能再次刷新。",
   "faq.rateLimited.q": "为什么 Claude 显示达到速率限制？",
   "faq.rateLimited.a": "Anthropic 允许每个登录每小时读取约 30 次用量，这个额度与 Claude Code 及其他显示你用量的工具共享。用完后，Anthropic 会要求等待最多一小时，应用会遵守这个时间，即使重启也一样。若要减少查询，请开启 {settings} → {claudeCode}：Claude Code 会把自己的用量交给应用。",
   "faq.accounts.q": "可以追踪第二个 Claude 或 Codex 账户吗？",

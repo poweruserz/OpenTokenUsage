@@ -675,6 +675,9 @@
   // most every 30 minutes, for the rows the status line lacks (model limits, extra usage).
   const STATUS_LINE_FRESH_MS = 5 * 60 * 1000
   const LIVE_API_INTERVAL_MS = 30 * 60 * 1000
+  // Fewest minutes between two reads of the endpoint, whatever asks (an app restart or update, the
+  // panel opening, a manual refresh): Anthropic answers a read over its budget with a 1-hour wait.
+  const MIN_READ_GAP_MS = 10 * 60 * 1000
 
   function liveWindow(w) {
     return w && typeof w.usedPercent === "number" && typeof w.resetsAtMs === "number" ? w : null
@@ -1194,13 +1197,19 @@
     let data = null
     let lines = []
     let usageFetched = false
+    let staleSince = null
     if (canFetchLiveUsage) {
       const account = usageAccount(ctx, creds)
       const live = account ? loadLiveLimits(ctx, nowMs, accountSince(ctx, account, nowMs)) : null
-      const last = live ? loadLastUsage(ctx, account) : null
-      if (live && last && nowMs - last.at < LIVE_API_INTERVAL_MS) {
+      const last = account ? loadLastUsage(ctx, account) : null
+      const lastAge = last ? nowMs - last.at : Infinity
+      if (live && last && lastAge < LIVE_API_INTERVAL_MS) {
         ctx.host.log.info("usage from Claude Code's status line")
         data = withLiveLimits(last.data, live, nowMs)
+      } else if (!live && lastAge >= 0 && lastAge < MIN_READ_GAP_MS) {
+        ctx.host.log.info("usage from the answer read " + Math.round(lastAge / 1000) + "s ago")
+        data = withLiveLimits(last.data, {}, nowMs)
+        staleSince = last.at
       } else {
         // Proactively refresh if token is expired or about to expire
         if (needsRefresh(ctx, creds.oauth, nowMs)) {
@@ -1357,7 +1366,7 @@
       lines.push(ctx.line.badge({ label: "Status", text: "No usage data", color: "#a3a3a3" }))
     }
 
-    return { plan: plan, lines: lines }
+    return staleSince === null ? { plan: plan, lines: lines } : { plan: plan, lines: lines, staleSince: staleSince }
   }
 
   // Who is signed in, for the WSL same-account check (wsl.rs). Claude Code keeps the account in

@@ -20,9 +20,11 @@ This file holds the project facts that are easy to get wrong.
   (email, name, uuid, ids) to the redaction list with a test.
 - Host already handles: HTTP 429 backoff per plugin+URL (`plugin_engine/http_gate.rs`, saved to
   `http-gates.json` so it outlives a restart), probe timeout (30 s), one probe per plugin at a time,
-  panics → error result. Don't re-implement in JS. Anthropic's usage endpoint allows ~30 reads an hour
-  per login, shared with Claude Code: Smart refresh keeps Claude cards at ≥5 min (`smartFloorMinutes`).
-  A 429 waits Retry-After but at least 5/10/20/30 min per 429 in a row (reset by a 2xx).
+  panics → error result. Don't re-implement in JS. Anthropic budgets usage-endpoint reads per login,
+  shared with Claude Code's own reads, and answers one over it with Retry-After 3600: Smart
+  refresh keeps Claude cards at ≥10 min (`smartFloorMinutes`), and the claude plugin itself reads at most
+  once per 10 min whatever asks (restart, panel, manual refresh), returning the kept answer with
+  `staleSince` in between. A 429 waits Retry-After but at least 5/10/20/30 min per 429 in a row (reset by a 2xx).
 - Claude Code status-line bridge (`claude_statusline.rs`, Settings → Claude Code status line): writes a fixed
   `curl.exe` command into Claude's `settings.json` (never over the user's own `statusLine`; the other top-level
   entries keep their order and text) that posts Claude Code's statusLine JSON to `POST /v1/claude/statusline`.

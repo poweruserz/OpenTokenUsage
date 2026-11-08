@@ -106,16 +106,16 @@ it("refreshes stale data on panel focus without bypassing error backoff", async 
 })
 
 // Anthropic allows about 30 usage reads an hour per login, shared with Claude Code.
-it("asks Claude at most every 5 minutes, panel focus included", async () => {
+it("asks Claude at most every 10 minutes, panel focus included", async () => {
   const app = setup({ claude: state("claude") }, ["claude"])
-  await app.tick(4)
+  await app.tick(9)
   act(() => window.dispatchEvent(new Event("focus")))
   await app.tick(0)
   expect(app.startBatch).not.toHaveBeenCalled()
   await app.tick(1)
   expect(app.startBatch).toHaveBeenCalledWith(["claude"], true)
   app.complete("claude", 30)
-  expect(app.result.current).toBe(Date.now() + 5 * MINUTE)
+  expect(app.result.current).toBe(Date.now() + 10 * MINUTE)
 })
 
 // setTimeout runs on a monotonic clock, Date.now() on the wall clock: after an NTP slew, a clock

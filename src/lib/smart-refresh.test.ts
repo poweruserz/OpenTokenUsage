@@ -24,24 +24,24 @@ describe("Smart refresh schedule", () => {
     expect(state.nextAt).toBe(now + 2 * MINUTE)
   })
 
-  // Anthropic allows about 30 usage reads an hour per login, shared with Claude Code.
-  it("keeps Claude's cards, extra accounts and WSL logins at 5 minutes or more", () => {
-    expect(["claude", "claude-1a2b3c4d", "claude-wsl-91f17ddf"].map(smartFloorMinutes)).toEqual([5, 5, 5])
+  // Anthropic budgets usage reads per login, shared with Claude Code's own reads.
+  it("keeps Claude's cards, extra accounts and WSL logins at 10 minutes or more", () => {
+    expect(["claude", "claude-1a2b3c4d", "claude-wsl-91f17ddf"].map(smartFloorMinutes)).toEqual([10, 10, 10])
     expect(["codex", "codex-1a2b3c4d", "cursor"].map(smartFloorMinutes)).toEqual([0, 0, 0])
 
     let now = 100_000
-    let state = newSmartSchedule(now, 5)
-    expect(state.nextAt! - now).toBe(5 * MINUTE)
+    let state = newSmartSchedule(now, 10)
+    expect(state.nextAt! - now).toBe(10 * MINUTE)
     state = completeSmartCheck(state, output(), false, now)
-    expect(state.nextAt! - now).toBe(5 * MINUTE)
-    for (const minutes of [5, 5, 10, 15]) {
+    expect(state.nextAt! - now).toBe(10 * MINUTE)
+    for (const minutes of [10, 10, 10, 15]) {
       now = state.nextAt!
       state = completeSmartCheck(state, output(), false, now)
       expect(state.nextAt! - now).toBe(minutes * MINUTE)
     }
 
-    state = newSmartSchedule(now, 5)
-    for (const minutes of [5, 5, 10, 15]) {
+    state = newSmartSchedule(now, 10)
+    for (const minutes of [10, 10, 10, 15]) {
       state = completeSmartCheck(state, output(), true, now)
       expect(state.nextAt! - now).toBe(minutes * MINUTE)
       now = state.nextAt!
