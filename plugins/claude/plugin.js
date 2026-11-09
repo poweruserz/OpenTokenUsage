@@ -651,10 +651,12 @@
     const eligible = !!(cached && cached.block && cached.block.eligible === true)
     // Claude Code asks for grants itself when it starts and notes in `.claude.json` whether the
     // account holds an unused reset. A note newer than a kept "none" means grants came since (a
-    // model launch hands them out): a day's wait would show "0 available" beside them.
+    // model launch hands them out): a day's wait would show "0 available" beside them. Newer than
+    // the answer, not the last try: a failed check leaves the note standing, for the next hour's.
     const seen = claudeJson && claudeJson.unusedLimitResetStatusCache
+    let answeredAt = cached ? (typeof cached.answeredAt === "number" ? cached.answeredAt : cached.checkedAt) : 0
     const arrived = !!(cached && seen && seen.holdsUnusedReset === true && seen.accountUuid === account &&
-      typeof seen.checkedAt === "number" && seen.checkedAt > cached.checkedAt)
+      typeof seen.checkedAt === "number" && seen.checkedAt > answeredAt && seen.checkedAt <= nowMs)
     const interval = eligible || atLimit || arrived ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS
     if (cached && nowMs - cached.checkedAt < interval) return cached.block
 
@@ -664,13 +666,15 @@
       // covers the whole account, so after a 429 here nothing more goes out until it passes.
       const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl)
       const data = resp.status >= 200 && resp.status < 300 ? ctx.util.tryParseJson(resp.bodyText) : null
-      if (data) block = data.cedar_ember ?? null
-      else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")
+      if (data) {
+        block = data.cedar_ember ?? null
+        answeredAt = nowMs
+      } else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")
     } catch (e) {
       ctx.host.log.warn("reset grants check failed: " + String(e) + "; keeping the last answer")
     }
     try {
-      ctx.host.fs.writeText(path, JSON.stringify({ account: account, checkedAt: nowMs, block: block }))
+      ctx.host.fs.writeText(path, JSON.stringify({ account: account, checkedAt: nowMs, answeredAt: answeredAt, block: block }))
     } catch (e) {
       ctx.host.log.warn("reset grants cache write failed: " + String(e))
     }
