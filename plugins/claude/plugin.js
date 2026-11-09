@@ -653,8 +653,9 @@
     // account holds an unused reset. A note newer than a kept "none" means grants came since (a
     // model launch hands them out): a day's wait would show "0 available" beside them. Newer than
     // the answer, not the last try: a failed check leaves the note standing, for the next hour's.
+    // A file kept by a version before `answeredAt` only has the last try's time: never answered.
     const seen = claudeJson && claudeJson.unusedLimitResetStatusCache
-    let answeredAt = cached ? (typeof cached.answeredAt === "number" ? cached.answeredAt : cached.checkedAt) : 0
+    let answeredAt = cached && typeof cached.answeredAt === "number" ? cached.answeredAt : 0
     const arrived = !!(cached && seen && seen.holdsUnusedReset === true && seen.accountUuid === account &&
       typeof seen.checkedAt === "number" && seen.checkedAt > answeredAt && seen.checkedAt <= nowMs)
     const interval = eligible || atLimit || arrived ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS

@@ -2449,6 +2449,15 @@ describe("claude plugin", () => {
           expect((await probe(ctx)).resets?.value).toBe("1 available")
           expect(grantsCheckCount(ctx)).toBe(3)
         })
+
+        it("takes a file kept before the answer's time was noted as never answered", async () => {
+          const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+          const now = Date.now()
+          // Its `checkedAt` can be a failed try's, later than both the answer and the note.
+          ctx.host.fs.writeText(CACHE, JSON.stringify({ account: "acc-1", checkedAt: now - HOUR, block: NONE }))
+          claudeCodeSaw(ctx, { checkedAt: now - 2 * HOUR })
+          expect((await probe(ctx)).resets?.value).toBe("1 available")
+        })
       })
 
       it("counts a per-model weekly limit at 100% as a limit reached", async () => {
