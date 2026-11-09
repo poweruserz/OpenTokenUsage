@@ -538,18 +538,28 @@
     })
   }
 
+  // Anthropic renamed the Max tiers on 2026-10-30: Max 5x is "Max" and Max 20x is "Ultra". Logins and
+  // the API still call both `max`, told apart by `default_claude_max_5x` / `default_claude_max_20x`.
   function formatPlan(ctx, subscriptionType, rateLimitTier) {
     const basePlan = subscriptionType ? ctx.fmt.planLabel(subscriptionType) : ""
     if (!basePlan) return null
     const tierMatch = String(rateLimitTier || "").match(/(\d+)x/)
+    if (basePlan === "Max") return tierMatch && tierMatch[1] === "20" ? "Ultra" : "Max"
     return tierMatch ? basePlan + " " + tierMatch[1] + "x" : basePlan
   }
 
+  // The profile's own name for the plan ("Ultra"), when it can be shown as a badge.
+  function planDisplayName(value) {
+    const name = typeof value === "string" ? value.trim() : ""
+    return name && name.length <= 40 && !/[\u0000-\u001f\u007f-\u009f]/.test(name) ? name : null
+  }
+
   // Claude Code stamps subscriptionType/rateLimitTier into the login at sign-in and never updates
-  // them, so a Max 5x -> 20x upgrade kept the stale badge until re-login (upstream #1258). Read the
+  // them, so a Max -> Ultra upgrade kept the stale badge until re-login (upstream #1258). Read the
   // live plan from /api/oauth/profile at most once per token pair (failures included), only after a
   // successful usage fetch. A failure keeps the stored plan and never touches the usage lines.
   // The host runs every probe in a fresh runtime, so the result lives in pluginDataDir, not memory.
+  const PLAN_NAMES = 2
   function livePlanPath(ctx) {
     return ctx.app.pluginDataDir + "/live-plan.json"
   }
@@ -567,12 +577,13 @@
   }
 
   // Returns the plan for this token pair, or null when unknown (lookup failed or not yet done).
+  // A plan kept before the tiers were renamed (no `names`) says "Max 20x": looked up again.
   function resolveLivePlan(ctx, creds, fingerprint, usageFetched) {
     if (!fingerprint) return null
     const cached = loadLivePlan(ctx)
-    if (cached && cached.fingerprint === fingerprint) return cached.plan
+    if (cached && cached.fingerprint === fingerprint && cached.names === PLAN_NAMES) return cached.plan
     if (!usageFetched) return null
-    const livePlan = { fingerprint: fingerprint, plan: lookupLivePlan(ctx, creds) }
+    const livePlan = { fingerprint: fingerprint, plan: lookupLivePlan(ctx, creds), names: PLAN_NAMES }
     try {
       ctx.host.fs.writeText(livePlanPath(ctx), JSON.stringify(livePlan))
     } catch (e) {
@@ -601,6 +612,9 @@
     }
     const org = body && body.organization
     if (!org || typeof org !== "object") return null
+    // Anthropic's own name for the plan, which Claude Code shows too: right through the next rename.
+    const name = planDisplayName(org.plan_display_name)
+    if (name) return name
     // organization_type arrives as `claude_max` / `claude_pro`; omitted fields fall back to the login.
     const orgType = typeof org.organization_type === "string" ? org.organization_type.replace(/^claude_/, "") : null
     return formatPlan(

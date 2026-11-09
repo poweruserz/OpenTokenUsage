@@ -557,15 +557,15 @@ describe("claude plugin", () => {
     expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
-  it("appends max rate limit tier to the plan label when present", async () => {
-    const runCase = async (rateLimitTier, expectedPlan) => {
+  it("names the Max tiers as Anthropic does since 2026-10-30: Max 5x is Max, Max 20x is Ultra", async () => {
+    const runCase = async (rateLimitTier, expectedPlan, subscriptionType = "max") => {
       const ctx = makeCtx()
       ctx.host.fs.exists = () => true
       ctx.host.fs.readText = () =>
         JSON.stringify({
           claudeAiOauth: {
             accessToken: "token",
-            subscriptionType: "max",
+            subscriptionType,
             rateLimitTier,
           },
         })
@@ -581,8 +581,14 @@ describe("claude plugin", () => {
       expect(result.plan).toBe(expectedPlan)
     }
 
-    await runCase("claude_max_subscription_20x", "Max 20x")
-    await runCase("claude_max_subscription_5x", "Max 5x")
+    await runCase("default_claude_max_20x", "Ultra")
+    await runCase("claude_max_subscription_20x", "Ultra")
+    await runCase("default_claude_max_5x", "Max")
+    await runCase("default_claude_max_10x", "Max")
+    await runCase(undefined, "Max")
+    // Other plans keep their tier.
+    await runCase("default_claude_max_5x", "Team 5x", "team")
+    await runCase(undefined, "Pro", "pro")
   })
 
   it("omits resetsAt when resets_at is missing", async () => {
@@ -2224,8 +2230,53 @@ describe("claude plugin", () => {
         profileResponse({ uuid: "org", organization_type: "claude_max", rate_limit_tier: "default_claude_max_20x" })
       )
       const result = (await loadPlugin()).probe(ctx)
-      expect(result.plan).toBe("Max 20x")
+      expect(result.plan).toBe("Ultra")
       expect(profileCalls(ctx)[0][0].headers.Authorization).toBe("Bearer token")
+    })
+
+    it("shows the name the profile gives the plan, whatever the tier", async () => {
+      const ctx = makeCtx()
+      ctx.host.fs.exists = () => true
+      ctx.host.fs.readText = () => STORED
+      routeRequests(ctx, () =>
+        profileResponse({ organization_type: "claude_team", rate_limit_tier: "default_claude_max_5x", plan_display_name: " Team Premium " })
+      )
+      expect((await loadPlugin()).probe(ctx).plan).toBe("Team Premium")
+
+      const longest = makeCtx()
+      longest.host.fs.exists = () => true
+      longest.host.fs.readText = () => STORED
+      routeRequests(longest, () => profileResponse({ plan_display_name: "x".repeat(40) }))
+      expect((await loadPlugin()).probe(longest).plan).toBe("x".repeat(40))
+    })
+
+    it("names the plan itself when the profile's name can't be shown", async () => {
+      for (const name of ["", "   ", "x".repeat(41), "Ultra\u0007", "Ultra\u007f", "Ultra\u0085", 20, null]) {
+        const ctx = makeCtx()
+        ctx.host.fs.exists = () => true
+        ctx.host.fs.readText = () => STORED
+        routeRequests(ctx, () =>
+          profileResponse({ organization_type: "claude_max", rate_limit_tier: "default_claude_max_20x", plan_display_name: name })
+        )
+        expect((await loadPlugin()).probe(ctx).plan, JSON.stringify(name)).toBe("Ultra")
+      }
+    })
+
+    it("looks a plan kept under the earlier names up again", async () => {
+      const KEPT = "/tmp/openusage-test/plugin/live-plan.json"
+      const ctx = makeCtx()
+      ctx.host.fs.writeText("~/.claude/.credentials.json", STORED)
+      routeRequests(ctx, () => profileResponse({ organization_type: "claude_max", rate_limit_tier: "default_claude_max_20x" }))
+      ;(await loadPlugin()).probe(ctx)
+      // As 0.8.2 and earlier kept it.
+      const fingerprint = JSON.parse(ctx.host.fs.readText(KEPT)).fingerprint
+      ctx.host.fs.writeText(KEPT, JSON.stringify({ fingerprint: fingerprint, plan: "Max 20x" }))
+      // A probe inside the read gap asks nothing: the login's plan shows, never the kept old name.
+      expect((await loadPlugin()).probe(ctx).plan).toBe("Max")
+      expect(profileCalls(ctx)).toHaveLength(1)
+      ageLastRead(ctx)
+      expect((await loadPlugin()).probe(ctx).plan).toBe("Ultra")
+      expect(profileCalls(ctx)).toHaveLength(2)
     })
 
     it("falls back to stored fields the profile omits", async () => {
@@ -2233,7 +2284,7 @@ describe("claude plugin", () => {
       ctx.host.fs.exists = () => true
       ctx.host.fs.readText = () => STORED
       routeRequests(ctx, () => profileResponse({ uuid: "org", rate_limit_tier: "default_claude_max_20x" }))
-      expect((await loadPlugin()).probe(ctx).plan).toBe("Max 20x")
+      expect((await loadPlugin()).probe(ctx).plan).toBe("Ultra")
     })
 
     it("keeps the stored plan and the usage lines when the profile lookup fails", async () => {
@@ -2244,7 +2295,7 @@ describe("claude plugin", () => {
         throw new Error("network down")
       })
       const result = (await loadPlugin()).probe(ctx)
-      expect(result.plan).toBe("Max 5x")
+      expect(result.plan).toBe("Max")
       expect(result.lines.find((l) => l.label === "Session")?.used).toBe(10)
       expect(ctx.host.log.warn).toHaveBeenCalledWith(expect.stringContaining("live plan lookup failed"))
     })
@@ -2259,7 +2310,7 @@ describe("claude plugin", () => {
       expect(ctx.host.fs.readText("/tmp/openusage-test/plugin/live-plan.json")).toContain('"plan":null')
       expect(usageRequestCount(ctx)).toBe(2)
       expect(profileCalls(ctx)).toHaveLength(1)
-      expect(result.plan).toBe("Max 5x")
+      expect(result.plan).toBe("Max")
     })
 
     it("skips the profile lookup when the usage fetch is rate limited", async () => {

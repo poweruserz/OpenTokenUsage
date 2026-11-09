@@ -126,6 +126,19 @@ Content-Type: application/json
 }
 ```
 
+## Plan
+
+The badge shows the plan under Anthropic's own name: `organization.plan_display_name` from `GET /api/oauth/profile` (`Pro`, `Max`, `Ultra`), the name Claude Code shows too. The profile is read at most once per token pair, after a usage read that worked, and the answer is kept in `live-plan.json`; Claude Code stamps the plan into the login at sign-in and never updates it, so an upgrade would otherwise show the old plan until the next sign-in.
+
+When the profile gives no usable name, the plan is named from its `organization_type` and `rate_limit_tier`, with the login's `subscriptionType` and `rateLimitTier` for what it omits; until the profile has answered, from the login's alone. Anthropic renamed the Max tiers on 2026-10-30, and the ids didn't change:
+
+| Type | Tier | Name | Before 2026-10-30 |
+|---|---|---|---|
+| `max` | `default_claude_max_5x` | Max | Max 5x |
+| `max` | `default_claude_max_20x` | Ultra | Max 20x |
+
+A verified Ultra account has no 5-hour limit: `five_hour` comes back `null` and the card shows no Session row.
+
 ## Live sessions
 
 The Claude card (the usual login and each extra account) lists the Claude Code sessions running on this machine, read every 5 seconds while the panel is shown. Each running `claude` keeps `sessions/<pid>.json` in its config folder (`CLAUDE_CONFIG_DIR` or `~/.claude`) with its name, folder and state (`busy`, `shell`, `idle`, `waiting`). A file is skipped when its process has ended (a crash leaves it behind) or its pid now belongs to a process started at another time than the file's `procStart`; daemon processes aren't sessions. With the status line on, each session also shows how full its context window is (`context_window.used_percentage` from its last post, kept in memory): yellow from 70%, red with "Compacts soon" from 85%. A WSL card lists none: its processes aren't Windows processes.

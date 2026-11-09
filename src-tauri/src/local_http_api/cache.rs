@@ -625,7 +625,7 @@ mod tests {
         let snap = CachedPluginSnapshot {
             provider_id: "claude".to_string(),
             display_name: "Claude".to_string(),
-            plan: Some("Max 20x".to_string()),
+            plan: Some("Ultra".to_string()),
             lines: vec![crate::plugin_engine::runtime::MetricLine::Progress {
                 label: "Session".to_string(),
                 used: 42.0,

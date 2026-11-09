@@ -41,7 +41,7 @@ Unknown routes return **404 Not Found**.
 {
   "providerId": "claude",
   "displayName": "Claude",
-  "plan": "Team 5x",
+  "plan": "Max",
   "lines": [
     {
       "type": "progress",
