@@ -70,7 +70,14 @@ fn weight(log: Log, model: &str, parts: &Parts) -> f64 {
 /// models after them (most of Claude Code's tokens are cache reads, so a tenth there overpays the
 /// projects with long conversations). A model newer than these counts at a tenth until it's added.
 fn claude_cache_read(model: &str) -> f64 {
-    let is = |names: &[&str]| names.iter().any(|name| model.contains(name));
+    // The version must end where the name does: a dated `fable-5-20260101` starts like `fable-5-2`.
+    let is = |names: &[&str]| {
+        names.iter().any(|name| {
+            model.match_indices(name).any(|(at, _)| {
+                !model[at + name.len()..].starts_with(|next: char| next.is_ascii_digit())
+            })
+        })
+    };
     if is(&["fable-5-1", "fable-5-2", "mythos-5-1", "mythos-5-2"]) {
         0.025
     } else if is(&["opus-5-5", "sonnet-5-5"]) {
@@ -511,13 +518,18 @@ mod tests {
         // (a fortieth of input each), 2000 on Opus 5.5 (a twentieth), 1000 on Opus 5 (a tenth).
         for (model, reads) in [
             ("claude-fable-5-2", 4000),
+            ("claude-fable-5-2-20261101", 4000),
             ("claude-mythos-5-2", 4000),
             ("claude-fable-5-1", 4000),
             ("claude-mythos-5-1", 4000),
             ("claude-opus-5-5", 2000),
+            ("claude-opus-5-5[1m]", 2000),
             ("claude-sonnet-5-5", 2000),
             ("claude-opus-5", 1000),
             ("claude-fable-5", 1000),
+            // A dated id of the older model starts like the newer one's name.
+            ("claude-fable-5-20261101", 1000),
+            ("claude-mythos-5-20261101", 1000),
             ("claude-haiku-5-5", 1000),
         ] {
             let usage = usage(&[
