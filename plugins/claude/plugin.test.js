@@ -2381,6 +2381,49 @@ describe("claude plugin", () => {
         expect(grantsCheckCount(ctx)).toBe(3)
       })
 
+      describe("Claude Code's own note of an unused reset", () => {
+        const NONE = { eligible: false, ineligible_reason: "no_grant", grants: [] }
+        const claudeCodeSaw = (ctx, note) =>
+          ctx.host.fs.writeText("~/.claude.json", JSON.stringify({
+            oauthAccount: { accountUuid: "acc-1" },
+            unusedLimitResetStatusCache: { accountUuid: "acc-1", holdsUnusedReset: true, ...note },
+          }))
+        const askedAt = (ctx) => JSON.parse(ctx.host.fs.readText(CACHE)).checkedAt
+
+        it("asks again when the note is newer than a kept 'none', instead of a day later", async () => {
+          let grants = NONE
+          const ctx = setup(() => okUsageResponse({ cedar_ember: grants }))
+          expect((await probe(ctx)).resets?.value).toBe("0 available")
+          const asked = askedAt(ctx)
+          ageCache(ctx, 2 * 60 * 60 * 1000)
+          grants = GRANTS
+
+          claudeCodeSaw(ctx, { checkedAt: asked - 3 * 60 * 60 * 1000 }) // older than the kept answer
+          await probe(ctx)
+          claudeCodeSaw(ctx, { checkedAt: asked, holdsUnusedReset: false })
+          await probe(ctx)
+          claudeCodeSaw(ctx, { checkedAt: asked, accountUuid: "acc-2" })
+          await probe(ctx)
+          expect(grantsCheckCount(ctx)).toBe(1)
+
+          claudeCodeSaw(ctx, { checkedAt: asked })
+          expect((await probe(ctx)).resets?.value).toBe("1 available")
+          expect(grantsCheckCount(ctx)).toBe(2)
+        })
+
+        it("still waits an hour after its own check", async () => {
+          const ctx = setup(() => okUsageResponse({ cedar_ember: NONE }))
+          await probe(ctx)
+          claudeCodeSaw(ctx, { checkedAt: askedAt(ctx) + 1 })
+          await probe(ctx)
+          expect(grantsCheckCount(ctx)).toBe(1)
+
+          ageCache(ctx, 60 * 60 * 1000)
+          await probe(ctx)
+          expect(grantsCheckCount(ctx)).toBe(2)
+        })
+      })
+
       it("counts a per-model weekly limit at 100% as a limit reached", async () => {
         const ctx = makeCtx()
         ctx.host.fs.writeText("~/.claude/.credentials.json", JSON.stringify({ claudeAiOauth: { accessToken: "token" } }))

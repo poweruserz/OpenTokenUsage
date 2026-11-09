@@ -628,8 +628,10 @@
   function resolveResetGrants(ctx, accessToken, fingerprint, atLimit) {
     const path = resetGrantsPath(ctx)
     let account
+    let claudeJson
     try {
-      account = accountKey(ctx) || (fingerprint ? "login:" + fingerprint : null)
+      claudeJson = readClaudeJson(ctx)
+      account = accountIdOf(claudeJson) || (fingerprint ? "login:" + fingerprint : null)
     } catch (e) {
       ctx.host.log.warn("reset grants skipped: account lookup failed: " + String(e))
       return null
@@ -647,7 +649,13 @@
     }
     const nowMs = Date.now()
     const eligible = !!(cached && cached.block && cached.block.eligible === true)
-    const interval = eligible || atLimit ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS
+    // Claude Code asks for grants itself when it starts and notes in `.claude.json` whether the
+    // account holds an unused reset. A note newer than a kept "none" means grants came since (a
+    // model launch hands them out): a day's wait would show "0 available" beside them.
+    const seen = claudeJson && claudeJson.unusedLimitResetStatusCache
+    const arrived = !!(cached && seen && seen.holdsUnusedReset === true && seen.accountUuid === account &&
+      typeof seen.checkedAt === "number" && seen.checkedAt > cached.checkedAt)
+    const interval = eligible || atLimit || arrived ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS
     if (cached && nowMs - cached.checkedAt < interval) return cached.block
 
     let block = cached ? cached.block : null
@@ -1400,15 +1408,22 @@
     return staleSince === null ? { plan: plan, lines: lines } : { plan: plan, lines: lines, staleSince: staleSince }
   }
 
-  // Who is signed in, for the WSL same-account check (wsl.rs). Claude Code keeps the account in
-  // `.claude.json`: inside CLAUDE_CONFIG_DIR when that is set, else in the home folder. Local only.
-  function accountKey(ctx) {
+  // Claude Code's `.claude.json`: inside CLAUDE_CONFIG_DIR when that is set, else in the home
+  // folder. Local only.
+  function readClaudeJson(ctx) {
     const override = getClaudeHomeOverride(ctx)
     const path = override ? override.replace(/[\\/]+$/, "") + "/.claude.json" : "~/.claude.json"
-    if (!ctx.host.fs.exists(path)) return null
-    const data = ctx.util.tryParseJson(ctx.host.fs.readText(path))
-    const id = data && data.oauthAccount && data.oauthAccount.accountUuid
+    return ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
+  }
+
+  function accountIdOf(claudeJson) {
+    const id = claudeJson && claudeJson.oauthAccount && claudeJson.oauthAccount.accountUuid
     return typeof id === "string" && id.trim() ? id.trim() : null
+  }
+
+  // Who is signed in, for the WSL same-account check (wsl.rs).
+  function accountKey(ctx) {
+    return accountIdOf(readClaudeJson(ctx))
   }
 
   globalThis.__openusage_plugin = { id: "claude", probe, accountKey }
