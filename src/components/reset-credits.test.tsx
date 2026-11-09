@@ -25,6 +25,29 @@ describe("reset inventory", () => {
     fireEvent.click(screen.getByRole("button"))
     expect(openUrl).toHaveBeenCalledWith(url)
   })
+  it("names each kind of reset and says what a Fable reset leaves of the weekly limit", () => {
+    const expiresAt = "2026-10-26T15:00:00Z"
+    render(
+      <ResetCredits
+        now={now}
+        credits={[
+          { count: 1, expiresAt, kind: "fable" },
+          { count: 2, expiresAt, kind: "fable" },
+          { count: 1, expiresAt, kind: "weekly" },
+          { count: 1, expiresAt: "2026-10-27T15:00:00Z" }
+        ]}
+      />
+    )
+    expect(screen.getByText("5 available")).toBeInTheDocument()
+    expect(screen.getByText("Fable reset")).toBeInTheDocument()
+    expect(screen.getByText("3 reset(s) expire in 2d 3h")).toBeInTheDocument()
+    expect(screen.getByText(/only gets back what Fable used/)).toBeInTheDocument()
+    expect(screen.getByText("Weekly reset")).toBeInTheDocument()
+    expect(screen.getByText("1 reset(s) expire in 2d 3h")).toBeInTheDocument()
+    // A reset the provider doesn't describe stays as it was: no name, no note.
+    expect(screen.getByText("1 reset(s) expire in 3d 3h")).toBeInTheDocument()
+    expect(screen.queryByText("Full reset")).not.toBeInTheDocument()
+  })
   it("removes expired resets between probes", () => {
     const credits = [{ count: 1, expiresAt: new Date(now + 1000).toISOString() }]
     const { rerender } = render(<ResetCredits credits={credits} now={now} usageUrl={url} />)

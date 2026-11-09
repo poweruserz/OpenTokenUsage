@@ -34,6 +34,8 @@ export function ResetCredits({ credits, now, usageUrl }: { credits: ResetCredit[
               : "text-muted-foreground"
           }
         >
+          {credit.kind && <div className="text-foreground">{t(`banked.kind.${credit.kind}`)}</div>}
+          {credit.kind === "fable" && <div className="text-[10px]">{t("banked.fableNote")}</div>}
           {credit.expiresAt ? (
             <>
               <div>

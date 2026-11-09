@@ -2596,6 +2596,28 @@ describe("claude plugin", () => {
       expect(line.resetCredits).toEqual([{ count: 1, expiresAt: "2099-01-01T00:00:00.000Z" }])
     })
 
+    it("says what each grant resets, a Fable reset apart from a weekly one", async () => {
+      const { line } = await probeWith({ cedar_ember: { eligible: true, grants: [
+        // The two shapes Anthropic sent after the Fable 5.2 launch.
+        { resets_left: 1, type: "weekly", clears: ["seven_day", "seven_day_overage_included"], gives_back_weekly: false },
+        { resets_left: 1, type: "full", clears: ["seven_day_overage_included"], gives_back_weekly: true },
+        // Without a type, by what it clears.
+        { resets_left: 1, clears: ["five_hour"] },
+        { resets_left: 1, clears: ["seven_day", "seven_day_opus"] },
+        { resets_left: 1, clears: ["five_hour", "seven_day"] },
+        { resets_left: 1, type: "something new" },
+        { resets_left: 1 },
+        // Its type names it before what it clears does; nothing usable names nothing.
+        { resets_left: 1, type: "weekly", clears: ["five_hour"] },
+        { resets_left: 1, clears: [] },
+        { resets_left: 1, clears: "five_hour" },
+      ] } })
+      expect(line.value).toBe("10 available")
+      expect(line.resetCredits.map((credit) => credit.kind)).toEqual([
+        "weekly", "fable", "session", "weekly", "full", undefined, undefined, "weekly", undefined, undefined,
+      ])
+    })
+
     it("reads 0 available for an ineligible account", async () => {
       const { line } = await probeWith({
         cedar_ember: { eligible: false, ineligible_reason: "tier", grants: [{ resets_left: 1 }] },
