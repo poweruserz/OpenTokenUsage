@@ -30,23 +30,36 @@ function toggleSection(id: SectionId) {
 /**
  * One part of a provider's detail page, under a rule and a title that opens and closes it.
  * `aside` stays beside the title either way (a count); `controls` take its place while open.
+ * `empty`: there is nothing to open (no banked resets), so the title is only a title.
  */
 export function DetailSection({
   id,
   title,
   aside,
   controls,
+  empty = false,
   children,
 }: {
   id: SectionId
   title: string
   aside?: ReactNode
   controls?: ReactNode
+  empty?: boolean
   children?: ReactNode
 }) {
   const open = useDetailSectionOpen(id)
   const bodyId = useId()
   const beside = open ? (controls ?? aside) : aside
+  if (empty) {
+    return (
+      <section className="mt-3 border-t border-border pt-2.5">
+        <div className="flex min-h-5 items-center justify-between gap-2 text-xs">
+          <span className="truncate pl-4 font-medium text-muted-foreground">{title}</span>
+          {aside != null && <div className="shrink-0">{aside}</div>}
+        </div>
+      </section>
+    )
+  }
   return (
     <section className="mt-3 border-t border-border pt-2.5">
       <div className="flex min-h-5 items-center justify-between gap-2">

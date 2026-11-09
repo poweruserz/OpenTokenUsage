@@ -1,11 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { DetailSection } from "@/components/detail-section"
+import { DetailSection, useStoredDetailSections } from "@/components/detail-section"
 import { ProviderCard } from "@/components/provider-card"
 import type { MetricLine } from "@/lib/plugin-types"
 import {
   DEFAULT_COLLAPSED_SECTIONS,
+  loadCollapsedSections,
   normalizeCollapsedSections,
   saveCollapsedSections,
 } from "@/lib/settings"
@@ -14,6 +15,7 @@ import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(() => Promise.resolve()) }))
 vi.mock("@/lib/settings", async (original) => ({
   ...(await original<typeof import("@/lib/settings")>()),
+  loadCollapsedSections: vi.fn(async () => []),
   saveCollapsedSections: vi.fn(async () => {}),
 }))
 vi.mock("@/components/ui/tooltip", () => ({
@@ -100,6 +102,40 @@ describe("detail page sections", () => {
     expect(screen.getByText("rows")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "This month" })).toBeInTheDocument()
     expect(screen.queryByText("12")).toBeNull()
+  })
+
+  it("gives a section with nothing under it a title that opens nothing", () => {
+    const none: MetricLine[] = [{ type: "text", label: "Rate Limit Resets", value: "0 available", resetCredits: [] }]
+    render(<ProviderCard name="Claude" displayMode="used" lines={none} />)
+    expect(screen.getByText("Rate Limit Resets")).toBeInTheDocument()
+    expect(screen.getByText("0 available")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Rate Limit Resets" })).toBeNull()
+  })
+
+  it("restores the closed sections at start, and keeps the defaults when that fails", async () => {
+    vi.mocked(loadCollapsedSections).mockResolvedValueOnce(["projects"])
+    const { unmount } = renderHook(() => useStoredDetailSections())
+    await waitFor(() => expect(useAppPreferencesStore.getState().collapsedSections).toEqual(["projects"]))
+    unmount()
+
+    useAppPreferencesStore.setState({ collapsedSections: DEFAULT_COLLAPSED_SECTIONS })
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.mocked(loadCollapsedSections).mockRejectedValueOnce(new Error("locked"))
+    renderHook(() => useStoredDetailSections())
+    await waitFor(() => expect(logged).toHaveBeenCalled())
+    expect(useAppPreferencesStore.getState().collapsedSections).toEqual(DEFAULT_COLLAPSED_SECTIONS)
+    logged.mockRestore()
+  })
+
+  it("still closes a section when saving that fails: the failure is only logged", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.mocked(saveCollapsedSections).mockRejectedValueOnce(new Error("disk full"))
+    render(<ProviderCard name="Claude" displayMode="used" lines={LINES} />)
+    fireEvent.click(title("Cost"))
+    expect(screen.queryByText("Today")).toBeNull()
+    await waitFor(() => expect(logged).toHaveBeenCalled())
+    expect(screen.queryByRole("alert")).toBeNull()
+    logged.mockRestore()
   })
 
   it("reads a saved list of closed sections, and starts from the defaults without one", () => {

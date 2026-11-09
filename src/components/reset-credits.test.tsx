@@ -52,6 +52,12 @@ describe("reset inventory", () => {
     expect(screen.getByText(/^1 reset\(s\) expire in 3d 3h/)).toBeInTheDocument()
     expect(screen.queryByText("Full reset")).not.toBeInTheDocument()
   })
+  it("says what a Fable reset leaves of the weekly limit even when its expiry isn't known", () => {
+    render(<ResetCredits label="Rate Limit Resets" now={now} credits={[{ count: 1, kind: "fable" }]} />)
+    expect(screen.getByText("Fable reset")).toBeInTheDocument()
+    expect(screen.getByText("1 reset(s): expiry unavailable")).toBeInTheDocument()
+    expect(screen.getByText(/only gets back what Fable used/)).toBeInTheDocument()
+  })
   it("removes expired resets between probes", () => {
     const credits = [{ count: 1, expiresAt: new Date(now + 1000).toISOString() }]
     const { rerender } = render(<ResetCredits label="Rate Limit Resets" credits={credits} now={now} usageUrl={url} />)

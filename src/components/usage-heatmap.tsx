@@ -76,6 +76,7 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
   if (!hasUsageLogs(pluginId)) return null
   const title = t("heatmap.title")
   if (!shown || !heatmap) return <DetailSection id="heatmap" title={title} />
+  if (!showsGrid && heatmap.unreadable === 0) return null
 
   const grid = heatmapGrid(heatmap.slots)
   const max = Math.max(1, ...grid.flat())

@@ -139,9 +139,11 @@ describe("usage heatmap", () => {
 
   it("shows no grid without usage, and reads nothing while the panel is hidden or for other cards", async () => {
     vi.mocked(invoke).mockResolvedValue(heatmap([]))
-    render(<UsageHeatmap pluginId="codex" />)
+    const empty = render(<UsageHeatmap pluginId="codex" />)
     await waitFor(() => expect(invoke).toHaveBeenCalled())
-    expect(screen.queryByRole("grid")).toBeNull()
+    // Nothing to show: no section at all, rather than a title that opens onto nothing.
+    await waitFor(() => expect(empty.container).toBeEmptyDOMElement())
+    empty.unmount()
 
     vi.mocked(invoke).mockClear()
     const other = render(<UsageHeatmap pluginId="cursor" />)

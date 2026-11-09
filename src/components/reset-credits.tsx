@@ -31,11 +31,15 @@ export function ResetCreditRows({ credits, now, usageUrl }: { credits: ResetCred
     <div className="space-y-1.5 text-xs">
       {live.map((credit, index) => {
         const expiresMs = credit.expiresAt ? Date.parse(credit.expiresAt) : null
+        const note = credit.kind === "fable" && (
+          <p className="text-[10px] leading-snug text-muted-foreground">{t("banked.fableNote")}</p>
+        )
         if (expiresMs === null) {
           return (
             <div key={index}>
               {credit.kind && <div>{t(`banked.kind.${credit.kind}`)}</div>}
               <div className="text-muted-foreground">{t("banked.unknownExpiry", { count: credit.count })}</div>
+              {note}
             </div>
           )
         }
@@ -71,7 +75,7 @@ export function ResetCreditRows({ credits, now, usageUrl }: { credits: ResetCred
                 <span className="sr-only">{spelled}</span>
               </span>
             </div>
-            {credit.kind === "fable" && <p className="text-[10px] leading-snug text-muted-foreground">{t("banked.fableNote")}</p>}
+            {note}
           </div>
         )
       })}

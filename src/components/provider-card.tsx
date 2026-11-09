@@ -372,6 +372,7 @@ export function ProviderCard({
                       id="resets"
                       title={tLabel(line.label)}
                       aside={t("banked.available", { count: resetCount(line.resetCredits, now) })}
+                      empty={resetCount(line.resetCredits, now) === 0}
                     >
                       <ResetCreditRows credits={line.resetCredits} now={now} usageUrl={usageUrl} />
                     </DetailSection>

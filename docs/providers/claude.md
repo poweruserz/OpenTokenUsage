@@ -155,7 +155,7 @@ Usage notifications also remind you during the final seven days and final 24 hou
 
 `cedar_ember.grants[].ends_at` supplies expiry dates; `resets_left` supplies counts. Spent, expired, paused, and explicitly unusable grants are excluded.
 
-Each entry names what it resets, as Claude Code does: a grant with `gives_back_weekly` is a **Fable reset**, otherwise its `type` (`session`, `weekly`, `full`) names it, and without a type what it `clears` does (only `five_hour`: 5-hour reset; no `five_hour`: weekly reset; both: full reset). A Fable reset clears the 5-hour and Fable limits and gives the weekly limit back only what Fable used, so the row says so under it: counted with a weekly reset as one number, it read as a reset of the whole week. Resets of one kind that expire together are shown as one entry with their count. A grant that says neither has no name.
+Each entry names what it resets, as Claude Code does: a grant with `gives_back_weekly` is a **Fable reset**, otherwise its `type` (`session`, `weekly`, `full`) names it, and without a type what it `clears` does (only `five_hour`: 5-hour reset; no `five_hour`: weekly reset; both: full reset). A Fable reset clears the 5-hour and Fable limits and gives the weekly limit back only what Fable used, so the row says so under it: counted with a weekly reset as one number, it read as a reset of the whole week. Resets of one kind that expire together are shown as one entry with their count. A grant that says neither is a plain reset.
 
 Implementation reference: [T3 Code Claude reset credits](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/claudeResetCredits.ts). T3 Code also implements explicit redemption; OpenTokenUsage opens the provider’s usage page instead.
 
