@@ -2313,7 +2313,7 @@ describe("claude plugin", () => {
       }
       const ageCache = (ctx, ms) => {
         const cached = JSON.parse(ctx.host.fs.readText(CACHE))
-        ctx.host.fs.writeText(CACHE, JSON.stringify({ ...cached, checkedAt: cached.checkedAt - ms }))
+        ctx.host.fs.writeText(CACHE, JSON.stringify({ ...cached, checkedAt: cached.checkedAt - ms, answeredAt: cached.answeredAt - ms }))
       }
 
       it("asks once an hour and shows the last answer in between", async () => {
@@ -2379,6 +2379,85 @@ describe("claude plugin", () => {
         ageCache(ctx, 60 * 60 * 1000)
         await probe(ctx)
         expect(grantsCheckCount(ctx)).toBe(3)
+      })
+
+      describe("Claude Code's own note of an unused reset", () => {
+        const NONE = { eligible: false, ineligible_reason: "no_grant", grants: [] }
+        const claudeCodeSaw = (ctx, note) =>
+          ctx.host.fs.writeText("~/.claude.json", JSON.stringify({
+            oauthAccount: { accountUuid: "acc-1" },
+            unusedLimitResetStatusCache: { accountUuid: "acc-1", holdsUnusedReset: true, ...note },
+          }))
+        const askedAt = (ctx) => JSON.parse(ctx.host.fs.readText(CACHE)).checkedAt
+
+        const HOUR = 60 * 60 * 1000
+
+        it("asks again when the note is newer than a kept 'none', instead of a day later", async () => {
+          let grants = NONE
+          const ctx = setup(() => okUsageResponse({ cedar_ember: grants }))
+          expect((await probe(ctx)).resets?.value).toBe("0 available")
+          const asked = askedAt(ctx)
+          ageCache(ctx, 2 * HOUR) // the kept "none" is from 2 hours ago
+          grants = GRANTS
+
+          for (const note of [
+            { checkedAt: asked - 3 * HOUR }, // older than the kept answer
+            { checkedAt: asked - 2 * HOUR }, // as old
+            { checkedAt: String(asked - HOUR) },
+            { checkedAt: asked + 7 * 24 * HOUR }, // ahead of this PC's clock: it would stay newer
+            { checkedAt: asked - HOUR, holdsUnusedReset: false },
+            { checkedAt: asked - HOUR, accountUuid: "acc-2" },
+          ]) {
+            claudeCodeSaw(ctx, note)
+            await probe(ctx)
+          }
+          expect(grantsCheckCount(ctx)).toBe(1)
+
+          claudeCodeSaw(ctx, { checkedAt: asked - HOUR })
+          expect((await probe(ctx)).resets?.value).toBe("1 available")
+          expect(grantsCheckCount(ctx)).toBe(2)
+        })
+
+        it("still waits an hour after its own check", async () => {
+          const ctx = setup(() => okUsageResponse({ cedar_ember: NONE }))
+          await probe(ctx)
+          const asked = askedAt(ctx)
+          ageCache(ctx, 10 * 60 * 1000)
+          claudeCodeSaw(ctx, { checkedAt: asked - 5 * 60 * 1000 })
+          await probe(ctx)
+          expect(grantsCheckCount(ctx)).toBe(1)
+
+          ageCache(ctx, 50 * 60 * 1000)
+          await probe(ctx)
+          expect(grantsCheckCount(ctx)).toBe(2)
+        })
+
+        it("tries again an hour after a check that failed, not a day after", async () => {
+          let respond = () => okUsageResponse({ cedar_ember: NONE })
+          const ctx = setup(() => respond())
+          await probe(ctx)
+          const asked = askedAt(ctx)
+          ageCache(ctx, 2 * HOUR)
+          claudeCodeSaw(ctx, { checkedAt: asked - HOUR })
+          respond = () => ({ status: 429, bodyText: "", headers: { "retry-after": "3000" } })
+          expect((await probe(ctx)).resets?.value).toBe("0 available")
+          await probe(ctx)
+          expect(grantsCheckCount(ctx)).toBe(2)
+
+          respond = () => okUsageResponse({ cedar_ember: GRANTS })
+          ageCache(ctx, HOUR)
+          expect((await probe(ctx)).resets?.value).toBe("1 available")
+          expect(grantsCheckCount(ctx)).toBe(3)
+        })
+
+        it("takes a file kept before the answer's time was noted as never answered", async () => {
+          const ctx = setup(() => okUsageResponse({ cedar_ember: GRANTS }))
+          const now = Date.now()
+          // Its `checkedAt` can be a failed try's, later than both the answer and the note.
+          ctx.host.fs.writeText(CACHE, JSON.stringify({ account: "acc-1", checkedAt: now - HOUR, block: NONE }))
+          claudeCodeSaw(ctx, { checkedAt: now - 2 * HOUR })
+          expect((await probe(ctx)).resets?.value).toBe("1 available")
+        })
       })
 
       it("counts a per-model weekly limit at 100% as a limit reached", async () => {

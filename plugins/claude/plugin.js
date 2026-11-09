@@ -628,8 +628,10 @@
   function resolveResetGrants(ctx, accessToken, fingerprint, atLimit) {
     const path = resetGrantsPath(ctx)
     let account
+    let claudeJson
     try {
-      account = accountKey(ctx) || (fingerprint ? "login:" + fingerprint : null)
+      claudeJson = readClaudeJson(ctx)
+      account = accountIdOf(claudeJson) || (fingerprint ? "login:" + fingerprint : null)
     } catch (e) {
       ctx.host.log.warn("reset grants skipped: account lookup failed: " + String(e))
       return null
@@ -647,7 +649,16 @@
     }
     const nowMs = Date.now()
     const eligible = !!(cached && cached.block && cached.block.eligible === true)
-    const interval = eligible || atLimit ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS
+    // Claude Code asks for grants itself when it starts and notes in `.claude.json` whether the
+    // account holds an unused reset. A note newer than a kept "none" means grants came since (a
+    // model launch hands them out): a day's wait would show "0 available" beside them. Newer than
+    // the answer, not the last try: a failed check leaves the note standing, for the next hour's.
+    // A file kept by a version before `answeredAt` only has the last try's time: never answered.
+    const seen = claudeJson && claudeJson.unusedLimitResetStatusCache
+    let answeredAt = cached && typeof cached.answeredAt === "number" ? cached.answeredAt : 0
+    const arrived = !!(cached && seen && seen.holdsUnusedReset === true && seen.accountUuid === account &&
+      typeof seen.checkedAt === "number" && seen.checkedAt > answeredAt && seen.checkedAt <= nowMs)
+    const interval = eligible || atLimit || arrived ? RESET_GRANTS_INTERVAL_MS : NO_GRANTS_INTERVAL_MS
     if (cached && nowMs - cached.checkedAt < interval) return cached.block
 
     let block = cached ? cached.block : null
@@ -656,13 +667,15 @@
       // covers the whole account, so after a 429 here nothing more goes out until it passes.
       const resp = fetchUsage(ctx, accessToken, getOauthConfig(ctx).grantsUrl)
       const data = resp.status >= 200 && resp.status < 300 ? ctx.util.tryParseJson(resp.bodyText) : null
-      if (data) block = data.cedar_ember ?? null
-      else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")
+      if (data) {
+        block = data.cedar_ember ?? null
+        answeredAt = nowMs
+      } else ctx.host.log.warn("reset grants check failed (status=" + resp.status + "); keeping the last answer")
     } catch (e) {
       ctx.host.log.warn("reset grants check failed: " + String(e) + "; keeping the last answer")
     }
     try {
-      ctx.host.fs.writeText(path, JSON.stringify({ account: account, checkedAt: nowMs, block: block }))
+      ctx.host.fs.writeText(path, JSON.stringify({ account: account, checkedAt: nowMs, answeredAt: answeredAt, block: block }))
     } catch (e) {
       ctx.host.log.warn("reset grants cache write failed: " + String(e))
     }
@@ -1400,15 +1413,22 @@
     return staleSince === null ? { plan: plan, lines: lines } : { plan: plan, lines: lines, staleSince: staleSince }
   }
 
-  // Who is signed in, for the WSL same-account check (wsl.rs). Claude Code keeps the account in
-  // `.claude.json`: inside CLAUDE_CONFIG_DIR when that is set, else in the home folder. Local only.
-  function accountKey(ctx) {
+  // Claude Code's `.claude.json`: inside CLAUDE_CONFIG_DIR when that is set, else in the home
+  // folder. Local only.
+  function readClaudeJson(ctx) {
     const override = getClaudeHomeOverride(ctx)
     const path = override ? override.replace(/[\\/]+$/, "") + "/.claude.json" : "~/.claude.json"
-    if (!ctx.host.fs.exists(path)) return null
-    const data = ctx.util.tryParseJson(ctx.host.fs.readText(path))
-    const id = data && data.oauthAccount && data.oauthAccount.accountUuid
+    return ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
+  }
+
+  function accountIdOf(claudeJson) {
+    const id = claudeJson && claudeJson.oauthAccount && claudeJson.oauthAccount.accountUuid
     return typeof id === "string" && id.trim() ? id.trim() : null
+  }
+
+  // Who is signed in, for the WSL same-account check (wsl.rs).
+  function accountKey(ctx) {
+    return accountIdOf(readClaudeJson(ctx))
   }
 
   globalThis.__openusage_plugin = { id: "claude", probe, accountKey }
