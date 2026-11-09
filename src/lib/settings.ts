@@ -53,6 +53,7 @@ const USAGE_ALERTS_KEY = "usageAlerts";
 const ALERT_SETTINGS_KEY = "alertSettings";
 const CURRENCY_KEY = "currency";
 const PROJECT_BUDGETS_KEY = "projectBudgets";
+const COLLAPSED_SECTIONS_KEY = "collapsedSections";
 const PANEL_PINNED_KEY = "panelPinned";
 // Read by src-tauri/src/tray.rs, which also writes the position while the user drags the panel.
 const REMEMBER_PANEL_POSITION_KEY = "rememberPanelPosition";
@@ -490,6 +491,26 @@ export async function loadProjectBudgets(): Promise<ProjectBudgets> {
 
 export async function saveProjectBudgets(value: ProjectBudgets): Promise<void> {
   await store.set(PROJECT_BUDGETS_KEY, value);
+  await store.save();
+}
+
+/** The parts of a provider's detail page that a click on their title closes, for every provider. */
+export const DETAIL_SECTIONS = ["resets", "cost", "models", "sessions", "heatmap", "projects"] as const;
+export type DetailSection = (typeof DETAIL_SECTIONS)[number];
+/** Closed until opened: the two longest parts, and the hour grid reads the logs only once it's open. */
+export const DEFAULT_COLLAPSED_SECTIONS: DetailSection[] = ["models", "heatmap"];
+
+export function normalizeCollapsedSections(value: unknown): DetailSection[] {
+  if (!Array.isArray(value)) return DEFAULT_COLLAPSED_SECTIONS;
+  return DETAIL_SECTIONS.filter((section) => value.includes(section));
+}
+
+export async function loadCollapsedSections(): Promise<DetailSection[]> {
+  return normalizeCollapsedSections(await store.get<unknown>(COLLAPSED_SECTIONS_KEY));
+}
+
+export async function saveCollapsedSections(value: DetailSection[]): Promise<void> {
+  await store.set(COLLAPSED_SECTIONS_KEY, value);
   await store.save();
 }
 

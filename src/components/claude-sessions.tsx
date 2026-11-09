@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { DetailSection } from "@/components/detail-section"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { useNowTicker } from "@/hooks/use-now-ticker"
 import { usePanelOpen } from "@/hooks/use-unseen-usage"
@@ -62,20 +63,31 @@ export function useClaudeSessions(pluginId: string) {
   return enabled ? sessions : []
 }
 
-export function ClaudeSessionList({ sessions }: { sessions: LiveSession[] }) {
+/** `section`: on the detail page, where the list is one of the parts that close. */
+export function ClaudeSessionList({ sessions, section = false }: { sessions: LiveSession[]; section?: boolean }) {
   if (sessions.length === 0) return null
+  const rows = sessions.map((session) => <SessionRow key={session.id} session={session} />)
+  if (section) {
+    return (
+      <DetailSection
+        id="sessions"
+        title={t("card.sessions.title")}
+        aside={<span className="tabular-nums text-muted-foreground">{sessions.length}</span>}
+      >
+        <div className="space-y-1.5">{rows}</div>
+      </DetailSection>
+    )
+  }
   return (
     <div className="mt-4 space-y-1.5">
       <div className="text-xs font-medium text-muted-foreground">{t("card.sessions.title")}</div>
-      {sessions.map((session) => (
-        <SessionRow key={session.id} session={session} />
-      ))}
+      {rows}
     </div>
   )
 }
 
-export function ClaudeSessions({ pluginId }: { pluginId: string }) {
-  return <ClaudeSessionList sessions={useClaudeSessions(pluginId)} />
+export function ClaudeSessions({ pluginId, section }: { pluginId: string; section?: boolean }) {
+  return <ClaudeSessionList sessions={useClaudeSessions(pluginId)} section={section} />
 }
 
 function SessionRow({ session }: { session: LiveSession }) {

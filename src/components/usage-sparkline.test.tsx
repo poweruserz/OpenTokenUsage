@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { describe, expect, it } from "vitest"
 import userEvent from "@testing-library/user-event"
 import { ProviderCard } from "@/components/provider-card"
@@ -55,6 +56,8 @@ describe("UsageSparkline", () => {
   })
 
   it("renders an inline usage sparkline row inside a ProviderCard", () => {
+    // The rows after the chart are the page's models section, which starts closed.
+    useAppPreferencesStore.setState({ collapsedSections: [] })
     render(
       <ProviderCard
         name="Chart"

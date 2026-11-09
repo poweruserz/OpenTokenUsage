@@ -25,6 +25,8 @@ import {
   type TrayMetric,
   type TrayPercentColor,
   type ProjectBudgets,
+  type DetailSection,
+  DEFAULT_COLLAPSED_SECTIONS,
   type TrayProvider,
 } from "@/lib/settings"
 import { DEFAULT_CURRENCY, type CurrencySetting } from "@/lib/currency"
@@ -46,6 +48,7 @@ type AppPreferencesStore = {
   alertSettings: AlertSettings
   currency: CurrencySetting
   projectBudgets: ProjectBudgets
+  collapsedSections: DetailSection[]
   panelPinned: boolean
   rememberPanelPosition: boolean
   trayLogoColors: boolean
@@ -68,6 +71,7 @@ type AppPreferencesStore = {
   setAlertSettings: (value: AlertSettings) => void
   setCurrency: (value: CurrencySetting) => void
   setProjectBudgets: (value: ProjectBudgets) => void
+  setCollapsedSections: (value: DetailSection[]) => void
   setPanelPinned: (value: boolean) => void
   setRememberPanelPosition: (value: boolean) => void
   setTrayLogoColors: (value: boolean) => void
@@ -94,6 +98,7 @@ const initialState = {
   alertSettings: DEFAULT_ALERT_SETTINGS,
   currency: DEFAULT_CURRENCY,
   projectBudgets: {} as ProjectBudgets,
+  collapsedSections: DEFAULT_COLLAPSED_SECTIONS,
   panelPinned: false,
   rememberPanelPosition: false,
   trayLogoColors: true,
@@ -120,6 +125,7 @@ export const useAppPreferencesStore = create<AppPreferencesStore>((set) => ({
   setAlertSettings: (value) => set({ alertSettings: value }),
   setCurrency: (value) => set({ currency: value }),
   setProjectBudgets: (value) => set({ projectBudgets: value }),
+  setCollapsedSections: (value) => set({ collapsedSections: value }),
   setPanelPinned: (value) => set({ panelPinned: value }),
   setRememberPanelPosition: (value) => set({ rememberPanelPosition: value }),
   setTrayLogoColors: (value) => set({ trayLogoColors: value }),

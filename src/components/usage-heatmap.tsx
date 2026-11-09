@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
+import { DetailSection, useDetailSectionOpen } from "@/components/detail-section"
 import { usePanelOpen } from "@/hooks/use-unseen-usage"
 import { getLocale, t } from "@/lib/i18n"
 import { getTimeFormatter } from "@/lib/reset-tooltip"
@@ -40,15 +41,16 @@ const ROW = "grid grid-cols-[2rem_repeat(24,minmax(0,1fr))] items-center gap-px"
 /** When in the week a login's CLI was used over the last four weeks, read every few minutes while shown. */
 export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: string; timeFormatMode?: TimeFormatMode }) {
   const open = usePanelOpen()
+  // Closed, it reads nothing: the first read of the logs after a start takes seconds.
+  const shown = useDetailSectionOpen("heatmap")
   // Kept with the card it belongs to: the detail page reuses this component when another card is picked.
   const [read, setRead] = useState<{ pluginId: string; heatmap: Heatmap } | null>(null)
   // The cell with keyboard focus: the readout shows it instead of the busiest hour.
   const [active, setActive] = useState<Cell | null>(null)
   const cells = useRef<(HTMLSpanElement | null)[]>([])
-  const titleId = useId()
 
   useEffect(() => {
-    if (!open || !isTauri() || !hasUsageLogs(pluginId)) return
+    if (!open || !shown || !isTauri() || !hasUsageLogs(pluginId)) return
     let live = true
     const load = () =>
       invoke<Heatmap>("usage_heatmap", { pluginId })
@@ -62,7 +64,7 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
       live = false
       clearInterval(timer)
     }
-  }, [open, pluginId])
+  }, [open, shown, pluginId])
 
   const heatmap = read?.pluginId === pluginId ? read.heatmap : null
   const showsGrid = (heatmap?.slots.length ?? 0) > 0
@@ -71,7 +73,9 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
     if (!showsGrid) setActive(null)
   }, [showsGrid])
 
-  if (!heatmap || (!showsGrid && heatmap.unreadable === 0)) return null
+  if (!hasUsageLogs(pluginId)) return null
+  const title = t("heatmap.title")
+  if (!shown || !heatmap) return <DetailSection id="heatmap" title={title} />
 
   const grid = heatmapGrid(heatmap.slots)
   const max = Math.max(1, ...grid.flat())
@@ -102,19 +106,19 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
   }
 
   return (
-    <section className="pb-3">
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <span id={titleId} className="text-xs font-medium text-muted-foreground">
-          {t("heatmap.title")}
-        </span>
-        {showsGrid && (
+    <DetailSection
+      id="heatmap"
+      title={title}
+      controls={
+        showsGrid ? (
           <span className="text-[10px] tabular-nums text-muted-foreground">
             {active ? cellLabel(active) : t("heatmap.peak", { day: days[peak.day], hour: hourLabel(peak.hour) })}
           </span>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
       {showsGrid && (
-        <div role="grid" aria-labelledby={titleId} className="flex flex-col gap-px">
+        <div role="grid" aria-label={title} className="flex flex-col gap-px">
           {grid.map((row, day) => (
             <div key={day} role="row" className={ROW}>
               <span role="rowheader" className="truncate pr-1 text-[10px] leading-none text-muted-foreground">
@@ -158,6 +162,6 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
       {heatmap.unreadable > 0 && (
         <p className="mt-1.5 text-[10px] text-destructive">{t("heatmap.unreadable", { count: heatmap.unreadable })}</p>
       )}
-    </section>
+    </DetailSection>
   )
 }

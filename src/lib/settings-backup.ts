@@ -9,6 +9,7 @@ import { backupStore, DEFAULT_ALERT_SETTINGS, DEFAULT_TASKBAR_STRIP_STYLE, norma
 export const BACKUP_KEYS = [
   "alertSettings",
   "autoUpdateInterval",
+  "collapsedSections",
   "currency",
   "displayMode",
   "globalShortcut",
