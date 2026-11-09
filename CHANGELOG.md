@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.2
+
+Rate limit resets that arrive after a model launch show up within the hour, and project costs follow the newer models' prices.
+
+### Bug Fixes
+- Claude: rate limit resets handed out after the app last asked for them showed as "0 available" for up to a day (the Fable 5.2 launch gave Max accounts three). An account without any is asked only once a day, the read Anthropic limits hardest. When Claude Code has noticed an unused reset, the app now asks again within the hour, and tries again an hour after a check that failed (#73)
+- Usage by project: a model's dollars are shared out at that model's own cache-read price. A cache read costs a twentieth of the input price on Opus 5.5 and Sonnet 5.5 and a fortieth on Fable and Mythos 5.1 and 5.2; counting a tenth for every model gave projects with long conversations too much of the month. The month's total is unchanged (#74)
+
 ## v0.8.1
 
 What each project costs on Claude and Codex, with monthly budgets, and fewer Claude rate limits.
