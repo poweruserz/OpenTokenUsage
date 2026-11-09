@@ -558,14 +558,14 @@ describe("claude plugin", () => {
   })
 
   it("names the Max tiers as Anthropic does since 2026-10-30: Max 5x is Max, Max 20x is Ultra", async () => {
-    const runCase = async (rateLimitTier, expectedPlan) => {
+    const runCase = async (rateLimitTier, expectedPlan, subscriptionType = "max") => {
       const ctx = makeCtx()
       ctx.host.fs.exists = () => true
       ctx.host.fs.readText = () =>
         JSON.stringify({
           claudeAiOauth: {
             accessToken: "token",
-            subscriptionType: "max",
+            subscriptionType,
             rateLimitTier,
           },
         })
@@ -584,7 +584,11 @@ describe("claude plugin", () => {
     await runCase("default_claude_max_20x", "Ultra")
     await runCase("claude_max_subscription_20x", "Ultra")
     await runCase("default_claude_max_5x", "Max")
+    await runCase("default_claude_max_10x", "Max")
     await runCase(undefined, "Max")
+    // Other plans keep their tier.
+    await runCase("default_claude_max_5x", "Team 5x", "team")
+    await runCase(undefined, "Pro", "pro")
   })
 
   it("omits resetsAt when resets_at is missing", async () => {
@@ -2238,10 +2242,16 @@ describe("claude plugin", () => {
         profileResponse({ organization_type: "claude_team", rate_limit_tier: "default_claude_max_5x", plan_display_name: " Team Premium " })
       )
       expect((await loadPlugin()).probe(ctx).plan).toBe("Team Premium")
+
+      const longest = makeCtx()
+      longest.host.fs.exists = () => true
+      longest.host.fs.readText = () => STORED
+      routeRequests(longest, () => profileResponse({ plan_display_name: "x".repeat(40) }))
+      expect((await loadPlugin()).probe(longest).plan).toBe("x".repeat(40))
     })
 
     it("names the plan itself when the profile's name can't be shown", async () => {
-      for (const name of ["", "   ", "x".repeat(41), "Ultra\u0007", 20, null]) {
+      for (const name of ["", "   ", "x".repeat(41), "Ultra\u0007", "Ultra\u007f", "Ultra\u0085", 20, null]) {
         const ctx = makeCtx()
         ctx.host.fs.exists = () => true
         ctx.host.fs.readText = () => STORED
@@ -2261,6 +2271,9 @@ describe("claude plugin", () => {
       // As 0.8.2 and earlier kept it.
       const fingerprint = JSON.parse(ctx.host.fs.readText(KEPT)).fingerprint
       ctx.host.fs.writeText(KEPT, JSON.stringify({ fingerprint: fingerprint, plan: "Max 20x" }))
+      // A probe inside the read gap asks nothing: the login's plan shows, never the kept old name.
+      expect((await loadPlugin()).probe(ctx).plan).toBe("Max")
+      expect(profileCalls(ctx)).toHaveLength(1)
       ageLastRead(ctx)
       expect((await loadPlugin()).probe(ctx).plan).toBe("Ultra")
       expect(profileCalls(ctx)).toHaveLength(2)

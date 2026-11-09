@@ -130,9 +130,9 @@ Content-Type: application/json
 
 The badge shows the plan under Anthropic's own name: `organization.plan_display_name` from `GET /api/oauth/profile` (`Pro`, `Max`, `Ultra`), the name Claude Code shows too. The profile is read at most once per token pair, after a usage read that worked, and the answer is kept in `live-plan.json`; Claude Code stamps the plan into the login at sign-in and never updates it, so an upgrade would otherwise show the old plan until the next sign-in.
 
-Until the profile has answered, and when it gives no usable name, the plan is named from the login's `subscriptionType` and `rateLimitTier`. Anthropic renamed the Max tiers on 2026-10-30, and the ids didn't change:
+When the profile gives no usable name, the plan is named from its `organization_type` and `rate_limit_tier`, with the login's `subscriptionType` and `rateLimitTier` for what it omits; until the profile has answered, from the login's alone. Anthropic renamed the Max tiers on 2026-10-30, and the ids didn't change:
 
-| `subscriptionType` | `rateLimitTier` | Name | Before 2026-10-30 |
+| Type | Tier | Name | Before 2026-10-30 |
 |---|---|---|---|
 | `max` | `default_claude_max_5x` | Max | Max 5x |
 | `max` | `default_claude_max_20x` | Ultra | Max 20x |

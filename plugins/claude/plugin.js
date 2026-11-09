@@ -551,7 +551,7 @@
   // The profile's own name for the plan ("Ultra"), when it can be shown as a badge.
   function planDisplayName(value) {
     const name = typeof value === "string" ? value.trim() : ""
-    return name && name.length <= 40 && !/[\u0000-\u001f\u007f]/.test(name) ? name : null
+    return name && name.length <= 40 && !/[\u0000-\u001f\u007f-\u009f]/.test(name) ? name : null
   }
 
   // Claude Code stamps subscriptionType/rateLimitTier into the login at sign-in and never updates
