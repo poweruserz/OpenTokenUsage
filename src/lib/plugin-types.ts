@@ -6,7 +6,10 @@ export type BarChartPoint = {
   valueLabel?: string
 }
 
-export type ResetCredit = { count: number; expiresAt?: string }
+/** What a banked reset clears. A Fable reset gives the weekly limit back only what Fable used. */
+export type ResetKind = "session" | "weekly" | "fable" | "full"
+
+export type ResetCredit = { count: number; expiresAt?: string; kind?: ResetKind }
 
 export type MetricLine =
   | { type: "text"; label: string; value: string; color?: string; subtitle?: string; resetCredits?: ResetCredit[] }

@@ -32,6 +32,26 @@ describe("banked reset inventory", () => {
     ])
     expect(liveResetCredits([{ count: 1, expiresAt: "bad" }], NOW)).toEqual([{ count: 1, expiresAt: undefined }])
   })
+  it("counts resets of one kind that expire together as one entry, and keeps kinds apart", () => {
+    expect(
+      liveResetCredits(
+        [
+          { count: 1, expiresAt: expiry(48), kind: "fable" },
+          { count: 1, expiresAt: expiry(48), kind: "fable" },
+          { count: 1, expiresAt: new Date(NOW + 48 * HOUR).toISOString().replace(".000Z", "+00:00"), kind: "fable" },
+          { count: 1, expiresAt: expiry(48), kind: "weekly" },
+          { count: 1, expiresAt: expiry(24), kind: "fable" },
+          { count: 2, expiresAt: expiry(48) }
+        ],
+        NOW
+      )
+    ).toEqual([
+      { count: 1, expiresAt: expiry(24), kind: "fable" },
+      { count: 3, expiresAt: expiry(48), kind: "fable" },
+      { count: 1, expiresAt: expiry(48), kind: "weekly" },
+      { count: 2, expiresAt: expiry(48) }
+    ])
+  })
   it("warns once in seven days, again in 24 hours, never after expiry", () => {
     const first = collect()
     expect(first).toHaveLength(1)

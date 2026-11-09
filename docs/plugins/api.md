@@ -358,7 +358,7 @@ ctx.line.text({
   value: string,      // Required: value shown on the right
   color?: string,     // Optional: hex color for value text
   subtitle?: string,  // Optional: smaller text below the line
-  resetCredits?: { count: number; expiresAt?: string }[] // Banked resets; ISO expiry, omitted when unknown
+  resetCredits?: { count: number; expiresAt?: string; kind?: "session" | "weekly" | "fable" | "full" }[] // Banked resets; ISO expiry, omitted when unknown; kind = what it clears, omitted when the provider doesn't say (another value is dropped)
 }): MetricLine
 ```
 

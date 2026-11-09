@@ -1112,6 +1112,19 @@
     return Number.isFinite(parsed) ? parsed : null
   }
 
+  // What a grant resets, named as Claude Code names it. A Fable reset (`gives_back_weekly`) clears
+  // the Fable limit and gives the weekly limit back only what Fable used: beside a weekly reset it
+  // mustn't read as one. A grant that doesn't say what it clears has no kind.
+  function resetKind(grant) {
+    if (grant.gives_back_weekly === true) return "fable"
+    if (grant.type === "session" || grant.type === "weekly" || grant.type === "full") return grant.type
+    const clears = Array.isArray(grant.clears) ? grant.clears : []
+    if (clears.length === 0) return undefined
+    const session = clears.includes("five_hour")
+    const other = clears.some((limit) => limit !== "five_hour")
+    return session && !other ? "session" : other && !session ? "weekly" : "full"
+  }
+
   // Anthropic's one-off usage-limit reset grants (`cedar_ember`, e.g. a model-launch reset for
   // Pro/Max), read-only like Codex's Rate Limit Resets row (upstream #1290). Grants past their
   // `ends_at` deadline or with no resets left are skipped; an ineligible account reads
@@ -1128,7 +1141,11 @@
         const endsAtMs = ctx.util.parseDateMs(ctx.util.toIso(grant.ends_at))
         if (endsAtMs !== null && endsAtMs <= nowMs) continue
         count += Math.floor(left)
-        inventory.push({ count: Math.floor(left), expiresAt: ctx.util.toIso(grant.ends_at) || undefined })
+        inventory.push({
+          count: Math.floor(left),
+          expiresAt: ctx.util.toIso(grant.ends_at) || undefined,
+          kind: resetKind(grant),
+        })
       }
     }
     lines.push(ctx.line.text({ label: "Rate Limit Resets", value: count + " available", resetCredits: inventory }))

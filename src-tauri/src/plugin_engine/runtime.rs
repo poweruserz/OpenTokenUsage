@@ -29,6 +29,10 @@ pub struct BarChartPoint {
 pub struct ResetCredit {
     count: u32,
     expires_at: Option<String>,
+    /// What the reset clears: `session`, `weekly`, `fable` or `full`. None when the provider
+    /// doesn't say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -366,6 +370,12 @@ fn parse_lines(result: &Object) -> Result<Vec<MetricLine>, String> {
                                 Ok(ResetCredit {
                                     count: count as u32,
                                     expires_at: entry.get::<_, String>("expiresAt").ok(),
+                                    kind: entry.get::<_, String>("kind").ok().filter(|kind| {
+                                        matches!(
+                                            kind.as_str(),
+                                            "session" | "weekly" | "fable" | "full"
+                                        )
+                                    }),
                                 })
                             })
                             .collect::<Result<Vec<_>, String>>()
@@ -943,7 +953,7 @@ mod tests {
         let plugin = test_plugin(
             r#"
             globalThis.__openusage_plugin = {
-                probe(ctx) { return { lines: [ctx.line.text({ label: "Rate Limit Resets", value: "2 available", resetCredits: [{count: 2, expiresAt: "2099-01-01T00:00:00Z"}] })] }; }
+                probe(ctx) { return { lines: [ctx.line.text({ label: "Rate Limit Resets", value: "2 available", resetCredits: [{count: 2, expiresAt: "2099-01-01T00:00:00Z", kind: "fable"}, {count: 1, kind: "<b>bold</b>"}] })] }; }
             };
         "#,
         );
@@ -960,6 +970,9 @@ mod tests {
             value["lines"][0]["resetCredits"][0]["expiresAt"],
             "2099-01-01T00:00:00Z"
         );
+        assert_eq!(value["lines"][0]["resetCredits"][0]["kind"], "fable");
+        // A kind the app doesn't know is dropped, not shown.
+        assert!(value["lines"][0]["resetCredits"][1].get("kind").is_none());
     }
 
     #[test]
