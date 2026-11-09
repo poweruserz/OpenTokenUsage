@@ -55,15 +55,36 @@ type Usage = HashMap<(String, String, String), Parts>;
 /// What a token of each kind costs next to an uncached input token. Anthropic and OpenAI price their
 /// models in these ratios (Anthropic's 5-minute cache writes, OpenAI's GPT-5 family), so sharing a
 /// model's dollars by them is exact but for 1-hour cache writes and long-context rates.
-fn weight(log: Log, parts: &Parts) -> f64 {
+fn weight(log: Log, model: &str, parts: &Parts) -> f64 {
     let (output, cache_write, cache_read) = match log {
-        Log::Claude => (5.0, 1.25, 0.1),
+        Log::Claude => (5.0, 1.25, claude_cache_read(model)),
         Log::Codex => (8.0, 1.0, 0.1),
     };
     parts.input as f64
         + parts.output as f64 * output
         + parts.cache_write as f64 * cache_write
         + parts.cache_read as f64 * cache_read
+}
+
+/// A cache read on Claude cost a tenth of an input token up to Opus 5 and Fable 5, and less on the
+/// models after them (most of Claude Code's tokens are cache reads, so a tenth there overpays the
+/// projects with long conversations). A model newer than these counts at a tenth until it's added.
+fn claude_cache_read(model: &str) -> f64 {
+    // The version must end where the name does: a dated `fable-5-20260101` starts like `fable-5-2`.
+    let is = |names: &[&str]| {
+        names.iter().any(|name| {
+            model.match_indices(name).any(|(at, _)| {
+                !model[at + name.len()..].starts_with(|next: char| next.is_ascii_digit())
+            })
+        })
+    };
+    if is(&["fable-5-1", "fable-5-2", "mythos-5-1", "mythos-5-2"]) {
+        0.025
+    } else if is(&["opus-5-5", "sonnet-5-5"]) {
+        0.05
+    } else {
+        0.1
+    }
 }
 
 /// ccusage's dollars for the month by model. Its Codex report has no per-model dollars: those are
@@ -202,7 +223,7 @@ fn share_out(
     let pooled = costs.is_some_and(|costs| costs.contains_key(""));
     for ((model, ..), parts) in usage {
         let key = if pooled { "" } else { model.as_str() };
-        *weights.entry(key).or_default() += weight(log, parts);
+        *weights.entry(key).or_default() += weight(log, model, parts);
     }
     let rate = |model: &str| -> f64 {
         let key = if pooled { "" } else { model };
@@ -236,7 +257,7 @@ fn share_out(
             .or_default()
             .entry(branch.as_str())
             .or_default();
-        spent.0 += weight(log, parts) * rate(model);
+        spent.0 += weight(log, model, parts) * rate(model);
         spent.1 += parts.total();
     }
 
@@ -489,6 +510,37 @@ mod tests {
 
     fn cents(usd: f64) -> i64 {
         (usd * 100.0).round() as i64
+    }
+
+    #[test]
+    fn weighs_cache_reads_at_each_claude_models_own_price() {
+        // 20 output tokens cost what 100 input tokens do: as much as 4000 cache reads on Fable 5.2
+        // (a fortieth of input each), 2000 on Opus 5.5 (a twentieth), 1000 on Opus 5 (a tenth).
+        for (model, reads) in [
+            ("claude-fable-5-2", 4000),
+            ("claude-fable-5-2-20261101", 4000),
+            ("claude-mythos-5-2", 4000),
+            ("claude-fable-5-1", 4000),
+            ("claude-mythos-5-1", 4000),
+            ("claude-opus-5-5", 2000),
+            ("claude-opus-5-5[1m]", 2000),
+            ("claude-sonnet-5-5", 2000),
+            ("claude-opus-5", 1000),
+            ("claude-fable-5", 1000),
+            // A dated id of the older model starts like the newer one's name.
+            ("claude-fable-5-20261101", 1000),
+            ("claude-mythos-5-20261101", 1000),
+            ("claude-haiku-5-5", 1000),
+        ] {
+            let usage = usage(&[
+                (model, "C:/work/shop", "main", parts(0, 20, 0, 0)),
+                (model, "C:/work/blog", "main", parts(0, 0, 0, reads)),
+            ]);
+            let costs = HashMap::from([(model.to_string(), 8.0)]);
+            let out = share_out(Log::Claude, &usage, Some(&costs), by_parent);
+            let shares: Vec<_> = out.projects.iter().map(|p| cents(p.cost)).collect();
+            assert_eq!(shares, [400, 400], "{model}");
+        }
     }
 
     #[test]
