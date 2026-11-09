@@ -2607,10 +2607,14 @@ describe("claude plugin", () => {
         { resets_left: 1, clears: ["five_hour", "seven_day"] },
         { resets_left: 1, type: "something new" },
         { resets_left: 1 },
+        // Its type names it before what it clears does; nothing usable names nothing.
+        { resets_left: 1, type: "weekly", clears: ["five_hour"] },
+        { resets_left: 1, clears: [] },
+        { resets_left: 1, clears: "five_hour" },
       ] } })
-      expect(line.value).toBe("7 available")
+      expect(line.value).toBe("10 available")
       expect(line.resetCredits.map((credit) => credit.kind)).toEqual([
-        "weekly", "fable", "session", "weekly", "full", undefined, undefined,
+        "weekly", "fable", "session", "weekly", "full", undefined, undefined, "weekly", undefined, undefined,
       ])
     })
 

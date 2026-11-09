@@ -51,6 +51,29 @@ describe("banked reset inventory", () => {
       { count: 1, expiresAt: expiry(48), kind: "weekly" },
       { count: 2, expiresAt: expiry(48) }
     ])
+    // Without a kind, and without an expiry, the same holds.
+    expect(
+      liveResetCredits(
+        [
+          { count: 1, expiresAt: expiry(48) },
+          { count: 1, expiresAt: expiry(48) },
+          { count: 1, kind: "fable" },
+          { count: 2, kind: "fable" },
+          { count: 1, kind: "weekly" },
+          { count: 1 }
+        ],
+        NOW
+      )
+    ).toEqual([
+      { count: 2, expiresAt: expiry(48) },
+      { count: 3, kind: "fable" },
+      { count: 1, kind: "weekly" },
+      { count: 1 }
+    ])
+  })
+  it("shows a kind it has no name for as a plain reset", () => {
+    const kept = [{ count: 1, expiresAt: expiry(48), kind: "monthly" }] as unknown as Parameters<typeof liveResetCredits>[0]
+    expect(liveResetCredits(kept, NOW)).toEqual([{ count: 1, expiresAt: expiry(48) }])
   })
   it("warns once in seven days, again in 24 hours, never after expiry", () => {
     const first = collect()
