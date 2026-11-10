@@ -175,6 +175,13 @@ This file holds the project facts that are easy to get wrong.
   cards in every setting that names cards (`plugins`, `trayHiddenPlugins`, `providerLevels`, the strip's providers and
   line modes, `trayProvider`); the backup's card ids are dropped. A new preference key belongs in `BACKUP_KEYS` too,
   and a new setting that names cards in `restoredValue`.
+- Detail page sections (`detail-section.tsx`, `detail-sections.ts`): a provider's detail page shows its bars, then
+  parts under a rule and a title that closes them: banked resets, cost (the text rows before a usage chart, and the
+  chart), models (the rows after the chart: both ccusage plugins list each model's share there), live sessions, the
+  hour grid, projects. A provider without a chart keeps its text rows with the bars. The closed parts are the setting
+  `collapsedSections`: one list for every provider, in `BACKUP_KEYS`, read once at start (`useStoredDetailSections`);
+  models and the hour grid start closed. A closed hour grid or projects list reads no logs. The overview card keeps
+  one run of lines.
 - Pace (`pace-status.ts`): one elapsed share for everything that shows it (card dot, marker, deficit, tray,
   pace alert) via `paceElapsedFraction`; with `paceWorkdays` a ~7-day window counts Mon–Fri (local time) only.
 - Currency (`src/lib/currency.ts`, setting `currency`): providers report US dollars; the card shows `dollars`

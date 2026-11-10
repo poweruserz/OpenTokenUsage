@@ -149,13 +149,13 @@ A login inside a running WSL distro shows as its own `Claude · WSL` card when i
 
 ## Banked reset expiry
 
-The reset row shows the available count and each expiry in local time, with a live days/hours countdown. Expired entries are removed locally between probes. The usage-page button opens the provider dashboard; this app never redeems a reset.
+The resets section shows the available count beside its title and a row per kind of reset: how many, the time left, and the day they expire (the exact local time on hover). Expired entries are removed locally between probes. The usage-page button opens the provider dashboard; this app never redeems a reset.
 
 Usage notifications also remind you during the final seven days and final 24 hours. The app must be running, notifications enabled, and the provider data current. Reminders are persisted so restarting does not repeat them. A missing expiry is shown as unavailable and never guessed.
 
 `cedar_ember.grants[].ends_at` supplies expiry dates; `resets_left` supplies counts. Spent, expired, paused, and explicitly unusable grants are excluded.
 
-Each entry names what it resets, as Claude Code does: a grant with `gives_back_weekly` is a **Fable reset**, otherwise its `type` (`session`, `weekly`, `full`) names it, and without a type what it `clears` does (only `five_hour`: 5-hour reset; no `five_hour`: weekly reset; both: full reset). A Fable reset clears the 5-hour and Fable limits and gives the weekly limit back only what Fable used, so the row says so under it: counted with a weekly reset as one number, it read as a reset of the whole week. Resets of one kind that expire together are shown as one entry with their count. A grant that says neither has no name.
+Each entry names what it resets, as Claude Code does: a grant with `gives_back_weekly` is a **Fable reset**, otherwise its `type` (`session`, `weekly`, `full`) names it, and without a type what it `clears` does (only `five_hour`: 5-hour reset; no `five_hour`: weekly reset; both: full reset). A Fable reset clears the 5-hour and Fable limits and gives the weekly limit back only what Fable used, so the row says so under it: counted with a weekly reset as one number, it read as a reset of the whole week. Resets of one kind that expire together are shown as one entry with their count. A grant that says neither is a plain reset.
 
 Implementation reference: [T3 Code Claude reset credits](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/claudeResetCredits.ts). T3 Code also implements explicit redemption; OpenTokenUsage opens the provider’s usage page instead.
 

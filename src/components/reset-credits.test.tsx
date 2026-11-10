@@ -9,6 +9,7 @@ describe("reset inventory", () => {
   it("shows live count, countdown, absolute expiry, unknown expiry and opens usage", async () => {
     render(
       <ResetCredits
+        label="Rate Limit Resets"
         now={now}
         usageUrl={url}
         credits={[
@@ -19,9 +20,10 @@ describe("reset inventory", () => {
       />
     )
     expect(screen.getByText("3 available")).toBeInTheDocument()
-    expect(screen.getByText("1 reset(s) expire in 2d 3h")).toBeInTheDocument()
+    // The row shows the time left and the day; the sentence and the exact time are spelled out beside it.
+    expect(screen.getByText(/^2d 3h · /)).toBeInTheDocument()
+    expect(screen.getByText(/^1 reset\(s\) expire in 2d 3h \(.*2026/)).toBeInTheDocument()
     expect(screen.getByText("2 reset(s): expiry unavailable")).toBeInTheDocument()
-    expect(screen.getByText(/2026/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button"))
     expect(openUrl).toHaveBeenCalledWith(url)
   })
@@ -29,6 +31,7 @@ describe("reset inventory", () => {
     const expiresAt = "2026-10-26T15:00:00Z"
     render(
       <ResetCredits
+        label="Rate Limit Resets"
         now={now}
         credits={[
           { count: 1, expiresAt, kind: "fable" },
@@ -39,26 +42,33 @@ describe("reset inventory", () => {
       />
     )
     expect(screen.getByText("5 available")).toBeInTheDocument()
-    expect(screen.getByText("Fable reset")).toBeInTheDocument()
-    expect(screen.getByText("3 reset(s) expire in 2d 3h")).toBeInTheDocument()
+    expect(screen.getByText("Fable reset").textContent).toBe("Fable reset ×3")
+    expect(screen.getByText(/^3 reset\(s\) expire in 2d 3h/)).toBeInTheDocument()
     expect(screen.getByText(/only gets back what Fable used/)).toBeInTheDocument()
-    expect(screen.getByText("Weekly reset")).toBeInTheDocument()
-    expect(screen.getByText("1 reset(s) expire in 2d 3h")).toBeInTheDocument()
-    // A reset the provider doesn't describe stays as it was: no name, no note.
-    expect(screen.getByText("1 reset(s) expire in 3d 3h")).toBeInTheDocument()
+    expect(screen.getByText("Weekly reset").textContent).toBe("Weekly reset ×1")
+    expect(screen.getByText(/^1 reset\(s\) expire in 2d 3h/)).toBeInTheDocument()
+    // A reset the provider doesn't describe is a plain reset, without a note.
+    expect(screen.getByText("Reset").textContent).toBe("Reset ×1")
+    expect(screen.getByText(/^1 reset\(s\) expire in 3d 3h/)).toBeInTheDocument()
     expect(screen.queryByText("Full reset")).not.toBeInTheDocument()
+  })
+  it("says what a Fable reset leaves of the weekly limit even when its expiry isn't known", () => {
+    render(<ResetCredits label="Rate Limit Resets" now={now} credits={[{ count: 1, kind: "fable" }]} />)
+    expect(screen.getByText("Fable reset")).toBeInTheDocument()
+    expect(screen.getByText("1 reset(s): expiry unavailable")).toBeInTheDocument()
+    expect(screen.getByText(/only gets back what Fable used/)).toBeInTheDocument()
   })
   it("removes expired resets between probes", () => {
     const credits = [{ count: 1, expiresAt: new Date(now + 1000).toISOString() }]
-    const { rerender } = render(<ResetCredits credits={credits} now={now} usageUrl={url} />)
-    rerender(<ResetCredits credits={credits} now={now + 1000} usageUrl={url} />)
+    const { rerender } = render(<ResetCredits label="Rate Limit Resets" credits={credits} now={now} usageUrl={url} />)
+    rerender(<ResetCredits label="Rate Limit Resets" credits={credits} now={now + 1000} usageUrl={url} />)
     expect(screen.getByText("0 available")).toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
   it("shows a visible error if opening the page fails", async () => {
     vi.mocked(openUrl).mockRejectedValueOnce(new Error("blocked"))
     vi.spyOn(console, "error").mockImplementation(() => {})
-    render(<ResetCredits credits={[{ count: 1 }]} now={now} usageUrl={url} />)
+    render(<ResetCredits label="Rate Limit Resets" credits={[{ count: 1 }]} now={now} usageUrl={url} />)
     fireEvent.click(screen.getByRole("button"))
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Could not open"))
   })

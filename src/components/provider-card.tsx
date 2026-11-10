@@ -1,5 +1,7 @@
-import { ResetCredits } from "@/components/reset-credits"
+import { resetCount, ResetCreditRows, ResetCredits } from "@/components/reset-credits"
 import { ClaudeSessions, isClaudeLogin } from "@/components/claude-sessions"
+import { DetailSection } from "@/components/detail-section"
+import { detailLines } from "@/lib/detail-sections"
 import { Fragment, useMemo } from "react"
 import { AlertCircle, Clock, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -202,9 +204,39 @@ export function ProviderCard({
     return t("card.availableIn", { time })
   }
 
+  const usageUrl = links.find((link) => link.label === "Usage dashboard")?.url
+  const renderLines = (lines: MetricLine[]) =>
+    groupLinesByType(lines).map((group, gi) => {
+      const rows = group.lines.map((line, li) => (
+        <MetricLineRenderer
+          usageUrl={usageUrl}
+          key={`${line.label}-${gi}-${li}`}
+          line={line}
+          displayMode={displayMode}
+          resetTimerDisplayMode={resetTimerDisplayMode}
+          timeFormatMode={timeFormatMode}
+          onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
+          now={now}
+          refreshing={isRefreshingWithData}
+          pluginId={pluginId}
+          alertLevels={alertLevels}
+        />
+      ))
+      return group.kind === "text" ? (
+        <div key={gi} className="space-y-1">
+          {rows}
+        </div>
+      ) : (
+        <Fragment key={gi}>{rows}</Fragment>
+      )
+    })
+  // The detail page lays its lines out in sections that close; the overview keeps one run of lines.
+  const sections = scopeFilter === "all" ? detailLines(filteredLines) : null
+
   return (
     <div>
-      <div className="py-3">
+      {/* Sections bring their own space above: the detail page closes the gap under its last one. */}
+      <div className={sections ? "pt-3" : "py-3"}>
         <div className="flex items-center justify-between mb-2">
           <div className="relative flex items-center">
             <h2 className="text-base font-semibold font-display" style={{ transform: "translateZ(0)" }}>{name}</h2>
@@ -327,51 +359,41 @@ export function ProviderCard({
           <SkeletonLines lines={filteredSkeletonLines} />
         )}
 
-        {hasStaleData && (
-          <div className="space-y-4">
-            {groupLinesByType(filteredLines).map((group, gi) =>
-              group.kind === "text" ? (
-                <div key={gi} className="space-y-1">
-                  {group.lines.map((line, li) => (
-                    <MetricLineRenderer
-                      usageUrl={links.find((link) => link.label === "Usage dashboard")?.url}
-                      key={`${line.label}-${gi}-${li}`}
-                      line={line}
-                      displayMode={displayMode}
-                      resetTimerDisplayMode={resetTimerDisplayMode}
-                      timeFormatMode={timeFormatMode}
-                      onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
-                      now={now}
-                      refreshing={isRefreshingWithData}
-                      pluginId={pluginId}
-                      alertLevels={alertLevels}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <Fragment key={gi}>
-                  {group.lines.map((line, li) => (
-                    <MetricLineRenderer
-                      usageUrl={links.find((link) => link.label === "Usage dashboard")?.url}
-                      key={`${line.label}-${gi}-${li}`}
-                      line={line}
-                      displayMode={displayMode}
-                      resetTimerDisplayMode={resetTimerDisplayMode}
-                      timeFormatMode={timeFormatMode}
-                      onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
-                      now={now}
-                      refreshing={isRefreshingWithData}
-                      pluginId={pluginId}
-                      alertLevels={alertLevels}
-                    />
-                  ))}
-                </Fragment>
-              )
-            )}
-          </div>
-        )}
+        {hasStaleData &&
+          (sections ? (
+            <>
+              {sections.top.length > 0 && <div className="space-y-4">{renderLines(sections.top)}</div>}
+              {sections.resets.map(
+                (line) =>
+                  line.type === "text" &&
+                  line.resetCredits && (
+                    <DetailSection
+                      key={line.label}
+                      id="resets"
+                      title={tLabel(line.label)}
+                      aside={t("banked.available", { count: resetCount(line.resetCredits, now) })}
+                      empty={resetCount(line.resetCredits, now) === 0}
+                    >
+                      <ResetCreditRows credits={line.resetCredits} now={now} usageUrl={usageUrl} />
+                    </DetailSection>
+                  )
+              )}
+              {sections.cost.length > 0 && (
+                <DetailSection id="cost" title={t("detail.cost")}>
+                  <div className="space-y-4">{renderLines(sections.cost)}</div>
+                </DetailSection>
+              )}
+              {sections.models.length > 0 && (
+                <DetailSection id="models" title={t("detail.models")}>
+                  <div className="space-y-4">{renderLines(sections.models)}</div>
+                </DetailSection>
+              )}
+            </>
+          ) : (
+            <div className="space-y-4">{renderLines(filteredLines)}</div>
+          ))}
 
-        {pluginId && isClaudeLogin(pluginId) && <ClaudeSessions pluginId={pluginId} />}
+        {pluginId && isClaudeLogin(pluginId) && <ClaudeSessions pluginId={pluginId} section={sections !== null} />}
       </div>
       {showSeparator && <Separator />}
     </div>
@@ -414,7 +436,7 @@ function MetricLineRenderer({
   )
 
   if (line.type === "text" && line.resetCredits) {
-    return <ResetCredits credits={line.resetCredits} now={now} usageUrl={usageUrl} />
+    return <ResetCredits label={line.label} credits={line.resetCredits} now={now} usageUrl={usageUrl} />
   }
   if (line.type === "text") {
     return (

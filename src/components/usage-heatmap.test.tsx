@@ -2,10 +2,15 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { invoke } from "@tauri-apps/api/core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { hasUsageLogs, heatmapGrid, UsageHeatmap, type Heatmap } from "@/components/usage-heatmap"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }))
 let panelOpen = true
 vi.mock("@/hooks/use-unseen-usage", () => ({ usePanelOpen: () => panelOpen }))
+vi.mock("@/lib/settings", async (original) => ({
+  ...(await original<typeof import("@/lib/settings")>()),
+  saveCollapsedSections: vi.fn(async () => {}),
+}))
 
 // The host's UTC quarter hour of a local time; 2026-02-02 is a Monday.
 const slotOf = (day: number, hour: number, minute = 0) => new Date(2026, 1, 2 + day, hour, minute).getTime() / 900_000
@@ -16,6 +21,23 @@ describe("usage heatmap", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockReset()
     panelOpen = true
+    // The grid starts closed; these tests are about it open.
+    useAppPreferencesStore.setState({ collapsedSections: [] })
+  })
+
+  it("reads nothing while its section is closed, and reads once it's opened", async () => {
+    useAppPreferencesStore.setState({ collapsedSections: ["heatmap"] })
+    vi.mocked(invoke).mockResolvedValue(heatmap([[slotOf(1, 14), 10]]))
+    render(<UsageHeatmap pluginId="claude" />)
+    const title = screen.getByRole("button", { name: "Usage by hour, last 4 weeks" })
+    expect(title).toHaveAttribute("aria-expanded", "false")
+    expect(screen.queryByRole("grid")).toBeNull()
+    expect(invoke).not.toHaveBeenCalled()
+
+    fireEvent.click(title)
+    await waitFor(() => expect(screen.getByRole("grid")).toBeInTheDocument())
+    expect(title).toHaveAttribute("aria-expanded", "true")
+    expect(useAppPreferencesStore.getState().collapsedSections).toEqual([])
   })
 
   it("adds the quarter hours up per local weekday, Monday first, and hour", () => {
@@ -105,23 +127,27 @@ describe("usage heatmap", () => {
     rerender(<UsageHeatmap pluginId="cursor" />)
     expect(container).toBeEmptyDOMElement()
 
-    // Codex's first read is still running: nothing until it answers.
+    // Codex's first read is still running: its title alone until it answers.
     let answer: (value: Heatmap) => void = () => {}
     vi.mocked(invoke).mockReturnValue(new Promise((resolve) => (answer = resolve)))
     rerender(<UsageHeatmap pluginId="codex" />)
-    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByRole("grid")).toBeNull()
+    expect(screen.queryByText(/Busiest/)).toBeNull()
     answer(heatmap([[slotOf(3, 8), 1_000]]))
     await waitFor(() => expect(screen.getByText(/Busiest/).textContent).toMatch(/Thu/))
   })
 
-  it("stays empty without usage, while the panel is hidden, and for other cards", async () => {
+  it("shows no grid without usage, and reads nothing while the panel is hidden or for other cards", async () => {
     vi.mocked(invoke).mockResolvedValue(heatmap([]))
-    const { container } = render(<UsageHeatmap pluginId="codex" />)
+    const empty = render(<UsageHeatmap pluginId="codex" />)
     await waitFor(() => expect(invoke).toHaveBeenCalled())
-    expect(container).toBeEmptyDOMElement()
+    // Nothing to show: no section at all, rather than a title that opens onto nothing.
+    await waitFor(() => expect(empty.container).toBeEmptyDOMElement())
+    empty.unmount()
 
     vi.mocked(invoke).mockClear()
-    render(<UsageHeatmap pluginId="cursor" />)
+    const other = render(<UsageHeatmap pluginId="cursor" />)
+    expect(other.container).toBeEmptyDOMElement()
     panelOpen = false
     render(<UsageHeatmap pluginId="claude" />)
     expect(invoke).not.toHaveBeenCalled()

@@ -53,6 +53,7 @@ export function ProviderDetailPage({
       />
       <UsageHeatmap pluginId={plugin.meta.id} timeFormatMode={timeFormatMode} />
       <UsageProjects pluginId={plugin.meta.id} />
+      <div className="pb-3" />
     </>
   )
 }

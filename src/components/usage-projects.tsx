@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { ChevronRight } from "lucide-react"
+import { DetailSection, useDetailSectionOpen } from "@/components/detail-section"
 import { hasUsageLogs } from "@/components/usage-heatmap"
 import { usePanelOpen } from "@/hooks/use-unseen-usage"
 import { formatMoney } from "@/lib/currency"
@@ -76,6 +77,8 @@ function saveBudget(pluginId: string, path: string, usd: number | null, saved: (
 /** What each project and branch cost a Claude or Codex login this month or last, read every few minutes while shown. */
 export function UsageProjects({ pluginId }: { pluginId: string }) {
   const open = usePanelOpen()
+  // Closed, it reads nothing (budget alerts check on their own: use-project-budget-alerts.ts).
+  const shown = useDetailSectionOpen("projects")
   const currency = useAppPreferencesStore((state) => state.currency)
   const budgets = useAppPreferencesStore((state) => state.projectBudgets)
   const setProjectBudgets = useAppPreferencesStore((state) => state.setProjectBudgets)
@@ -103,7 +106,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   }
 
   useEffect(() => {
-    if (!open || !isTauri() || !hasUsageLogs(pluginId)) return
+    if (!open || !shown || !isTauri() || !hasUsageLogs(pluginId)) return
     let live = true
     const loading = `${pluginId}|${back}`
     const load = () => {
@@ -125,7 +128,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
       live = false
       clearInterval(timer)
     }
-  }, [open, pluginId, back])
+  }, [open, shown, pluginId, back])
 
   useEffect(() => {
     setExpanded(null)
@@ -133,7 +136,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   }, [key])
 
   const data = read?.key === key ? read.projects : null
-  if (!hasUsageLogs(pluginId) || (!data && read === null && failed !== key)) return null
+  if (!hasUsageLogs(pluginId)) return null
+  if (!shown || (!data && read === null && failed !== key)) return <DetailSection id="projects" title={t("projects.title")} />
   // No project rows can still be a priced month: logs it couldn't read, or dollars it couldn't place.
   const empty = !data || (data.projects.length === 0 && !(data.priced && data.totalCost >= 0.005))
   // The month the rows were read for (not today's: a month can end while the list is open).
@@ -161,9 +165,10 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   }
 
   return (
-    <section className="pb-3">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{t("projects.title")}</span>
+    <DetailSection
+      id="projects"
+      title={t("projects.title")}
+      controls={
         <div role="group" aria-label={t("projects.title")} className="flex rounded-md bg-foreground/5 p-0.5 text-[10px]">
           {[t("projects.thisMonth"), t("projects.lastMonth")].map((label, index) => (
             <button
@@ -180,7 +185,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
             </button>
           ))}
         </div>
-      </div>
+      }
+    >
 
       {failed === key && (
         <p role="status" className="mb-1 text-[11px] text-destructive">{t("projects.loadFailed")}</p>
@@ -347,6 +353,6 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
       {data && data.unreadable > 0 && (
         <p className="mt-1 text-[10px] text-destructive">{t("heatmap.unreadable", { count: data.unreadable })}</p>
       )}
-    </section>
+    </DetailSection>
   )
 }
