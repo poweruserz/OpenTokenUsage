@@ -2090,4 +2090,84 @@ describe("cursor plugin", () => {
     expect(result.lines.find((line) => line.label === "Grok Bot usage")).toBeUndefined()
     expect(failing.host.log.warn).toHaveBeenCalledWith("Grok Bot usage returned status=503")
   })
+
+  it("decrypts safe-storage tokens and does not write them back to sqlite", async () => {
+    const ctx = makeCtx()
+    const storedAccess = "cursor-safe-storage:v1:access"
+    const storedRefresh = "cursor-safe-storage:v1:refresh"
+    const expired = makeJwt({ exp: 1, sub: "user-1" })
+    const fresh = makeJwt({ exp: 9999999999, sub: "user-1" })
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) {
+        return JSON.stringify([{ value: storedAccess }])
+      }
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: storedRefresh }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = {
+      decrypt: vi.fn((raw) => {
+        if (raw === storedAccess) return expired
+        if (raw === storedRefresh) return "refresh-plain"
+        throw new Error("unexpected decrypt")
+      }),
+    }
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("/oauth/token")) {
+        const body = JSON.parse(opts.bodyText)
+        expect(body.refresh_token).toBe("refresh-plain")
+        return { status: 200, bodyText: JSON.stringify({ access_token: fresh }) }
+      }
+      return {
+        status: 200,
+        bodyText: JSON.stringify({ enabled: true, planUsage: { totalSpend: 0, limit: 100 } }),
+      }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.find((line) => line.label === "Total usage")).toBeTruthy()
+    expect(ctx.host.cursorAuth.decrypt).toHaveBeenCalledWith(storedAccess)
+    expect(ctx.host.cursorAuth.decrypt).toHaveBeenCalledWith(storedRefresh)
+    expect(ctx.host.sqlite.exec).not.toHaveBeenCalled()
+  })
+
+  it("reuses the in-memory access token on the next probe", async () => {
+    const ctx = makeCtx()
+    const storedAccess = "cursor-safe-storage:v1:access"
+    const expired = makeJwt({ exp: 1, sub: "user-1" })
+    const fresh = makeJwt({ exp: 9999999999, sub: "user-1" })
+    let refreshCalls = 0
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) {
+        return JSON.stringify([{ value: storedAccess }])
+      }
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "cursor-safe-storage:v1:refresh" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = {
+      decrypt: vi.fn((raw) => (String(raw).endsWith("access") ? expired : "refresh-plain")),
+    }
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("/oauth/token")) {
+        refreshCalls += 1
+        return { status: 200, bodyText: JSON.stringify({ access_token: fresh }) }
+      }
+      return {
+        status: 200,
+        bodyText: JSON.stringify({ enabled: true, planUsage: { totalSpend: 0, limit: 100 } }),
+      }
+    })
+
+    const plugin = await loadPlugin()
+    plugin.probe(ctx)
+    plugin.probe(ctx)
+
+    expect(refreshCalls).toBe(1)
+    expect(ctx.host.sqlite.exec).not.toHaveBeenCalled()
+  })
 })

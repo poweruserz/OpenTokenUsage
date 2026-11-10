@@ -72,6 +72,8 @@ const itIT: PluginErrorMessages = {
   probeStartFailed: "Impossibile avviare la raccolta dati",
   updateFailed: "Impossibile aggiornare i dati. Riprovare?",
   wslNotRunning: "WSL non è in esecuzione. Avvialo per aggiornare questa scheda.",
+  cursorSecureStorageUnavailable: "L'archivio protetto di Cursor non è disponibile.",
+  cursorSecureStorageUnreadable: "Impossibile leggere l'archivio protetto di Cursor.",
 }
 
 export default itIT

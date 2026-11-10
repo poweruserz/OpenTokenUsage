@@ -72,6 +72,8 @@ const frFR: PluginErrorMessages = {
   probeStartFailed: "Impossible de démarrer la collecte des données",
   updateFailed: "Impossible de mettre à jour les données. Réessayer ?",
   wslNotRunning: "WSL n'est pas lancé. Démarrez-le pour mettre à jour cette carte.",
+  cursorSecureStorageUnavailable: "Le stockage sécurisé de Cursor n'est pas disponible.",
+  cursorSecureStorageUnreadable: "Impossible de lire le stockage sécurisé de Cursor.",
 }
 
 export default frFR

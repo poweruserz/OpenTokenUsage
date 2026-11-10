@@ -72,6 +72,8 @@ const enUS = {
   probeStartFailed: "Failed to start probe",
   updateFailed: "Couldn't update data. Try again?",
   wslNotRunning: "WSL isn't running. Start it to update this card.",
+  cursorSecureStorageUnavailable: "Cursor secure storage is unavailable.",
+  cursorSecureStorageUnreadable: "Cursor secure storage could not be read.",
 }
 
 export default enUS

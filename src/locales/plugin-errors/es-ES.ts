@@ -72,6 +72,8 @@ const esES: PluginErrorMessages = {
   probeStartFailed: "No se pudo iniciar la consulta de datos",
   updateFailed: "No se pudieron actualizar los datos. ¿Quieres volver a intentarlo?",
   wslNotRunning: "WSL no se está ejecutando. Inícialo para actualizar esta tarjeta.",
+  cursorSecureStorageUnavailable: "El almacenamiento seguro de Cursor no está disponible.",
+  cursorSecureStorageUnreadable: "No se ha podido leer el almacenamiento seguro de Cursor.",
 }
 
 export default esES

@@ -17,6 +17,8 @@
   const CLIENT_ID = "KbZUR41cY7W6zRSdpSUJ7I7mLYBKOCmB"
   const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh 5 minutes before expiration
   const LOGIN_HINT = "Sign in via Cursor app or run `agent login`."
+  const SAFE_STORAGE_PREFIX = "cursor-safe-storage:v1:"
+  let cachedAccessToken = null
 
   function readStateValue(ctx, key) {
     try {
@@ -83,9 +85,46 @@
     }
   }
 
+  function isSafeStorageValue(value) {
+    return typeof value === "string" && value.indexOf(SAFE_STORAGE_PREFIX) === 0
+  }
+
+  function decodeStoredToken(ctx, raw) {
+    if (typeof raw !== "string" || raw.length === 0) return null
+    if (!isSafeStorageValue(raw)) return raw
+    if (!ctx.host.cursorAuth || typeof ctx.host.cursorAuth.decrypt !== "function") {
+      throw "Cursor secure storage is unavailable."
+    }
+    try {
+      const plain = ctx.host.cursorAuth.decrypt(raw)
+      if (typeof plain !== "string" || plain.length === 0) {
+        throw "Cursor secure storage could not be read."
+      }
+      return plain
+    } catch (e) {
+      if (typeof e === "string") throw e
+      ctx.host.log.error("cursor secure storage decrypt failed")
+      throw "Cursor secure storage could not be read."
+    }
+  }
+
+  function takeCachedAccessToken(ctx, loadedAccessToken) {
+    if (!cachedAccessToken) return null
+    const cachedSubject = getTokenSubject(ctx, cachedAccessToken)
+    const loadedSubject = getTokenSubject(ctx, loadedAccessToken)
+    if (cachedSubject && loadedSubject && cachedSubject !== loadedSubject) {
+      cachedAccessToken = null
+      return null
+    }
+    return cachedAccessToken
+  }
+
   function loadAuthState(ctx) {
-    const sqliteAccessToken = readStateValue(ctx, "cursorAuth/accessToken")
-    const sqliteRefreshToken = readStateValue(ctx, "cursorAuth/refreshToken")
+    const sqliteAccessRaw = readStateValue(ctx, "cursorAuth/accessToken")
+    const sqliteRefreshRaw = readStateValue(ctx, "cursorAuth/refreshToken")
+    const sqliteAccessToken = decodeStoredToken(ctx, sqliteAccessRaw)
+    const sqliteRefreshToken = decodeStoredToken(ctx, sqliteRefreshRaw)
+    const writeSqlite = !isSafeStorageValue(sqliteAccessRaw)
     const sqliteMembershipTypeRaw = readStateValue(ctx, "cursorAuth/stripeMembershipType")
     const sqliteMembershipType = typeof sqliteMembershipTypeRaw === "string"
       ? sqliteMembershipTypeRaw.trim().toLowerCase()
@@ -107,6 +146,7 @@
           refreshToken: keychainRefreshToken,
           membershipType: null,
           source: "keychain",
+          writeSqlite: false,
         }
       }
 
@@ -115,6 +155,7 @@
         refreshToken: sqliteRefreshToken,
         membershipType: sqliteMembershipType || null,
         source: "sqlite",
+        writeSqlite: writeSqlite,
       }
     }
 
@@ -125,6 +166,7 @@
         refreshToken: keychainRefreshToken,
         membershipType: null,
         source: "keychain",
+        writeSqlite: false,
       }
     }
 
@@ -132,6 +174,7 @@
       accessToken: null,
       refreshToken: null,
       source: null,
+      writeSqlite: false,
     }
   }
 
@@ -143,11 +186,18 @@
     return subject || null
   }
 
-  function persistAccessToken(ctx, source, accessToken) {
+  function persistAccessToken(ctx, source, accessToken, writeSqlite) {
+    cachedAccessToken = accessToken
     if (source === "keychain") {
       return writeKeychainValue(ctx, KEYCHAIN_ACCESS_TOKEN_SERVICE, accessToken)
     }
-    return writeStateValue(ctx, "cursorAuth/accessToken", accessToken)
+    if (!writeSqlite) {
+      ctx.host.log.info("refresh succeeded, token kept in memory")
+      return true
+    }
+    const wrote = writeStateValue(ctx, "cursorAuth/accessToken", accessToken)
+    if (wrote) ctx.host.log.info("refresh succeeded, token persisted")
+    return wrote
   }
 
   function getTokenExpiration(ctx, token) {
@@ -166,7 +216,7 @@
     })
   }
 
-  function refreshToken(ctx, refreshTokenValue, source) {
+  function refreshToken(ctx, refreshTokenValue, source, writeSqlite) {
     if (!refreshTokenValue) {
       ctx.host.log.warn("refresh skipped: no refresh token")
       return null
@@ -192,6 +242,7 @@
         const shouldLogout = errorInfo && errorInfo.shouldLogout === true
         ctx.host.log.error("refresh failed: status=" + resp.status + " shouldLogout=" + shouldLogout)
         if (shouldLogout) {
+          cachedAccessToken = null
           throw "Session expired. " + LOGIN_HINT
         }
         throw "Token expired. " + LOGIN_HINT
@@ -211,6 +262,7 @@
       // Check if server wants us to logout
       if (body.shouldLogout === true) {
         ctx.host.log.error("refresh response indicates shouldLogout=true")
+        cachedAccessToken = null
         throw "Session expired. " + LOGIN_HINT
       }
 
@@ -221,8 +273,7 @@
       }
 
       // Persist updated access token to source where auth was loaded from.
-      persistAccessToken(ctx, source, newAccessToken)
-      ctx.host.log.info("refresh succeeded, token persisted")
+      persistAccessToken(ctx, source, newAccessToken, writeSqlite)
 
       // Note: Cursor refresh returns access_token which is used as both
       // access and refresh token in some flows
@@ -563,13 +614,17 @@
     ctx.host.log.info("tokens loaded from " + authSource + ": accessToken=" + (accessToken ? "yes" : "no") + " refreshToken=" + (refreshTokenValue ? "yes" : "no"))
 
     const nowMs = Date.now()
+    const cached = takeCachedAccessToken(ctx, accessToken)
+    if (cached && !needsRefresh(ctx, cached, nowMs)) {
+      accessToken = cached
+    }
 
     // Proactively refresh if token is expired or about to expire
     if (needsRefresh(ctx, accessToken, nowMs)) {
       ctx.host.log.info("token needs refresh (expired or expiring soon)")
       let refreshed = null
       try {
-        refreshed = refreshToken(ctx, refreshTokenValue, authSource)
+        refreshed = refreshToken(ctx, refreshTokenValue, authSource, authState.writeSqlite)
       } catch (e) {
         // If refresh fails but we have an access token, try it anyway
         ctx.host.log.warn("refresh failed but have access token, will try: " + String(e))
@@ -601,7 +656,7 @@
         refresh: () => {
           ctx.host.log.info("usage returned 401, attempting refresh")
           didRefresh = true
-          const refreshed = refreshToken(ctx, refreshTokenValue, authSource)
+          const refreshed = refreshToken(ctx, refreshTokenValue, authSource, authState.writeSqlite)
           if (refreshed) accessToken = refreshed
           return refreshed
         },
