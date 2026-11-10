@@ -42,6 +42,83 @@ pub fn decrypt_v10_blob(key: &[u8], blob: &[u8]) -> Result<String, String> {
     Ok(text)
 }
 
+pub fn read_wrapped_key(local_state_json: &str) -> Result<Vec<u8>, String> {
+    let json: serde_json::Value = serde_json::from_str(local_state_json)
+        .map_err(|_| "could not read Cursor's Local State".to_string())?;
+    let encoded = json
+        .pointer("/os_crypt/encrypted_key")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    let wrapped = BASE64_STANDARD
+        .decode(encoded)
+        .map_err(|_| "Cursor's Local State has no DPAPI key".to_string())?;
+    if wrapped.len() < 5 || &wrapped[..5] != b"DPAPI" {
+        return Err("Cursor's Local State has no DPAPI key".to_string());
+    }
+    Ok(wrapped[5..].to_vec())
+}
+
+#[cfg(windows)]
+pub fn unwrap_dpapi(payload: &[u8]) -> Result<Vec<u8>, String> {
+    use std::ptr;
+    use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
+    use windows_sys::Win32::Security::Cryptography::{CryptUnprotectData, CRYPT_INTEGER_BLOB};
+
+    const UI_FORBIDDEN: u32 = 0x1;
+    let input = CRYPT_INTEGER_BLOB {
+        cbData: u32::try_from(payload.len()).map_err(|_| "Windows DPAPI could not unwrap the key".to_string())?,
+        pbData: payload.as_ptr() as *mut u8,
+    };
+    let mut output = CRYPT_INTEGER_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+    let ok = unsafe {
+        CryptUnprotectData(
+            &input,
+            ptr::null_mut(),
+            ptr::null(),
+            ptr::null_mut(),
+            ptr::null(),
+            UI_FORBIDDEN,
+            &mut output,
+        )
+    };
+    if ok == 0 || output.pbData.is_null() {
+        return Err("Windows DPAPI could not unwrap the key".to_string());
+    }
+    let key = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec() };
+    unsafe {
+        LocalFree(output.pbData as HLOCAL);
+    }
+    if key.len() != 32 {
+        return Err("Windows DPAPI returned an unexpected key".to_string());
+    }
+    Ok(key)
+}
+
+pub fn decrypt_cursor_value(raw: &str) -> Result<String, String> {
+    if !raw.starts_with(SAFE_STORAGE_PREFIX) {
+        return Ok(raw.to_string());
+    }
+    #[cfg(windows)]
+    {
+        let path = dirs::data_dir()
+            .ok_or_else(|| "could not read Cursor's Local State".to_string())?
+            .join("Cursor")
+            .join("Local State");
+        let json = std::fs::read_to_string(&path)
+            .map_err(|_| "could not read Cursor's Local State".to_string())?;
+        let wrapped = read_wrapped_key(&json)?;
+        let key = unwrap_dpapi(&wrapped)?;
+        decrypt_stored_value(raw, &key)
+    }
+    #[cfg(not(windows))]
+    {
+        Err("not supported on this platform".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,6 +137,37 @@ mod tests {
         blob.extend_from_slice(nonce);
         blob.extend_from_slice(&sealed);
         blob
+    }
+
+    #[cfg(all(test, windows))]
+    fn protect_dpapi(plain: &[u8]) -> Vec<u8> {
+        use std::ptr;
+        use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
+        use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CRYPT_INTEGER_BLOB};
+
+        let input = CRYPT_INTEGER_BLOB {
+            cbData: plain.len() as u32,
+            pbData: plain.as_ptr() as *mut u8,
+        };
+        let mut output = CRYPT_INTEGER_BLOB {
+            cbData: 0,
+            pbData: ptr::null_mut(),
+        };
+        let ok = unsafe {
+            CryptProtectData(
+                &input,
+                ptr::null(),
+                ptr::null(),
+                ptr::null_mut(),
+                ptr::null(),
+                0x1,
+                &mut output,
+            )
+        };
+        assert_eq!(ok, 1, "CryptProtectData");
+        let protected = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec() };
+        unsafe { LocalFree(output.pbData as HLOCAL); }
+        protected
     }
 
     #[test]
@@ -115,5 +223,41 @@ mod tests {
             decrypt_stored_value(&stored, &key).expect_err("charset"),
             "decrypted value is not a token"
         );
+    }
+
+    #[test]
+    fn read_wrapped_key_strips_dpapi_prefix() {
+        let body = b"DPAPI0123456789abcdef0123456789ab";
+        let json = format!(
+            r#"{{"os_crypt":{{"encrypted_key":"{}"}}}}"#,
+            BASE64_STANDARD.encode(body)
+        );
+        let wrapped = read_wrapped_key(&json).expect("wrapped");
+        assert_eq!(wrapped, b"0123456789abcdef0123456789ab");
+    }
+
+    #[test]
+    fn read_wrapped_key_rejects_other_prefixes() {
+        let json = format!(
+            r#"{{"os_crypt":{{"encrypted_key":"{}"}}}}"#,
+            BASE64_STANDARD.encode(b"APPBnot-dpapi")
+        );
+        assert_eq!(
+            read_wrapped_key(&json).expect_err("appb"),
+            "Cursor's Local State has no DPAPI key"
+        );
+        assert_eq!(
+            read_wrapped_key("{}").expect_err("missing"),
+            "Cursor's Local State has no DPAPI key"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn dpapi_round_trip_returns_32_bytes() {
+        let key = [3_u8; 32];
+        let protected = protect_dpapi(&key);
+        let opened = unwrap_dpapi(&protected).expect("unwrap");
+        assert_eq!(opened, key);
     }
 }
