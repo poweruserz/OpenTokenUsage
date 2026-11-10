@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.3
+
+The detail page in sections you can close, Claude's resets by what they clear, and the plans under their new names.
+
+### New Features
+- A provider's detail page is laid out in sections under the bars: rate limit resets, cost, models, live sessions, usage by hour and projects. A click on a section's title closes or opens it on every provider's page and is remembered. Models and usage by hour start closed, and a closed hour grid or projects list reads no logs (#78)
+- Claude: each banked reset says what it clears. A Fable reset (the Fable 5.2 launch gave Max and Ultra accounts up to three) clears the 5-hour and Fable limits and gives the weekly limit back only what Fable used; counted with a weekly reset as one number, it read as a reset of the whole week. Resets of one kind that expire together are one row with their count (#77)
+
+### Changes
+- Claude: the plan badge uses the names Anthropic gave its plans on 2026-10-30: Max 5x is Max and Max 20x is Ultra. The name comes from your profile, as in Claude Code, so a later rename shows up by itself (#76)
+
 ## v0.8.2
 
 Rate limit resets that arrive after a model launch show up within the hour, and project costs follow the newer models' prices.
