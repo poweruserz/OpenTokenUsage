@@ -20,7 +20,7 @@ The plugin checks auth in this order:
 
 | Order | Source | Path / key |
 |---|---|---|
-| 1 | Devin CLI | `~/.local/share/devin/credentials.toml` |
+| 1 | Devin CLI | `%APPDATA%\devin\credentials.toml` (written in the plugin as `~/Library/Application Support/devin/…`, which the host maps there), then `~/.local/share/devin/credentials.toml` (a WSL login). Both are tried; the same login is asked once. |
 | 2 | Devin app | `~/Library/Application Support/Devin/User/globalStorage/state.vscdb` / `windsurfAuthStatus` |
 
 CLI credentials:

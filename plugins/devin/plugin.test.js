@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { makeCtx } from "../test-helpers.js"
 
 const CREDENTIALS_PATH = "~/.local/share/devin/credentials.toml"
+const WINDOWS_CREDENTIALS_PATH = "~/Library/Application Support/devin/credentials.toml"
 const STATE_DB = "~/Library/Application Support/Devin/User/globalStorage/state.vscdb"
 const NEXT_STATE_DB = "~/Library/Application Support/Devin - Next/User/globalStorage/state.vscdb"
 const DEFAULT_API_SERVER_URL = "https://server.codeium.com"
@@ -244,6 +245,42 @@ describe("devin plugin", () => {
 
     expect(result.plan).toBe("Teams")
     expect(ctx.host.http.request).toHaveBeenCalledTimes(2)
+  })
+
+  // Issue #80: on Windows the CLI keeps credentials.toml in %APPDATA%\devin, which the host
+  // reaches through the Application Support path.
+  it("reads the CLI's login from its Windows folder", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.writeText(WINDOWS_CREDENTIALS_PATH, makeCredentialsToml())
+    ctx.host.http.request.mockReturnValue({ status: 200, bodyText: JSON.stringify(makeQuotaResponse()) })
+
+    const plugin = await loadPlugin()
+
+    expect(plugin.probe(ctx).plan).toBe("Max")
+    expect(JSON.parse(String(ctx.host.http.request.mock.calls[0][0].bodyText)).metadata.apiKey).toBe("devin-session-token$cli")
+    expect(plugin.accountKey(ctx)).toBe("devin-session-token$cli")
+  })
+
+  it("tries the other credentials file when the first one's login is refused, and the same login once", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.writeText(WINDOWS_CREDENTIALS_PATH, makeCredentialsToml({ apiKey: "devin-session-token$stale" }))
+    ctx.host.fs.writeText(CREDENTIALS_PATH, makeCredentialsToml())
+    ctx.host.http.request.mockImplementation((request) => {
+      const body = JSON.parse(String(request.bodyText))
+      if (body.metadata.apiKey === "devin-session-token$stale") return { status: 401, bodyText: "{}" }
+      return { status: 200, bodyText: JSON.stringify(makeQuotaResponse()) }
+    })
+
+    const plugin = await loadPlugin()
+    expect(plugin.probe(ctx).plan).toBe("Max")
+    expect(ctx.host.http.request).toHaveBeenCalledTimes(2)
+
+    // A junction from one folder to the other shows the same file twice: asked once.
+    ctx.host.fs.writeText(WINDOWS_CREDENTIALS_PATH, makeCredentialsToml())
+    ctx.host.http.request.mockClear()
+    ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "{}" })
+    expect(() => plugin.probe(ctx)).toThrow()
+    expect(ctx.host.http.request).toHaveBeenCalledTimes(1)
   })
 
   it("does not call the app auth path twice when both sources have the same token", async () => {
