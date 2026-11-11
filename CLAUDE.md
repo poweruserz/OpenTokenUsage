@@ -141,7 +141,9 @@ This file holds the project facts that are easy to get wrong.
   (`src/lib/taskbar-strip.ts`); its 1/255-alpha background keeps the whole strip clickable.
   Its look lives in `taskbarStripStyle` (fonts, colors, usage thresholds, and its own provider list
   and order, max 6, independent of the nav order; per provider both/session/weekly; color scales
-  in `TASKBAR_STRIP_COLOR_SCALES`, "base" = the text color). The strip and the tray styles that show numbers
+  in `TASKBAR_STRIP_COLOR_SCALES`, "base" = the text color). A provider without a percent line (DeepSeek reports a balance) shows its
+  first overview text line instead (`stripTextLabel`): in the text color, in the chosen currency, with no
+  session/weekly choice. The strip and the tray styles that show numbers
   exclude each other: enabling the strip sets the tray to "icon", picking another style turns it off.
   A strip click opens the panel above the strip (`tray::toggle_panel_at`, via `run_on_main_thread`).
   Placement (`taskbar_strip/placement.rs`): Right = beside the tray; "left" = the free side away from it,

@@ -1,4 +1,4 @@
-import type { PluginMeta } from "@/lib/plugin-types"
+import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
 import {
   MAX_TASKBAR_STRIP_PROVIDERS,
   TASKBAR_STRIP_COLOR_SCALES,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/settings"
 import type { TrayPrimaryBar } from "@/lib/tray-primary-progress"
 import { formatTrayPercentText } from "@/lib/tray-tooltip"
+import { escapeXmlText } from "@/lib/tray-bars-icon"
 import { readableBrandColor } from "@/lib/tray-provider-icons"
 
 export type TaskbarStripLine = { text: string; color: string }
@@ -109,34 +110,68 @@ function lineColor(
   return color === base.toLowerCase() ? base : readable(color)
 }
 
+/** A balance, not a sentence: a long value would push every provider off the strip. */
+const MAX_STRIP_TEXT = 16
+
+/** Plugin text as the strip draws it: one short line without control characters. */
+function stripText(value: string): string {
+  const clean = value.replace(/\p{Cc}/gu, "").trim()
+  return clean.length > MAX_STRIP_TEXT ? `${clean.slice(0, MAX_STRIP_TEXT - 1)}…` : clean
+}
+
+/** The overview text line a provider without a percent line shows on the strip (DeepSeek: Balance). */
+export function stripTextLabel(meta: PluginMeta): string | undefined {
+  if (meta.primaryCandidates.length > 0) return undefined
+  return meta.lines.find((line) => line.type === "text" && line.scope === "overview")?.label
+}
+
 export function buildTaskbarStripItems(args: {
+  /** The strip's providers, in its order. */
+  order: string[]
   primaryBars: TrayPrimaryBar[]
   weeklyBars: TrayPrimaryBar[]
   pluginsMeta: PluginMeta[]
+  pluginStates: Record<string, { data: PluginOutput | null } | undefined>
   onLightTaskbar: boolean
   logoColors: boolean
   displayMode: DisplayMode
   style: TaskbarStripStyle
+  /** Plugin text as the card shows it (dollars in the chosen currency). */
+  moneyText?: (text: string) => string
 }): TaskbarStripItem[] {
-  const { primaryBars, weeklyBars, pluginsMeta, onLightTaskbar, logoColors, displayMode, style } = args
+  const { order, primaryBars, weeklyBars, pluginsMeta, pluginStates, onLightTaskbar, logoColors, displayMode, style } = args
+  const moneyText = args.moneyText ?? ((value: string) => value)
   const taskbarColor = onLightTaskbar ? "black" : "white"
   const base = style.textColor ?? (onLightTaskbar ? "#000000" : "#ffffff")
   const metaById = new Map(pluginsMeta.map((meta) => [meta.id, meta]))
+  const primaryById = new Map(primaryBars.map((bar) => [bar.id, bar]))
   const weeklyById = new Map(weeklyBars.map((bar) => [bar.id, bar]))
   const text = (bar: TrayPrimaryBar | undefined) => {
     const percent = formatTrayPercentText(bar?.fraction)
     if (percent === "--%") return "--"
     return style.showPercentSign ? percent : percent.replace(/%$/, "")
   }
-  return primaryBars.flatMap((primary) => {
-    const meta = metaById.get(primary.id)
-    if (!meta) return []
+  const percentLines = (primary: TrayPrimaryBar) => {
     const weekly = weeklyById.get(primary.id)
     const hasWeekly = weekly?.weekly === true && weekly.label !== primary.label
     const mode = style.lineModes[primary.id] ?? "both"
     // A provider with one line shows it whatever the mode (e.g. a weekly-only plan).
     const bars = !hasWeekly ? [primary] : mode === "session" ? [primary] : mode === "weekly" ? [weekly] : [primary, weekly]
-    const lines = bars.map((bar) => ({ text: text(bar), color: lineColor(bar, base, style, displayMode, onLightTaskbar) }))
+    return bars.map((bar) => ({ text: text(bar), color: lineColor(bar, base, style, displayMode, onLightTaskbar) }))
+  }
+  // No share used to color by: a text value keeps the text color.
+  const textLines = (meta: PluginMeta) => {
+    const label = stripTextLabel(meta)
+    if (!label) return null
+    const line = pluginStates[meta.id]?.data?.lines.find((entry) => entry.type === "text" && entry.label === label)
+    return [{ text: (line?.type === "text" && stripText(moneyText(line.value))) || "--", color: base }]
+  }
+  return order.flatMap((id) => {
+    const meta = metaById.get(id)
+    if (!meta) return []
+    const primary = primaryById.get(id)
+    const lines = primary ? percentLines(primary) : textLines(meta)
+    if (!lines) return []
     return [
       {
         iconUrl: meta.iconUrl,
@@ -175,7 +210,7 @@ export function makeTaskbarStripSvg(args: {
     const firstCenter = height / 2 - ((item.lines.length - 1) * lineHeight) / 2
     item.lines.forEach((line, i) => {
       parts.push(
-        `<text x="${x}" y="${firstCenter + i * lineHeight}" dominant-baseline="central" fill="${line.color}" font-family='${fontCss}' font-size="${fontSize}" font-weight="${weight}" style="font-variant-numeric:tabular-nums">${line.text}</text>`
+        `<text x="${x}" y="${firstCenter + i * lineHeight}" dominant-baseline="central" fill="${line.color}" font-family='${fontCss}' font-size="${fontSize}" font-weight="${weight}" style="font-variant-numeric:tabular-nums">${escapeXmlText(line.text)}</text>`
       )
     })
     // Digits are drawn tabular (all as wide as "0"), which the canvas can't measure: measure zeros.
