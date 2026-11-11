@@ -2134,7 +2134,7 @@ describe("cursor plugin", () => {
     expect(ctx.host.sqlite.exec).not.toHaveBeenCalled()
   })
 
-  it("reuses the in-memory access token on the next probe", async () => {
+  it("reuses the safe-storage access token from pluginDataDir on a fresh probe", async () => {
     const ctx = makeCtx()
     const storedAccess = "cursor-safe-storage:v1:access"
     const expired = makeJwt({ exp: 1, sub: "user-1" })
@@ -2163,11 +2163,109 @@ describe("cursor plugin", () => {
       }
     })
 
-    const plugin = await loadPlugin()
-    plugin.probe(ctx)
-    plugin.probe(ctx)
+    ;(await loadPlugin()).probe(ctx)
+    vi.resetModules()
+    delete globalThis.__openusage_plugin
+    ;(await loadPlugin()).probe(ctx)
 
     expect(refreshCalls).toBe(1)
     expect(ctx.host.sqlite.exec).not.toHaveBeenCalled()
+    const saved = JSON.parse(ctx.host.fs.readText(ctx.app.pluginDataDir + "/access-token.json"))
+    expect(saved.accessToken).toBe(fresh)
+  })
+
+  it("drops the cached Cursor token when the loaded account changes", async () => {
+    const ctx = makeCtx()
+    const storedAccess = "cursor-safe-storage:v1:access"
+    const expiredOne = makeJwt({ exp: 1, sub: "user-1" })
+    const freshOne = makeJwt({ exp: 9999999999, sub: "user-1" })
+    const expiredTwo = makeJwt({ exp: 1, sub: "user-2" })
+    const freshTwo = makeJwt({ exp: 9999999999, sub: "user-2" })
+    let account = "user-1"
+    let refreshCalls = 0
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) {
+        return JSON.stringify([{ value: storedAccess }])
+      }
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "cursor-safe-storage:v1:refresh" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = {
+      decrypt: vi.fn((raw) => {
+        if (String(raw).endsWith("access")) return account === "user-1" ? expiredOne : expiredTwo
+        return "refresh-plain"
+      }),
+    }
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("/oauth/token")) {
+        refreshCalls += 1
+        const access_token = account === "user-1" ? freshOne : freshTwo
+        return { status: 200, bodyText: JSON.stringify({ access_token }) }
+      }
+      return {
+        status: 200,
+        bodyText: JSON.stringify({ enabled: true, planUsage: { totalSpend: 0, limit: 100 } }),
+      }
+    })
+
+    ;(await loadPlugin()).probe(ctx)
+    account = "user-2"
+    vi.resetModules()
+    delete globalThis.__openusage_plugin
+    ;(await loadPlugin()).probe(ctx)
+
+    expect(refreshCalls).toBe(2)
+    expect(ctx.host.sqlite.exec).not.toHaveBeenCalled()
+    const saved = JSON.parse(ctx.host.fs.readText(ctx.app.pluginDataDir + "/access-token.json"))
+    expect(saved.accessToken).toBe(freshTwo)
+  })
+
+  it("forgets the cached Cursor token when refresh demands logout", async () => {
+    const ctx = makeCtx()
+    const storedAccess = "cursor-safe-storage:v1:access"
+    const expired = makeJwt({ exp: 1, sub: "user-1" })
+    const fresh = makeJwt({ exp: 9999999999, sub: "user-1" })
+    let usageCalls = 0
+    let refreshCalls = 0
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) {
+        return JSON.stringify([{ value: storedAccess }])
+      }
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "cursor-safe-storage:v1:refresh" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = {
+      decrypt: vi.fn((raw) => (String(raw).endsWith("access") ? expired : "refresh-plain")),
+    }
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("/oauth/token")) {
+        refreshCalls += 1
+        if (refreshCalls > 1) return { status: 200, bodyText: JSON.stringify({ shouldLogout: true }) }
+        return { status: 200, bodyText: JSON.stringify({ access_token: fresh }) }
+      }
+      if (url.includes("GetCurrentPeriodUsage")) {
+        usageCalls += 1
+        if (usageCalls === 1) {
+          return {
+            status: 200,
+            bodyText: JSON.stringify({ enabled: true, planUsage: { totalSpend: 0, limit: 100 } }),
+          }
+        }
+        return { status: 401, bodyText: "" }
+      }
+      return { status: 200, bodyText: "{}" }
+    })
+
+    ;(await loadPlugin()).probe(ctx)
+    vi.resetModules()
+    delete globalThis.__openusage_plugin
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired")
+    expect(ctx.host.fs.readText(ctx.app.pluginDataDir + "/access-token.json")).toBe("{}")
   })
 })
