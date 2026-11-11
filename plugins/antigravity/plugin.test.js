@@ -2335,6 +2335,32 @@ describe("antigravity plugin", () => {
     ])
   })
 
+  // The probe has 30 s: a host that timed out with the project would time out again without it.
+  it("asks only the host that refused the project again, not one that didn't answer", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
+      if (url.includes("retrieveUserQuotaSummary")) {
+        if (url.includes("daily-cloudcode")) throw new Error("timeout")
+        if (JSON.parse(opts.bodyText).project) return { status: 403, bodyText: "" }
+        return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+    expect(summaryCalls(ctx)).toEqual([
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+    ])
+  })
+
   it("keeps the meters when only the plan lookup is refused", async () => {
     const ctx = makeCtx()
     setupDbToken(ctx)

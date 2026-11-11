@@ -798,21 +798,23 @@
   // The 2xx bodies in the order asked, { _authFailed: true }, or null.
   // 10 s each: with the plan lookup's 5 s, two hanging hosts still end inside the probe's 30 s.
   var SUMMARY_TIMEOUT_MS = 10000
-  function requestQuotaSummaries(ctx, token, project) {
+  function requestQuotaSummaries(ctx, token, project, hosts) {
+    hosts = hosts || CLOUD_CODE_URLS.slice().reverse()
     var bodies = []
-    var refused = false
-    for (var i = CLOUD_CODE_URLS.length - 1; i >= 0; i--) {
-      var json = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[i], QUOTA_SUMMARY_PATH, token, project ? { project: project } : {}, SUMMARY_TIMEOUT_MS)
+    var refused = []
+    for (var i = 0; i < hosts.length; i++) {
+      var json = requestCloudCodeHost(ctx, hosts[i], QUOTA_SUMMARY_PATH, token, project ? { project: project } : {}, SUMMARY_TIMEOUT_MS)
       if (!json) continue
-      if (json._authFailed) { refused = true; continue }
+      if (json._authFailed) { refused.push(hosts[i]); continue }
       bodies.push(json)
       if (isCompleteSummary(json)) break
     }
     if (bodies.length) return bodies
     // Refused on every host that answered: that may be about the project, which was never sent
-    // before, so ask once more without it.
-    if (refused && project) return requestQuotaSummaries(ctx, token, null)
-    return refused ? { _authFailed: true } : null
+    // before, so those hosts are asked once more without it. A host that didn't answer isn't
+    // asked again: its second timeout would leave the probe no time for the one that does.
+    if (refused.length && project) return requestQuotaSummaries(ctx, token, null, refused)
+    return refused.length ? { _authFailed: true } : null
   }
 
   // The account's plan and Cloud Code project. It never gates the meters: one short request to
