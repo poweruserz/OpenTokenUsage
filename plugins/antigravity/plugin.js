@@ -6,11 +6,16 @@
   ]
   var AGY_KEYCHAIN_SERVICE = "gemini"
   var AGY_KEYCHAIN_ACCOUNT = "antigravity"
-  // Production first: daily can answer 200 without the Gemini group (as upstream found too).
+  // Production first for the plan and the per-model lists; the quota summary asks daily first
+  // (requestQuotaSummaries).
   var CLOUD_CODE_URLS = [
     "https://cloudcode-pa.googleapis.com",
     "https://daily-cloudcode-pa.googleapis.com",
   ]
+  // The User-Agent of the Antigravity client itself. A bare "antigravity" gets a summary without
+  // the Gemini group and an old model list with every quota full, so the card showed 0% used
+  // however much was spent (seen 2026-11-11 with Antigravity 2.31.1; upstream sends the same shape).
+  var CLOUD_USER_AGENT = "antigravity/2.31.1 (aidev_client; os_type=windows; arch=amd64)"
   var LOAD_CODE_ASSIST_PATH = "/v1internal:loadCodeAssist"
   var FETCH_MODELS_PATH = "/v1internal:fetchAvailableModels"
   var RETRIEVE_QUOTA_PATH = "/v1internal:retrieveUserQuota"
@@ -364,8 +369,9 @@
     })
   }
 
+  // The status the port answers the liveness call with; throws when nothing answers.
   function probePort(ctx, scheme, port, csrf) {
-    ctx.host.http.request({
+    var resp = ctx.host.http.request({
       method: "POST",
       url: scheme + "://127.0.0.1:" + port + "/" + LS_SERVICE + "/GetUnleashData",
       headers: {
@@ -387,19 +393,30 @@
       timeoutMs: 5000,
       dangerouslyIgnoreTls: scheme === "https",
     })
-    // Any HTTP response means this port is alive (even 400 validation errors).
-    return true
+    return resp.status
   }
 
+  // The language server's process listens on more than its RPC port: its host bridge and sidecars
+  // sit on lower ports and answer 401 to everything (seen 2026-11-11, Antigravity 2.31.1). Taking
+  // the first port that answered at all sent every quota call there, and the probe fell back to
+  // Cloud Code without a word. The RPC port answers the liveness call with 2xx; another answer
+  // that isn't a refusal (an older build's 400) is used only when no port does.
   function findWorkingPort(ctx, discovery) {
     var ports = discovery.ports || []
+    var schemes = ["https", "http"] // HTTPS first: the LS may use a self-signed cert
+    var other = null
     for (var i = 0; i < ports.length; i++) {
-      var port = ports[i]
-      // Try HTTPS first (LS may use self-signed cert), then HTTP
-      try { if (probePort(ctx, "https", port, discovery.csrf)) return { port: port, scheme: "https" } } catch (e) { /* ignore */ }
-      try { if (probePort(ctx, "http", port, discovery.csrf)) return { port: port, scheme: "http" } } catch (e) { /* ignore */ }
-      ctx.host.log.info("port " + port + " probe failed on both schemes")
+      var answered = false
+      for (var j = 0; j < schemes.length; j++) {
+        var status
+        try { status = probePort(ctx, schemes[j], ports[i], discovery.csrf) } catch (e) { continue }
+        answered = true
+        if (status >= 200 && status < 300) return { port: ports[i], scheme: schemes[j] }
+        if (!other && !ctx.util.isAuthStatus(status)) other = { port: ports[i], scheme: schemes[j] }
+      }
+      if (!answered) ctx.host.log.info("port " + ports[i] + " probe failed on both schemes")
     }
+    if (other) return other
     if (discovery.extensionPort) return { port: discovery.extensionPort, scheme: "http" }
     return null
   }
@@ -717,7 +734,7 @@
   function withCloudGemini(ctx, token, summaries, lines) {
     if (!summaryLacksGemini(summaries, lines)) return lines
     ctx.host.log.warn("quota summary has no Gemini group; Session comes from fetchAvailableModels")
-    var models = requestCloudCodeJson(ctx, FETCH_MODELS_PATH, token, "antigravity", {})
+    var models = requestCloudCodeJson(ctx, FETCH_MODELS_PATH, token, {})
     return models && !models._authFailed ? withLegacyGemini(ctx, lines, parseCloudCodeModels(models)) : lines
   }
 
@@ -731,7 +748,7 @@
   // --- Cloud Code API ---
 
   // One Cloud Code host: the JSON body, { _authFailed: true }, or null (unavailable).
-  function requestCloudCodeHost(ctx, base, path, token, userAgent, body, timeoutMs) {
+  function requestCloudCodeHost(ctx, base, path, token, body, timeoutMs) {
     try {
       var resp = ctx.host.http.request({
         method: "POST",
@@ -740,7 +757,7 @@
           Accept: "application/json",
           "Content-Type": "application/json",
           Authorization: "Bearer " + token,
-          "User-Agent": userAgent || "antigravity",
+          "User-Agent": CLOUD_USER_AGENT,
         },
         bodyText: JSON.stringify(body || {}),
         timeoutMs: timeoutMs || 15000,
@@ -765,36 +782,53 @@
   }
 
   // The first host that answers (or rejects the token) wins.
-  function requestCloudCodeJson(ctx, path, token, userAgent, body) {
+  function requestCloudCodeJson(ctx, path, token, body) {
     for (var i = 0; i < CLOUD_CODE_URLS.length; i++) {
-      var json = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[i], path, token, userAgent, body)
+      var json = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[i], path, token, body)
       if (json) return json
     }
     return null
   }
 
-  // The quota summary from production, then daily unless production's answer is already complete
-  // (upstream #1407: one host can omit a whole pool). The 2xx bodies in host order,
-  // { _authFailed: true }, or null.
-  function requestQuotaSummaries(ctx, token) {
+  // The quota summary for the account's project, from daily, then production unless daily's
+  // answer is already complete (upstream #1407: one host can omit a whole pool). Daily is the host
+  // the Antigravity client itself is pointed at and has the live counters; production answered
+  // with every Gemini window untouched (seen 2026-11-11; upstream #1641), and it is complete, so
+  // asked first it hid daily's numbers. One host refusing (401/403) doesn't speak for the other.
+  // The 2xx bodies in the order asked, { _authFailed: true }, or null.
+  // 10 s each: with the plan lookup's 5 s, two hanging hosts still end inside the probe's 30 s.
+  var SUMMARY_TIMEOUT_MS = 10000
+  function requestQuotaSummaries(ctx, token, project, hosts) {
+    hosts = hosts || CLOUD_CODE_URLS.slice().reverse()
     var bodies = []
-    for (var i = 0; i < CLOUD_CODE_URLS.length; i++) {
-      var json = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[i], QUOTA_SUMMARY_PATH, token, "antigravity", {})
-      if (json && json._authFailed) return bodies.length ? bodies : json
+    var refused = []
+    for (var i = 0; i < hosts.length; i++) {
+      var json = requestCloudCodeHost(ctx, hosts[i], QUOTA_SUMMARY_PATH, token, project ? { project: project } : {}, SUMMARY_TIMEOUT_MS)
       if (!json) continue
+      if (json._authFailed) { refused.push(hosts[i]); continue }
       bodies.push(json)
       if (isCompleteSummary(json)) break
     }
-    return bodies.length ? bodies : null
+    if (bodies.length) return bodies
+    // Refused on every host that answered: that may be about the project, which was never sent
+    // before, so those hosts are asked once more without it. A host that didn't answer isn't
+    // asked again: its second timeout would leave the probe no time for the one that does.
+    if (refused.length && project) return requestQuotaSummaries(ctx, token, null, refused)
+    return refused.length ? { _authFailed: true } : null
   }
 
-  // The plan never gates the meters: one short request to production, and a failed loadCodeAssist
-  // just leaves the badge blank. The probe has a 30 s deadline, and two 15 s timeouts here would
-  // throw away meters already fetched.
+  // The account's plan and Cloud Code project. It never gates the meters: one short request to
+  // production, and a failed loadCodeAssist leaves the badge blank and the summary asked without
+  // a project. The probe has a 30 s deadline, and a 15 s timeout here would eat the meters' time.
   var PLAN_TIMEOUT_MS = 5000
-  function loadCloudPlan(ctx, token) {
-    var data = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[0], LOAD_CODE_ASSIST_PATH, token, "antigravity", {}, PLAN_TIMEOUT_MS)
-    return data && !data._authFailed ? readAgyPlan(data) : null
+  function loadCloudAssist(ctx, token) {
+    var data = requestCloudCodeHost(ctx, CLOUD_CODE_URLS[0], LOAD_CODE_ASSIST_PATH, token, {}, PLAN_TIMEOUT_MS)
+    return data && !data._authFailed ? data : null
+  }
+
+  function cloudProject(assist) {
+    var project = assist && assist.cloudaicompanionProject
+    return typeof project === "string" && project.trim() ? project.trim() : null
   }
 
   // Cloud Code probe for one DB/cached/refreshed token: the quota summary first (the only
@@ -802,21 +836,22 @@
   // then the legacy fetchAvailableModels chain for builds without the RPC.
   // Returns { plan, lines }, { _authFailed: true }, or null (unavailable).
   function probeCloudCodeToken(ctx, token) {
-    var summaries = requestQuotaSummaries(ctx, token)
+    var assist = loadCloudAssist(ctx, token)
+    var summaries = requestQuotaSummaries(ctx, token, cloudProject(assist))
     if (summaries && summaries._authFailed) return summaries
     if (summaries) {
       var summaryLines = parseQuotaSummaries(ctx, summaries)
       if (summaryLines) {
-        return { plan: loadCloudPlan(ctx, token), lines: withCloudGemini(ctx, token, summaries, summaryLines) }
+        return { plan: readAgyPlan(assist), lines: withCloudGemini(ctx, token, summaries, summaryLines) }
       }
       // 2xx but not a summary payload — the parser said so; fall to the legacy chain.
     }
 
-    var data = requestCloudCodeJson(ctx, FETCH_MODELS_PATH, token, "antigravity", {})
+    var data = requestCloudCodeJson(ctx, FETCH_MODELS_PATH, token, {})
     if (!data || data._authFailed) return data
     var lines = buildModelLines(ctx, parseCloudCodeModels(data))
     if (lines.length === 0) return null
-    return { plan: loadCloudPlan(ctx, token), lines: lines }
+    return { plan: readAgyPlan(assist), lines: lines }
   }
 
   function parseCloudCodeModels(data) {
@@ -889,29 +924,27 @@
   function probeAgyCloudCode(ctx, token) {
     // Authoritative first: the quota summary. The plan lookup never gates it — a failed
     // loadCodeAssist just leaves the plan blank. User-Agent "agy" gets 403 SUBSCRIPTION_REQUIRED
-    // on every quota endpoint (and no paidTier) even for paid accounts; "antigravity" works.
-    var summaries = requestQuotaSummaries(ctx, token)
+    // on every quota endpoint (and no paidTier) even for paid accounts; the client's own works.
+    var assist = loadCloudAssist(ctx, token)
+    var summaries = requestQuotaSummaries(ctx, token, cloudProject(assist))
     if (summaries && summaries._authFailed) return summaries
     if (summaries) {
       var summaryLines = parseQuotaSummaries(ctx, summaries)
       if (summaryLines) {
-        return { plan: loadCloudPlan(ctx, token), lines: withCloudGemini(ctx, token, summaries, summaryLines) }
+        return { plan: readAgyPlan(assist), lines: withCloudGemini(ctx, token, summaries, summaryLines) }
       }
     }
 
-    var loadData = requestCloudCodeJson(ctx, LOAD_CODE_ASSIST_PATH, token, "antigravity", {})
+    var loadData = assist || requestCloudCodeJson(ctx, LOAD_CODE_ASSIST_PATH, token, {})
     if (!loadData || loadData._authFailed) return loadData
 
-    var project =
-      typeof loadData.cloudaicompanionProject === "string" && loadData.cloudaicompanionProject.trim()
-        ? loadData.cloudaicompanionProject.trim()
-        : null
+    var project = cloudProject(loadData)
     var quotaData = null
     if (project) {
-      quotaData = requestCloudCodeJson(ctx, RETRIEVE_QUOTA_PATH, token, "antigravity", { project: project })
+      quotaData = requestCloudCodeJson(ctx, RETRIEVE_QUOTA_PATH, token, { project: project })
     }
     if (!quotaData || quotaData._authFailed) {
-      quotaData = requestCloudCodeJson(ctx, RETRIEVE_QUOTA_PATH, token, "antigravity", {})
+      quotaData = requestCloudCodeJson(ctx, RETRIEVE_QUOTA_PATH, token, {})
     }
     if (!quotaData || quotaData._authFailed) return quotaData
 
