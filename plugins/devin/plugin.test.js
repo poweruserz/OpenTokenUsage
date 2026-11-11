@@ -265,22 +265,31 @@ describe("devin plugin", () => {
     const ctx = makeCtx()
     ctx.host.fs.writeText(WINDOWS_CREDENTIALS_PATH, makeCredentialsToml({ apiKey: "devin-session-token$stale" }))
     ctx.host.fs.writeText(CREDENTIALS_PATH, makeCredentialsToml())
+    mockAppAuth(ctx)
+    const asked = []
     ctx.host.http.request.mockImplementation((request) => {
       const body = JSON.parse(String(request.bodyText))
+      asked.push(body.metadata.apiKey)
       if (body.metadata.apiKey === "devin-session-token$stale") return { status: 401, bodyText: "{}" }
       return { status: 200, bodyText: JSON.stringify(makeQuotaResponse()) }
     })
 
     const plugin = await loadPlugin()
     expect(plugin.probe(ctx).plan).toBe("Max")
-    expect(ctx.host.http.request).toHaveBeenCalledTimes(2)
+    // Both files before the app's login.
+    expect(asked).toEqual(["devin-session-token$stale", "devin-session-token$cli"])
+    // The same-account check names the login the probe tries first.
+    expect(plugin.accountKey(ctx)).toBe("devin-session-token$stale")
 
     // A junction from one folder to the other shows the same file twice: asked once.
     ctx.host.fs.writeText(WINDOWS_CREDENTIALS_PATH, makeCredentialsToml())
-    ctx.host.http.request.mockClear()
-    ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "{}" })
+    asked.length = 0
+    ctx.host.http.request.mockImplementation((request) => {
+      asked.push(JSON.parse(String(request.bodyText)).metadata.apiKey)
+      return { status: 401, bodyText: "{}" }
+    })
     expect(() => plugin.probe(ctx)).toThrow()
-    expect(ctx.host.http.request).toHaveBeenCalledTimes(1)
+    expect(asked).toEqual(["devin-session-token$cli", "devin-session-token$app"])
   })
 
   it("does not call the app auth path twice when both sources have the same token", async () => {
