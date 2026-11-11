@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.4
+
+Antigravity shows what you have really used, Devin finds a login made with its CLI, and DeepSeek's balance fits on the taskbar strip.
+
+### New Features
+- Taskbar strip: a provider without a percent value shows its text value instead. DeepSeek reports a balance, so it never appeared on the strip even when ticked; it now shows the balance beside its logo, in your currency (#81)
+
+### Bug Fixes
+- Antigravity: the card stayed at 0% used, with no Weekly row, while Antigravity itself counted down. The app asked the wrong one of the language server's ports, fell back to Google's API without saying so, and was answered there as an unknown client, without the Gemini limits. It now shows Session and Weekly for Gemini beside Claude and Claude Weekly, as Antigravity's own quota screen does (#39, #84)
+- Devin: a login made only with the Devin CLI wasn't found. On Windows the CLI keeps it in `%APPDATA%\devin`, where the app didn't look, so the card showed the sign-in hint (#80)
+
 ## v0.8.3
 
 The detail page in sections you can close, Claude's resets by what they clear, and the plans under their new names.
