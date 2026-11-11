@@ -138,6 +138,30 @@ describe("buildTaskbarStripItems", () => {
       expect(items({})[0]!.lines).toEqual([{ text: "--", color: "#00ff00" }])
     })
 
+    it("draws one short line: control characters dropped, a long value cut", () => {
+      const bell = String.fromCharCode(7)
+      expect(items(balance(`$9${bell}.33\n`))[0]!.lines[0]!.text).toBe("$9.33")
+      const long = items(balance("Balance is 1,234,567.89 US dollars"))[0]!.lines[0]!.text
+      expect(long).toBe("Balance is 1,23…")
+      expect(items(balance(bell))[0]!.lines[0]!.text).toBe("--")
+    })
+
+    it("keeps a provider that has a percent line on its percent, whatever text it also reports", () => {
+      const claudeWithText = meta("claude", "#DE7356", { lines: [{ type: "text", label: "Today", scope: "overview" }] })
+      const built = buildTaskbarStripItems({
+        order: ["claude"],
+        primaryBars: [{ id: "claude", fraction: 0.58, label: "Session" }],
+        weeklyBars: [],
+        pluginsMeta: [claudeWithText],
+        pluginStates: { claude: { data: { lines: [{ type: "text", label: "Today", value: "$4.20" }] } as PluginOutput } },
+        onLightTaskbar: false,
+        logoColors: true,
+        displayMode: "used",
+        style: style(),
+      })
+      expect(built[0]!.lines.map((line) => line.text)).toEqual(["58%"])
+    })
+
     it("is left out when it declares no overview text line either", () => {
       const bare = meta("deepseek", undefined, { primaryCandidates: [], lines: [{ type: "text", label: "Detail note", scope: "detail" }] })
       const built = buildTaskbarStripItems({
@@ -203,6 +227,18 @@ describe("makeTaskbarStripSvg", () => {
     expect(one.height).toBe(40)
     expect(one.svg.match(/<text /g)).toHaveLength(2)
     expect(one.svg).toContain('fill="red"')
+  })
+
+  // A text value comes from a plugin: markup in it must stay text, or the image fails to load.
+  it("escapes line text", () => {
+    const strip = makeTaskbarStripSvg({
+      items: [{ ...item, lines: [{ text: `A&B <rect/> "9"`, color: "white" }] }],
+      style: style(),
+      scale: 1,
+    })
+    expect(strip.svg).toContain("A&amp;B &lt;rect/&gt; &quot;9&quot;")
+    expect(strip.svg).not.toContain("<rect/>")
+    expect(new DOMParser().parseFromString(strip.svg, "image/svg+xml").querySelector("parsererror")).toBeNull()
   })
 
   it("uses the chosen font, size and weight, scaled for the display", () => {
