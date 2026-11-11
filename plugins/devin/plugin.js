@@ -2,7 +2,12 @@
   var CLOUD_SERVICE = "exa.seat_management_pb.SeatManagementService"
   var DEFAULT_API_SERVER_URL = "https://server.codeium.com"
   var CLOUD_COMPAT_VERSION = "1.108.2"
-  var CREDENTIALS_PATH = "~/.local/share/devin/credentials.toml"
+  // The Devin CLI's login: %APPDATA%\devin on Windows (the host maps the first path there),
+  // ~/.local/share/devin in a WSL distro.
+  var CREDENTIALS_PATHS = [
+    "~/Library/Application Support/devin/credentials.toml",
+    "~/.local/share/devin/credentials.toml",
+  ]
   var APP_AUTH_SOURCES = [
     {
       source: "Devin app",
@@ -117,10 +122,10 @@
     )
   }
 
-  function loadCredentialsFile(ctx) {
-    if (!ctx.host.fs.exists(CREDENTIALS_PATH)) return null
+  function loadCredentialsFile(ctx, path) {
+    if (!ctx.host.fs.exists(path)) return null
     try {
-      var text = ctx.host.fs.readText(CREDENTIALS_PATH)
+      var text = ctx.host.fs.readText(path)
       var apiKey = readTomlString(text, "windsurf_api_key")
       if (!apiKey) {
         ctx.host.log.warn("Devin credentials missing windsurf_api_key")
@@ -295,8 +300,9 @@
     var sawAuthFailure = false
     var attempts = []
 
-    var credentials = loadCredentialsFile(ctx)
-    if (credentials) {
+    for (var c = 0; c < CREDENTIALS_PATHS.length; c++) {
+      var credentials = loadCredentialsFile(ctx, CREDENTIALS_PATHS[c])
+      if (!credentials || alreadyAttempted(attempts, credentials)) continue
       sawApiKey = true
       attempts.push(authFingerprint(credentials))
       var credentialsAttempt = tryAuth(ctx, credentials)
@@ -339,7 +345,8 @@
   // Who is signed in, for the WSL same-account check (wsl.rs): the API key probe tries first (the
   // CLI's credentials, then each app install). Local only.
   function accountKey(ctx) {
-    var auth = loadCredentialsFile(ctx)
+    var auth = null
+    for (var c = 0; !auth && c < CREDENTIALS_PATHS.length; c++) auth = loadCredentialsFile(ctx, CREDENTIALS_PATHS[c])
     for (var i = 0; !auth && i < APP_AUTH_SOURCES.length; i++) auth = readAppAuth(ctx, APP_AUTH_SOURCES[i])
     return auth && auth.apiKey ? auth.apiKey : null
   }
