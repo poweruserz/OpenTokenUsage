@@ -31,10 +31,12 @@ ps -ax -o pid=,command= | grep -i '[l]anguage_server.*antigravity'
 lsof -nP -iTCP -sTCP:LISTEN -a -p <pid>
 
 # 3. Probe each port to find the Connect-RPC endpoint
-POST https://127.0.0.1:<port>/.../GetUnleashData  → first 200 OK wins
+POST https://127.0.0.1:<port>/.../GetUnleashData  → first 2xx wins
 ```
 
 Port and CSRF token change on every app/IDE restart. The LS may use HTTPS with a self-signed cert.
+
+The process listens on more than its RPC port. Antigravity 2.31.1 (seen 2026-11-11) had five: three lower ones (its host bridge and sidecars) that answer `401` to every request, then the RPC over HTTPS and over HTTP. Ports are tried in ascending order, so "any answer means alive" picked the first of the `401` ports, every quota call failed there, and the card silently fell back to Cloud Code. A port is taken when the liveness call answers 2xx; when none does, the first port whose answer isn't a `401`/`403` is used (an older build's `400`).
 
 `agy` can also expose the same local service via an `agy` process. It has listening ports but no CSRF token or Antigravity marker flags, so discovery matches the `agy` executable directly.
 
@@ -212,15 +214,17 @@ Same client_id/secret is there in the Antigravity app bundle, used for the Googl
 
 When the language server is not running, the plugin falls back to Google's Cloud Code API using a Google OAuth access token from the unified-state protobuf, a cached refreshed token, or the `agy` keychain account.
 
+Every Cloud Code request carries the Antigravity client's own User-Agent, `antigravity/2.31.1 (aidev_client; os_type=windows; arch=amd64)`. A bare `antigravity` is answered too, but as another client: on 2026-11-11 its summary had only the Claude group on both hosts and `fetchAvailableModels` listed an old model set with every quota full, so the card showed 0% used while Antigravity showed 19% (upstream sends the same shape).
+
 ### retrieveUserQuotaSummary (first)
 
-The pooled meters: `gemini-5h` (Session), `gemini-weekly` (Weekly), `3p-5h` (Claude) and `3p-weekly` (Claude Weekly), matched by exact `bucketId`. The plugin asks production first and daily only when production's answer lacks one of the four, then merges the bodies by bucket id, the first usable bucket winning: either host can omit a whole pool (upstream #1407).
+The pooled meters: `gemini-5h` (Session), `gemini-weekly` (Weekly), `3p-5h` (Claude) and `3p-weekly` (Claude Weekly), matched by exact `bucketId`. The body is `{"project": "<cloudaicompanionProject>"}` from `loadCodeAssist`, or `{}` when that lookup failed. The plugin asks daily first and production only when daily's answer lacks one of the four, then merges the bodies by bucket id, the first usable bucket winning: either host can omit a whole pool (upstream #1407). Daily is the host the client itself is started with (`--cloud_code_endpoint`) and has the live counters; production answered with all four pools untouched (seen 2026-11-11, upstream #1641), which is a complete answer, so asked first it hid daily's. A `401`/`403` from one host doesn't end it: the other is still asked, and when every host that answered refused a request that named a project, the summary is asked once more without one (as it always was before). Only then does the refusal count as a rejected token. Each summary request has a 10 s timeout, so two hanging hosts and the plan lookup still fit the probe's 30 s.
 
 Eligible accounts also get a `Gemini 4 Argon` group with one `window: "weekly"` bucket of its own id: it becomes **Argon Weekly**, between Weekly and Claude. A disabled bucket, a `disabled` flag that isn't a boolean, or anything but exactly one weekly bucket drops that line (upstream #1395). Argon models never join the Gemini pool in the per-model fallbacks below.
 
 When the merged summary reports other pools but no Gemini bucket at all (seen 2026-10-25 on both hosts), Session comes from `fetchAvailableModels`' Gemini models instead (the LS path uses `GetUserStatus`). Image models are left out: they have a quota of their own. Gemini's weekly window then has no data.
 
-The plan badge comes from `loadCodeAssist` (`User-Agent: antigravity`, body `{}`): `paidTier.name`, else a known `paidTier.id` (`g1-pro-tier`, `g1-ultra-tier`, `g1-ultra-lite-tier`), else `currentTier.name`. It is one request to production with a 5 s timeout: the probe has a 30 s deadline, and the badge is optional, so a slow plan lookup leaves it blank instead of costing the meters.
+The plan badge and the project come from `loadCodeAssist` (body `{}`), asked before the summary: `paidTier.name`, else a known `paidTier.id` (`g1-pro-tier`, `g1-ultra-tier`, `g1-ultra-lite-tier`), else `currentTier.name`. It is one request to production with a 5 s timeout: the probe has a 30 s deadline, and both are optional, so a slow lookup leaves the badge blank and the summary asked without a project instead of costing the meters.
 
 ### fetchAvailableModels
 
@@ -228,10 +232,10 @@ The plan badge comes from `loadCodeAssist` (`User-Agent: antigravity`, body `{}`
 POST https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels
 Authorization: Bearer <access_token>
 Content-Type: application/json
-User-Agent: antigravity
+User-Agent: antigravity/2.31.1 (aidev_client; os_type=windows; arch=amd64)
 ```
 
-Base URLs tried in order (production first: daily can answer 200 without the Gemini group):
+Base URLs tried in order for everything but the summary (the first that answers wins):
 1. `https://cloudcode-pa.googleapis.com`
 2. `https://daily-cloudcode-pa.googleapis.com`
 
@@ -273,7 +277,7 @@ The Cloud Code model set is a superset of the LS model set. The LS returns only 
 1. Probe the Antigravity app/IDE language server.
 2. Probe the `agy` local language server.
 3. Read SQLite token candidates from both Antigravity state DB paths.
-4. Try unexpired SQLite/cached access tokens with `retrieveUserQuotaSummary` (then `fetchAvailableModels` for builds without it), and read the plan from `loadCodeAssist`.
+4. Try unexpired SQLite/cached access tokens: the plan and project from `loadCodeAssist`, then `retrieveUserQuotaSummary` (then `fetchAvailableModels` for builds without it).
 5. Refresh SQLite refresh tokens only after auth failure or when no access token exists.
 6. Read `agy` keychain token from service `gemini`, account `antigravity`, then call `loadCodeAssist` and `retrieveUserQuota`.
 7. If all strategies fail: error "Start Antigravity or run `agy` and try again."
