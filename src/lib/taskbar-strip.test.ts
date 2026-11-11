@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { PluginMeta } from "@/lib/plugin-types"
+import type { PluginMeta, PluginOutput } from "@/lib/plugin-types"
 import {
   DEFAULT_TASKBAR_STRIP_STYLE,
   normalizeTaskbarStripStyle,
@@ -13,18 +13,29 @@ import {
   makeTaskbarStripSvg,
   readableOnTaskbar,
   stripPluginSettings,
+  stripTextLabel,
 } from "@/lib/taskbar-strip"
 import { readableBrandColor } from "@/lib/tray-provider-icons"
 import { normalizeStripDpis } from "@/hooks/app/use-taskbar-strip"
 
-const meta = (id: string, brandColor?: string) =>
-  ({ id, name: id, iconUrl: `data:image/svg+xml;base64,${id}`, brandColor }) as unknown as PluginMeta
+const meta = (id: string, brandColor?: string, patch: Partial<PluginMeta> = {}) =>
+  ({
+    id,
+    name: id,
+    iconUrl: `data:image/svg+xml;base64,${id}`,
+    brandColor,
+    lines: [],
+    primaryCandidates: ["Session"],
+    ...patch,
+  }) as PluginMeta
 
 const pluginsMeta = [meta("claude", "#DE7356"), meta("codex", "#000000")]
 const style = (patch: Partial<TaskbarStripStyle> = {}) => ({ ...DEFAULT_TASKBAR_STRIP_STYLE, ...patch })
 
 const build = (patch: Partial<TaskbarStripStyle> = {}, displayMode: "used" | "left" = "used", onLightTaskbar = false) =>
   buildTaskbarStripItems({
+    order: ["claude", "codex"],
+    pluginStates: {},
     primaryBars: [
       { id: "claude", fraction: 0.58, label: "Session" },
       { id: "codex", fraction: 0.95, label: "Weekly" },
@@ -87,6 +98,65 @@ describe("buildTaskbarStripItems", () => {
     expect(readableBrandColor(yellowish, true)).toBeUndefined() // would vanish on white
     expect(claude!.lines[0]!.color).not.toBe(yellowish)
     expect(readableBrandColor(claude!.lines[0]!.color, true)).toBeDefined()
+  })
+
+  // Issue #81: DeepSeek reports a balance, not a share used, so it has no percent line.
+  describe("a provider with only a text line", () => {
+    const deepseek = meta("deepseek", undefined, {
+      primaryCandidates: [],
+      lines: [
+        { type: "text", label: "Detail note", scope: "detail" },
+        { type: "text", label: "Balance", scope: "overview" },
+      ],
+    })
+    const balance = (value: string) =>
+      ({ deepseek: { data: { lines: [{ type: "text", label: "Balance", value }] } as PluginOutput } })
+    const items = (pluginStates: Parameters<typeof buildTaskbarStripItems>[0]["pluginStates"], moneyText?: (text: string) => string) =>
+      buildTaskbarStripItems({
+        order: ["deepseek", "claude"],
+        primaryBars: [{ id: "claude", fraction: 0.58, label: "Session" }],
+        weeklyBars: [],
+        pluginsMeta: [...pluginsMeta, deepseek],
+        pluginStates,
+        onLightTaskbar: false,
+        logoColors: true,
+        displayMode: "used",
+        style: style({ colorMode: "thresholds", warnAt: 1, textColor: "#00ff00" }),
+        moneyText,
+      })
+
+    it("shows its overview value in the strip's order, in the text color", () => {
+      const built = items(balance("$9.33"))
+      expect(built.map((item) => item.lines.map((line) => line.text))).toEqual([["$9.33"], ["58%"]])
+      // No share used to color by.
+      expect(built[0]!.lines[0]!.color).toBe("#00ff00")
+      expect(built[0]!.iconUrl).toBe(deepseek.iconUrl)
+    })
+
+    it("shows the value as the card does, and -- until there is one", () => {
+      expect(items(balance("$9.33"), (text) => text.replace("$9.33", "€8.60"))[0]!.lines[0]!.text).toBe("€8.60")
+      expect(items({})[0]!.lines).toEqual([{ text: "--", color: "#00ff00" }])
+    })
+
+    it("is left out when it declares no overview text line either", () => {
+      const bare = meta("deepseek", undefined, { primaryCandidates: [], lines: [{ type: "text", label: "Detail note", scope: "detail" }] })
+      const built = buildTaskbarStripItems({
+        order: ["deepseek", "claude"],
+        primaryBars: [{ id: "claude", fraction: 0.58, label: "Session" }],
+        weeklyBars: [],
+        pluginsMeta: [...pluginsMeta, bare],
+        pluginStates: balance("$9.33"),
+        onLightTaskbar: false,
+        logoColors: true,
+        displayMode: "used",
+        style: style(),
+      })
+      expect(built).toHaveLength(1)
+      expect(stripTextLabel(bare)).toBeUndefined()
+      expect(stripTextLabel(deepseek)).toBe("Balance")
+      // A provider with a percent line never falls back to text.
+      expect(stripTextLabel(meta("claude", undefined, { lines: [{ type: "text", label: "Today", scope: "overview" }] }))).toBeUndefined()
+    })
   })
 })
 
