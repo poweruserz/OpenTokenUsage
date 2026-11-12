@@ -235,6 +235,8 @@ describe("isNotSetUpError", () => {
     expect(isNotSetUpError("Amp not installed. Install Amp Code to get started.")).toBe(true)
     // The user has the provider: an old login, a bad key, a busy or unreachable server.
     expect(isNotSetUpError("Token expired. Run `claude` to log in again.")).toBe(false)
+    expect(isNotSetUpError("Session expired. Run `agy` to log in again.")).toBe(false)
+    expect(isNotSetUpError("Antigravity quota data unavailable. Try again later.")).toBe(false)
     expect(isNotSetUpError("API key invalid. Check your Z.ai API key.")).toBe(false)
     expect(isNotSetUpError("Rate limited by Claude, retry in ~5m")).toBe(false)
     expect(isNotSetUpError("Request failed. Check your connection.")).toBe(false)

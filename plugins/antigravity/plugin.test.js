@@ -899,7 +899,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
   })
 
   it("Cloud Code tries multiple base URLs", async () => {
@@ -1147,7 +1147,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
   })
 
   it("tries DB token first, then cached on auth failure", async () => {
@@ -1659,7 +1659,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
   })
 
   it("handles refresh response missing access_token", async () => {
@@ -1682,7 +1682,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
     expect(oauthCalls).toBe(1)
   })
 
@@ -1885,7 +1885,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
     expect(refreshCalls).toBe(0)
   })
 
@@ -1911,7 +1911,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
     expect(refreshCalls).toBe(0)
   })
 

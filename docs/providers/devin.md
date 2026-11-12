@@ -120,7 +120,7 @@ Devin currently returns no `weeklyQuotaRemainingPercent` field in the observed p
 2. Read Devin app SQLite auth if CLI credentials are missing or different.
 3. POST `GetUserStatus` with `ideName: "devin"`.
 4. Build weekly quota and extra balance lines. Show daily quota only if Devin does not mark it hidden.
-5. If auth fails, show: `Run devin auth login or sign in to Devin and try again.`
+5. With no login found, show: `Run devin auth login or sign in to Devin and try again.` When every login found is rejected (401/403), show: ``Session expired. Sign in via Devin app or run `devin auth login`.`` (a new install's detection reads only the first as "nothing set up").
 
 ## WSL
 

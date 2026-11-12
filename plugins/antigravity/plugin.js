@@ -1145,7 +1145,11 @@
 
     if (ccResult && !ccResult._authFailed) return ccResult
 
-    throw LOGIN_MESSAGE
+    // LOGIN_MESSAGE says no login was found; a saved one that was refused or couldn't be checked is the
+    // user's, and a new install shows its card (use-provider-detection.ts).
+    if (tokens.length === 0 && refreshTokens.length === 0 && !agy) throw LOGIN_MESSAGE
+    if (sawAuthFailure || ccResult || tokens.length === 0) throw "Session expired. Run `agy` to log in again."
+    throw "Antigravity quota data unavailable. Try again later."
   }
 
   globalThis.__openusage_plugin = { id: "antigravity", probe: probe }
