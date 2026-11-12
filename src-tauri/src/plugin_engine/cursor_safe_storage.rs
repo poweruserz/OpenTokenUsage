@@ -58,8 +58,12 @@ pub fn read_wrapped_key(local_state_json: &str) -> Result<Vec<u8>, String> {
     Ok(wrapped[5..].to_vec())
 }
 
+// Ties the token cache to this app, so unprotect_for_cache opens no other program's DPAPI data.
 #[cfg(windows)]
-fn dpapi_call(protect: bool, payload: &[u8], failure: &str) -> Result<Vec<u8>, String> {
+const CACHE_ENTROPY: &[u8] = b"OpenTokenUsage cursor token cache";
+
+#[cfg(windows)]
+fn dpapi_call(protect: bool, payload: &[u8], entropy: &[u8], failure: &str) -> Result<Vec<u8>, String> {
     use std::ptr;
     use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
     use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CryptUnprotectData, CRYPT_INTEGER_BLOB};
@@ -73,12 +77,17 @@ fn dpapi_call(protect: bool, payload: &[u8], failure: &str) -> Result<Vec<u8>, S
         cbData: 0,
         pbData: ptr::null_mut(),
     };
+    let entropy_blob = CRYPT_INTEGER_BLOB {
+        cbData: u32::try_from(entropy.len()).map_err(|_| failure.to_string())?,
+        pbData: entropy.as_ptr() as *mut u8,
+    };
+    let entropy_ptr: *const CRYPT_INTEGER_BLOB = if entropy.is_empty() { ptr::null() } else { &entropy_blob };
     let ok = unsafe {
         if protect {
             CryptProtectData(
                 &input,
                 ptr::null(),
-                ptr::null(),
+                entropy_ptr,
                 ptr::null_mut(),
                 ptr::null(),
                 UI_FORBIDDEN,
@@ -88,7 +97,7 @@ fn dpapi_call(protect: bool, payload: &[u8], failure: &str) -> Result<Vec<u8>, S
             CryptUnprotectData(
                 &input,
                 ptr::null_mut(),
-                ptr::null(),
+                entropy_ptr,
                 ptr::null_mut(),
                 ptr::null(),
                 UI_FORBIDDEN,
@@ -107,18 +116,18 @@ fn dpapi_call(protect: bool, payload: &[u8], failure: &str) -> Result<Vec<u8>, S
 }
 
 #[cfg(windows)]
-fn dpapi_protect(plain: &[u8]) -> Result<Vec<u8>, String> {
-    dpapi_call(true, plain, "Windows DPAPI could not protect the token")
+fn dpapi_protect(plain: &[u8], entropy: &[u8]) -> Result<Vec<u8>, String> {
+    dpapi_call(true, plain, entropy, "Windows DPAPI could not protect the token")
 }
 
 #[cfg(windows)]
-fn dpapi_unprotect(payload: &[u8]) -> Result<Vec<u8>, String> {
-    dpapi_call(false, payload, "Windows DPAPI could not unwrap the key")
+fn dpapi_unprotect(payload: &[u8], entropy: &[u8]) -> Result<Vec<u8>, String> {
+    dpapi_call(false, payload, entropy, "Windows DPAPI could not unwrap the key")
 }
 
 #[cfg(windows)]
 pub fn unwrap_dpapi(payload: &[u8]) -> Result<Vec<u8>, String> {
-    let key = dpapi_unprotect(payload)?;
+    let key = dpapi_unprotect(payload, &[])?;
     if key.len() != 32 {
         return Err("Windows DPAPI returned an unexpected key".to_string());
     }
@@ -131,7 +140,7 @@ pub fn protect_for_cache(plain: &str) -> Result<String, String> {
     }
     #[cfg(windows)]
     {
-        let protected = dpapi_protect(plain.as_bytes())?;
+        let protected = dpapi_protect(plain.as_bytes(), CACHE_ENTROPY)?;
         return Ok(BASE64_STANDARD.encode(protected));
     }
     #[cfg(not(windows))]
@@ -149,7 +158,7 @@ pub fn unprotect_for_cache(stored: &str) -> Result<String, String> {
         let blob = BASE64_STANDARD
             .decode(stored.trim())
             .map_err(|_| "cached token could not be read".to_string())?;
-        let plain = dpapi_unprotect(&blob).map_err(|_| "cached token could not be read".to_string())?;
+        let plain = dpapi_unprotect(&blob, CACHE_ENTROPY).map_err(|_| "cached token could not be read".to_string())?;
         let text = String::from_utf8(plain).map_err(|_| "cached token could not be read".to_string())?;
         if text.is_empty() {
             return Err("cached token could not be read".to_string());
@@ -191,7 +200,7 @@ mod tests {
         aead::{Aead, KeyInit, Payload},
         Aes256Gcm,
     };
-    use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
     fn seal(key: &[u8; 32], nonce: &[u8; 12], plain: &str) -> Vec<u8> {
         let cipher = Aes256Gcm::new_from_slice(key).expect("cipher");
@@ -290,11 +299,14 @@ mod tests {
     #[test]
     fn dpapi_round_trip_returns_32_bytes() {
         let key = [3_u8; 32];
-        let protected = dpapi_protect(&key).expect("protect");
+        let protected = dpapi_protect(&key, &[]).expect("protect");
         let opened = unwrap_dpapi(&protected).expect("unwrap");
         assert_eq!(opened, key);
         let cache = protect_for_cache("plain-token").expect("cache protect");
         assert_ne!(cache, "plain-token");
         assert_eq!(unprotect_for_cache(&cache).expect("cache unprotect"), "plain-token");
+        // The cache opens only what it protected, not this user's other DPAPI data.
+        let foreign = BASE64_STANDARD.encode(dpapi_protect(b"plain-token", &[]).expect("protect"));
+        assert!(unprotect_for_cache(&foreign).is_err());
     }
 }
