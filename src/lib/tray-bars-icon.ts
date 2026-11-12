@@ -12,7 +12,7 @@ function rgbaToImageDataBytes(rgba: Uint8ClampedArray): Uint8Array {
   return new Uint8Array(rgba.buffer)
 }
 
-function escapeXmlText(text: string): string {
+export function escapeXmlText(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

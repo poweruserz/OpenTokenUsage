@@ -25,7 +25,7 @@ import {
   type TaskbarStripMonitors,
   type TaskbarStripStyle,
 } from "@/lib/settings"
-import { colorOnScale, stripPluginSettings } from "@/lib/taskbar-strip"
+import { colorOnScale, stripPluginSettings, stripTextLabel } from "@/lib/taskbar-strip"
 import { cn } from "@/lib/utils"
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
@@ -105,7 +105,8 @@ function StripProviderRow({
   name: string
   checked: boolean
   disabled: boolean
-  lineMode: TaskbarStripLineMode
+  /** Absent for a provider that shows a text value: it has no session or weekly line to pick. */
+  lineMode?: TaskbarStripLineMode
   onToggle: (id: string) => void
   onLineModeChange: (id: string, mode: TaskbarStripLineMode) => void
 }) {
@@ -126,7 +127,7 @@ function StripProviderRow({
         <GripVertical className="h-4 w-4" />
       </button>
       <span className={cn("flex-1 truncate text-[13px]", !checked && "text-muted-foreground")}>{name}</span>
-      {checked && (
+      {checked && lineMode && (
         <select
           value={lineMode}
           aria-label={t("settings.strip.lineMode", { name })}
@@ -250,6 +251,10 @@ export function TaskbarStripSection({ onMenubarIconStyleChange }: { onMenubarIco
   }
 
   const nameOf = (id: string) => pluginsMeta.find((meta) => meta.id === id)?.name ?? id
+  const textOnly = (id: string) => {
+    const meta = pluginsMeta.find((entry) => entry.id === id)
+    return meta !== undefined && stripTextLabel(meta) !== undefined
+  }
   const enabledIds = pluginSettings ? pluginSettings.order.filter((id) => !pluginSettings.disabled.includes(id)) : []
   const shown = pluginSettings ? stripPluginSettings(style.providers, pluginSettings).order : []
   const rows = [...shown, ...enabledIds.filter((id) => !shown.includes(id))]
@@ -311,7 +316,7 @@ export function TaskbarStripSection({ onMenubarIconStyleChange }: { onMenubarIco
                     name={nameOf(id)}
                     checked={shown.includes(id)}
                     disabled={full && !shown.includes(id)}
-                    lineMode={style.lineModes[id] ?? "both"}
+                    lineMode={textOnly(id) ? undefined : (style.lineModes[id] ?? "both")}
                     onToggle={toggleProvider}
                     onLineModeChange={(provider, mode) => update({ lineModes: { ...style.lineModes, [provider]: mode } })}
                   />

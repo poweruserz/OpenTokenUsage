@@ -6,6 +6,7 @@ const loadPlugin = async () => {
   return globalThis.__openusage_plugin
 }
 
+const CLIENT_USER_AGENT = "antigravity/2.31.1 (aidev_client; os_type=windows; arch=amd64)"
 const OAUTH_TOKEN_KEY = "antigravityUnifiedStateSync.oauthToken"
 const OAUTH_TOKEN_SENTINEL = "oauthTokenInfoSentinelKey"
 const STATE_DB_V2 = "~/Library/Application Support/Antigravity IDE/User/globalStorage/state.vscdb"
@@ -393,6 +394,72 @@ describe("antigravity plugin", () => {
     expect(pro.used).toBe(40) // (1 - 0.6) * 100
   })
 
+  it("passes over the language server's other ports, which answer 401, to the one that serves quotas", async () => {
+    const ctx = makeCtx()
+    // Seen 2026-11-11: language_server.exe listened on 61975, 61978, 61980 (its host bridge and
+    // sidecars: plain HTTP, 401 to everything) below the RPC's own 63336 (https) and 63338 (http).
+    ctx.host.ls.discover.mockReturnValue(makeDiscovery({ ports: [61975, 61978, 63336] }))
+    const asked = []
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      asked.push(url)
+      if (!url.includes(":63336/")) {
+        if (url.startsWith("https")) throw new Error("tls handshake failed")
+        return { status: 401, bodyText: "Unauthorized\n" }
+      }
+      if (url.startsWith("http:")) throw new Error("connection reset")
+      if (url.includes("GetUnleashData")) return { status: 200, bodyText: "{}" }
+      if (url.includes("RetrieveUserQuotaSummary")) {
+        return { status: 200, bodyText: JSON.stringify({ response: makeQuotaSummaryPayload() }) }
+      }
+      return { status: 200, bodyText: JSON.stringify(makeUserStatusResponse()) }
+    })
+
+    const result = (await loadPlugin()).probe(ctx)
+    expect(result.lines.map((line) => [line.label, line.used])).toEqual([
+      ["Session", 25],
+      ["Weekly", 10],
+      ["Claude", 60],
+      ["Claude Weekly", 0],
+    ])
+    // Only the liveness check ever reached the wrong ports.
+    expect(asked.filter((url) => !url.includes(":63336/") && !url.includes("GetUnleashData"))).toEqual([])
+  })
+
+  it("prefers a later port that answers the liveness call over an earlier one that answers an error", async () => {
+    const ctx = makeCtx()
+    ctx.host.ls.discover.mockReturnValue(makeDiscovery())
+    const asked = []
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      asked.push(url)
+      if (url.includes("GetUnleashData")) return { status: url.includes(":42001/") ? 400 : 200, bodyText: "{}" }
+      if (url.includes("RetrieveUserQuotaSummary")) {
+        return { status: 200, bodyText: JSON.stringify({ response: makeQuotaSummaryPayload() }) }
+      }
+      return { status: 200, bodyText: JSON.stringify(makeUserStatusResponse()) }
+    })
+
+    const result = (await loadPlugin()).probe(ctx)
+    expect(result.lines.map((line) => line.used)).toEqual([25, 10, 60, 0])
+    expect(asked.filter((url) => url.includes(":42001/") && !url.includes("GetUnleashData"))).toEqual([])
+  })
+
+  it("sends no quota call to the language server when every port refuses the liveness call", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(makeDiscovery())
+    const asked = []
+    ctx.host.http.request.mockImplementation((opts) => {
+      asked.push(String(opts.url))
+      return { status: 403, bodyText: "Forbidden" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(asked.filter((url) => url.includes("127.0.0.1") && !url.includes("GetUnleashData"))).toEqual([])
+  })
+
   it("uses extension port as fallback when all ports fail probing", async () => {
     const ctx = makeCtx()
     ctx.host.ls.discover.mockReturnValue(makeDiscovery({ ports: [99999], extensionPort: 42010 }))
@@ -699,12 +766,17 @@ describe("antigravity plugin", () => {
 
     expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("gemini", "antigravity")
     expect(called.every((call) => call.auth === "Bearer agy-keychain-token")).toBe(true)
-    expect(called.every((call) => call.userAgent === "antigravity")).toBe(true)
+    expect(called.every((call) => call.userAgent === CLIENT_USER_AGENT)).toBe(true)
     expect(called.map((call) => call.url)).toEqual([
-      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
-      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
       "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
       "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+    ])
+    // The summary is asked for the account's project, as the client asks it.
+    expect(called.slice(1, 3).map((call) => JSON.parse(call.body))).toEqual([
+      { project: "projects/openusage-agy" },
+      { project: "projects/openusage-agy" },
     ])
     expect(result.plan).toBe("Google AI Pro")
     expect(result.lines.map((l) => l.label)).toEqual(["Session", "Claude"])
@@ -724,15 +796,13 @@ describe("antigravity plugin", () => {
       return null
     })
 
+    // Only the agy path asks retrieveUserQuota (the SQLite path asks fetchAvailableModels).
     let agyCalls = 0
     ctx.host.http.request.mockImplementation((opts) => {
       const url = String(opts.url)
       if (url.includes("retrieveUserQuotaSummary")) return { status: 404, bodyText: "" }
       if (url.includes("fetchAvailableModels")) return { status: 500, bodyText: "" }
-      if (url.includes("loadCodeAssist")) {
-        agyCalls += 1
-        return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
-      }
+      if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
       if (url.includes("retrieveUserQuota")) {
         agyCalls += 1
         return { status: 200, bodyText: JSON.stringify(makeAgyQuotaResponse()) }
@@ -744,7 +814,7 @@ describe("antigravity plugin", () => {
     const result = plugin.probe(ctx)
 
     expect(result.plan).toBe("Google AI Pro")
-    expect(agyCalls).toBe(2)
+    expect(agyCalls).toBe(1)
   })
 
   it("refreshes an expired agy keychain token, then reuses the refreshed token", async () => {
@@ -811,7 +881,7 @@ describe("antigravity plugin", () => {
 
     expect(capturedHeaders).toBeTruthy()
     expect(capturedHeaders.Authorization).toBe("Bearer ya29.proto-token")
-    expect(capturedHeaders["User-Agent"]).toBe("antigravity")
+    expect(capturedHeaders["User-Agent"]).toBe(CLIENT_USER_AGENT)
   })
 
   it("Cloud Code returns null on 401/403 (invalid token, no refresh)", async () => {
@@ -2172,14 +2242,27 @@ describe("antigravity plugin", () => {
       .filter((u) => u.includes("retrieveUserQuotaSummary"))
   }
 
-  it("merges the summary from both Cloud Code hosts when production lacks a pool", async () => {
+  // All four pools untouched, as production answered on 2026-11-11.
+  function untouchedSummary() {
+    const payload = makeQuotaSummaryPayload()
+    payload.groups.forEach((group) => group.buckets.forEach((bucket) => { bucket.remainingFraction = 1 }))
+    return payload
+  }
+
+  function summaryRequests(ctx) {
+    return ctx.host.http.request.mock.calls.map((c) => c[0]).filter((o) => String(o.url).includes("retrieveUserQuotaSummary"))
+  }
+
+  it("merges the summary from both Cloud Code hosts when daily lacks a pool, daily's buckets first", async () => {
     const ctx = makeCtx()
     setupDbToken(ctx)
+    const geminiOnly = makeQuotaSummaryPayload()
+    geminiOnly.groups = geminiOnly.groups.slice(1)
     ctx.host.http.request.mockImplementation((opts) => {
       const url = String(opts.url)
+      if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
       if (url.includes("retrieveUserQuotaSummary")) {
-        const payload = url.includes("daily-cloudcode") ? makeQuotaSummaryPayload() : claudeOnlySummary()
-        return { status: 200, bodyText: JSON.stringify(payload) }
+        return { status: 200, bodyText: JSON.stringify(url.includes("daily-cloudcode") ? geminiOnly : untouchedSummary()) }
       }
       return { status: 500, bodyText: "" }
     })
@@ -2188,25 +2271,149 @@ describe("antigravity plugin", () => {
     const result = plugin.probe(ctx)
 
     expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Claude", "Claude Weekly"])
-    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
-    expect(summaryCalls(ctx)).toHaveLength(2)
+    // Gemini from daily (production's untouched copy loses), Claude from production.
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 0, 0])
+    expect(summaryCalls(ctx)).toEqual([
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+    ])
+    expect(summaryRequests(ctx).map((o) => JSON.parse(o.bodyText))).toEqual([
+      { project: "projects/openusage-agy" },
+      { project: "projects/openusage-agy" },
+    ])
     const calls = ctx.host.http.request.mock.calls.map((c) => String(c[0].url))
     expect(calls.filter((u) => u.includes("fetchAvailableModels")).length).toBe(0)
   })
 
-  it("asks only production when its summary already has all four pools", async () => {
+  it("asks production when daily fails or refuses, without renewing the token", async () => {
+    for (const dailyStatus of [500, 403]) {
+      const ctx = makeCtx()
+      setupDbToken(ctx)
+      ctx.host.http.request.mockImplementation((opts) => {
+        const url = String(opts.url)
+        if (url.includes("retrieveUserQuotaSummary")) {
+          if (url.includes("daily-cloudcode")) return { status: dailyStatus, bodyText: "" }
+          return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+        }
+        return { status: 500, bodyText: "" }
+      })
+
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+
+      expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+      expect(summaryCalls(ctx)).toHaveLength(2)
+      // Two hanging hosts and the plan lookup must fit the probe's 30 s.
+      expect(summaryRequests(ctx).every((o) => o.timeoutMs <= 10000)).toBe(true)
+      const calls = ctx.host.http.request.mock.calls.map((c) => String(c[0].url))
+      expect(calls.filter((u) => u.includes("oauth2.googleapis.com"))).toEqual([])
+    }
+  })
+
+  it("asks the summary once more without the project when both hosts refuse it", async () => {
     const ctx = makeCtx()
     setupDbToken(ctx)
     ctx.host.http.request.mockImplementation((opts) => {
       const url = String(opts.url)
+      if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
+      if (url.includes("retrieveUserQuotaSummary")) {
+        if (JSON.parse(opts.bodyText).project) return { status: 403, bodyText: "" }
+        return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.plan).toBe("Google AI Pro")
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+    expect(summaryRequests(ctx).map((o) => JSON.parse(o.bodyText))).toEqual([
+      { project: "projects/openusage-agy" },
+      { project: "projects/openusage-agy" },
+      {},
+    ])
+  })
+
+  // The probe has 30 s: a host that timed out with the project would time out again without it.
+  it("asks only the host that refused the project again, not one that didn't answer", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("loadCodeAssist")) return { status: 200, bodyText: JSON.stringify(makeAgyLoadResponse()) }
+      if (url.includes("retrieveUserQuotaSummary")) {
+        if (url.includes("daily-cloudcode")) throw new Error("timeout")
+        if (JSON.parse(opts.bodyText).project) return { status: 403, bodyText: "" }
+        return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+    expect(summaryCalls(ctx)).toEqual([
+      "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+    ])
+  })
+
+  it("keeps the meters when only the plan lookup is refused", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("loadCodeAssist")) return { status: 403, bodyText: "" }
       if (url.includes("retrieveUserQuotaSummary")) return { status: 200, bodyText: JSON.stringify(makeQuotaSummaryPayload()) }
       return { status: 500, bodyText: "" }
     })
 
     const plugin = await loadPlugin()
-    plugin.probe(ctx)
+    const result = plugin.probe(ctx)
 
-    expect(summaryCalls(ctx)).toEqual(["https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"])
+    expect(result.plan).toBeNull()
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+  })
+
+  // Seen 2026-11-11: production answered with all four pools untouched while daily, the host the
+  // client itself asks, had the spent ones. Production first showed 0% used.
+  it("takes daily's summary, and never asks production once daily has all four pools", async () => {
+    const ctx = makeCtx()
+    setupDbToken(ctx)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("retrieveUserQuotaSummary")) {
+        return { status: 200, bodyText: JSON.stringify(url.includes("daily-cloudcode") ? makeQuotaSummaryPayload() : untouchedSummary()) }
+      }
+      return { status: 500, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
+    expect(summaryCalls(ctx)).toEqual(["https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary"])
+    // No project known (loadCodeAssist failed): the summary is still asked, without one.
+    expect(summaryRequests(ctx).map((o) => JSON.parse(o.bodyText))).toEqual([{}])
+  })
+
+  it("still uses a port whose liveness answer is an error that isn't a refusal", async () => {
+    const ctx = makeCtx()
+    ctx.host.ls.discover.mockReturnValue(makeDiscovery())
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("GetUnleashData")) return { status: 400, bodyText: "{}" }
+      if (url.includes("RetrieveUserQuotaSummary")) {
+        return { status: 200, bodyText: JSON.stringify({ response: makeQuotaSummaryPayload() }) }
+      }
+      return { status: 200, bodyText: JSON.stringify(makeUserStatusResponse()) }
+    })
+
+    const result = (await loadPlugin()).probe(ctx)
+    expect(result.lines.map((l) => l.used)).toEqual([25, 10, 60, 0])
   })
 
   function withArgon(payload, buckets) {

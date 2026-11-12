@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import type { PluginState } from "@/hooks/app/types"
 import { useTaskbarIsLight } from "@/hooks/app/use-provider-tray-icons"
+import { convertUsdText } from "@/lib/currency"
+import { useLocaleStore } from "@/lib/i18n"
 import type { PluginMeta } from "@/lib/plugin-types"
 import { stripMonitorsArg, type DisplayMode, type PluginSettings, type TaskbarStripStyle } from "@/lib/settings"
 import {
@@ -15,6 +17,7 @@ import {
 import { rasterizeSvgToRgba } from "@/lib/tray-bars-icon"
 import { getTrayPrimaryBars } from "@/lib/tray-primary-progress"
 import { bytesToBase64 } from "@/lib/tray-provider-icons"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 const UPDATE_DEBOUNCE_MS = 400
 /** Matches `taskbar_strip.rs`: 50 % to 500 %, at most one image per distinct scale. */
@@ -52,6 +55,9 @@ export function useTaskbarStrip(args: {
 }) {
   const { enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, themeMode } = args
   const taskbarIsLight = useTaskbarIsLight(themeMode)
+  const currency = useAppPreferencesStore((state) => state.currency)
+  // Money is written in the app language's style: a language change redraws it.
+  const locale = useLocaleStore((state) => state.locale)
   const showingRef = useRef(false)
   // Start with this window's scale; the host asks for the taskbars' own ones.
   const [dpis, setDpis] = useState<number[]>(() => [Math.round((window.devicePixelRatio || 1) * 96)])
@@ -79,13 +85,16 @@ export function useTaskbarStrip(args: {
       const barArgs = { pluginsMeta, pluginSettings: settings, pluginStates, maxBars: settings?.order.length ?? 0, displayMode }
       const items = settings
         ? buildTaskbarStripItems({
+            order: settings.order,
             primaryBars: getTrayPrimaryBars(barArgs),
             weeklyBars: getTrayPrimaryBars({ ...barArgs, preferWeekly: true }),
             pluginsMeta,
+            pluginStates,
             onLightTaskbar: taskbarIsLight,
             logoColors,
             displayMode,
             style,
+            moneyText: (text) => convertUsdText(text, currency, locale),
           })
         : []
       const draw = (scale: number) => makeTaskbarStripSvg({ items, style, scale, measure: measureTextWithCanvas })
@@ -119,5 +128,5 @@ export function useTaskbarStrip(args: {
         .catch((error) => console.error("Failed to update the taskbar strip:", error))
     }, UPDATE_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
-  }, [enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, taskbarIsLight, dpis])
+  }, [enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, taskbarIsLight, dpis, currency, locale])
 }
