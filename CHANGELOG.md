@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.8.5
+
+A new install turns on only the providers you use, and Cursor finds its encrypted login again.
+
+### New Features
+- First start: the app checks every provider once and turns on the ones you are signed in to, instead of always Claude and Codex. A provider it doesn't find stays off and can be turned on in Settings. GitHub Copilot is turned on only with a Copilot plan, since every GitHub CLI login reaches it. Updates still add new providers turned off (#89)
+
+### Bug Fixes
+- Cursor: since 3.27, Cursor keeps its login encrypted, and the card stopped showing usage. The app now reads the encrypted login and never writes a token back to Cursor's database; a token it renews is kept encrypted for your Windows account. Thanks to @JoaoFellows (#83, #90)
+- Antigravity, Cursor, Devin and Kimi: a login the service turned down says "Session expired" and asks you to sign in again, instead of saying you aren't signed in. Antigravity no longer says "Start Antigravity" when its servers don't answer: an outage or network error reads "quota data unavailable", without a sign-in prompt (#89)
+
 ## v0.8.4
 
 Antigravity shows what you have really used, Devin finds a login made with its CLI, and DeepSeek's balance fits on the taskbar strip.
