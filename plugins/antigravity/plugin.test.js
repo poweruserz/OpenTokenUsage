@@ -1994,6 +1994,35 @@ describe("antigravity plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
   })
 
+  it("says unavailable when the SQLite login is refused but the agy login can't be checked", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", refreshToken: "1//revoked", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({ token: { access_token: "agy-keychain-token" } }))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("oauth2.googleapis.com")) return { status: 400, bodyText: '{"error":"invalid_grant"}' }
+      return { status: 503, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says unavailable when the agy login is refused but the SQLite login can't be checked", async () => {
+    const ctx = makeCtx()
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.valid", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+      token: { access_token: "ya29.agy-expired", expiry: new Date(Date.now() - 3600000).toISOString() },
+    }))
+    ctx.host.http.request.mockReturnValue({ status: 503, bodyText: "" })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
   it("says unavailable when one database's refresh is refused and the other's can't reach Google", async () => {
     const ctx = makeCtx()
     const pastExpiry = Math.floor(Date.now() / 1000) - 3600

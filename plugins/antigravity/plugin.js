@@ -1146,12 +1146,19 @@
       }
     }
 
+    // Refused: Cloud Code turned a refreshed token down, or a token got a 401 or Google refused the refresh
+    // and no refresh worked, or an expired login has nothing to refresh it. A refused refresh next to one
+    // that couldn't be checked (a stale second database) isn't a refusal.
+    var sqliteRefused = (ccResult && ccResult._authFailed) ||
+      (!refreshWorked && (sawAuthFailure || (refreshRefused && !refreshUnchecked) || (tokens.length === 0 && refreshTokens.length === 0)))
+
+    var agyRefused = false
     if (!ccResult || ccResult._authFailed) {
       var agy = loadAgyKeychainToken(ctx)
       if (agy) {
         var agyResult = probeAgyKeychain(ctx, agy, nowSec)
         if (agyResult && !agyResult._authFailed) return agyResult
-        if (agyResult && agyResult._authFailed) ccResult = agyResult
+        agyRefused = Boolean(agyResult)
       }
     }
 
@@ -1160,12 +1167,9 @@
     // LOGIN_MESSAGE says no login was found; a saved one, even expired, is the user's, and a new install
     // shows its card (use-provider-detection.ts).
     if (dbTokenCandidates.length === 0 && !agy) throw LOGIN_MESSAGE
-    // "Session expired" asks the user to sign in again (useLoginRecovery), so it needs a refusal or a login
-    // with nothing left to try; a network error or 5xx, even after a refresh, is "unavailable".
-    // A refused refresh counts only when no other login's refresh is still unknown (a stale second database).
-    var refused = (ccResult && ccResult._authFailed) ||
-      (!refreshWorked && (sawAuthFailure || (refreshRefused && !refreshUnchecked)))
-    if (refused || (tokens.length === 0 && refreshTokens.length === 0 && !agy)) {
+    // "Session expired" asks the user to sign in again (useLoginRecovery), so every login found must be
+    // refused; one that couldn't be checked (network, 5xx, even after a refresh) makes it "unavailable".
+    if ((dbTokenCandidates.length === 0 || sqliteRefused) && (!agy || agyRefused)) {
       throw "Session expired. Run `agy` to log in again."
     }
     throw "Antigravity quota data unavailable. Try again later."
