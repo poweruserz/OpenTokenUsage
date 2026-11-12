@@ -7,7 +7,8 @@ import { normalizeCurrency, type CurrencySetting } from "@/lib/currency";
 // Refresh cooldown duration in milliseconds (5 minutes)
 export const REFRESH_COOLDOWN_MS = 300_000;
 
-// Spec: persist plugin order + disabled list; new plugins append, default disabled unless in DEFAULT_ENABLED_PLUGINS.
+// Spec: persist plugin order + disabled list; new plugins append, disabled (a new install turns on
+// what `use-provider-detection.ts` finds).
 export type PluginSettings = {
   order: string[];
   disabled: string[];
@@ -70,6 +71,7 @@ const GLOBAL_SHORTCUT_KEY = "globalShortcut";
 const START_ON_LOGIN_KEY = "startOnLogin";
 const LANGUAGE_KEY = "language";
 const UPDATE_RELAUNCH_KEY = "updateRelaunchVersion";
+export const PROVIDER_DETECTION_KEY = "providerDetectionPending";
 const UPDATE_NOTIFIED_KEY = "updateNotifiedVersion";
 const STAR_PROMPT_KEY = "starPrompt";
 
@@ -144,8 +146,6 @@ export const TIME_FORMAT_OPTIONS: SettingOption<TimeFormatMode>[] = [
 ];
 
 const store = new LazyStore(SETTINGS_STORE_PATH);
-
-const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex"]);
 
 const PREFERRED_ORDER = ["claude", "codex", "gemini"];
 
@@ -249,11 +249,8 @@ export function normalizePluginSettings(
   }
 
   const disabled = settings.disabled.filter((id) => knownSet.has(id));
-  const defaultDisabledIds = hasSavedOrder ? newlyAdded : order;
-  for (const id of defaultDisabledIds) {
-    if (!DEFAULT_ENABLED_PLUGINS.has(id) && !disabled.includes(id)) {
-      disabled.push(id);
-    }
+  for (const id of hasSavedOrder ? newlyAdded : order) {
+    if (!disabled.includes(id)) disabled.push(id);
   }
   return { order, disabled };
 }
@@ -548,6 +545,17 @@ export async function loadUpdateRelaunchVersion(): Promise<string | null> {
 export async function saveUpdateRelaunchVersion(version: string | null): Promise<void> {
   if (version === null) await store.delete(UPDATE_RELAUNCH_KEY);
   else await store.set(UPDATE_RELAUNCH_KEY, version);
+  await store.save();
+}
+
+/** Set while a new install's provider detection runs, so a start cut short detects again. */
+export async function loadProviderDetectionPending(): Promise<boolean> {
+  return (await store.get<unknown>(PROVIDER_DETECTION_KEY)) === true;
+}
+
+export async function saveProviderDetectionPending(pending: boolean): Promise<void> {
+  if (pending) await store.set(PROVIDER_DETECTION_KEY, true);
+  else await store.delete(PROVIDER_DETECTION_KEY);
   await store.save();
 }
 

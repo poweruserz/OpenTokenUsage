@@ -253,7 +253,10 @@
       if (refreshed) {
         accessToken = refreshed
       } else if (!accessToken) {
-        throw "Not logged in. Run `kimi login` to authenticate."
+        // A refresh token that no longer works is a login the user has (a new install shows its card).
+        throw creds.refresh_token
+          ? "Session expired. Run `kimi login` to authenticate."
+          : "Not logged in. Run `kimi login` to authenticate."
       }
     }
 

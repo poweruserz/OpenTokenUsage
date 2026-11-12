@@ -39,6 +39,8 @@ import {
   migrateLegacyTraySettings,
   migrateWindsurfToDevin,
   loadPluginSettings,
+  loadProviderDetectionPending,
+  saveProviderDetectionPending,
   loadResetTimerDisplayMode,
   loadStartOnLogin,
   loadThemeMode,
@@ -89,6 +91,7 @@ type UseSettingsBootstrapArgs = {
   setLoadingForPlugins: (ids: string[]) => void
   setErrorForPlugins: (ids: string[], error: string) => void
   startBatch: (pluginIds?: string[]) => Promise<string[] | undefined>
+  detectProviders: (ids: string[]) => Promise<void>
 }
 
 export function useSettingsBootstrap({
@@ -118,6 +121,7 @@ export function useSettingsBootstrap({
   setLoadingForPlugins,
   setErrorForPlugins,
   startBatch,
+  detectProviders,
 }: UseSettingsBootstrapArgs) {
   const applyStartOnLogin = useCallback(async (value: boolean) => {
     if (!isTauri()) return
@@ -205,6 +209,10 @@ export function useSettingsBootstrap({
         const storedSettings = await loadPluginSettings()
         const migratedSettings = migrateWindsurfToDevin(storedSettings)
         const normalized = normalizePluginSettings(migratedSettings, availablePlugins)
+        // A new install, or one whose detection was cut short (use-provider-detection.ts). The flag is saved
+        // before the settings, so no later save (a WSL card, a toggle) can hide an unfinished run.
+        const detect = storedSettings.order.length === 0 || (await loadProviderDetectionPending())
+        if (detect) await saveProviderDetectionPending(true)
         if (!arePluginSettingsEqual(storedSettings, normalized)) {
           await savePluginSettings(normalized)
         }
@@ -301,6 +309,10 @@ export function useSettingsBootstrap({
           setTrayMetric(storedTrayMetric)
           setTrayPercentColor(storedTrayPercentColor)
 
+          if (detect) {
+            await detectProviders(normalized.order)
+            return
+          }
           const enabledIds = getEnabledPluginIds(normalized)
           setLoadingForPlugins(enabledIds)
           try {
@@ -324,6 +336,7 @@ export function useSettingsBootstrap({
     }
   }, [
     applyStartOnLogin,
+    detectProviders,
     setAutoUpdateInterval,
     setDisplayMode,
     setErrorForPlugins,

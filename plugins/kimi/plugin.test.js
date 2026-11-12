@@ -306,7 +306,7 @@ describe("kimi plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Usage request failed. Check your connection.")
   })
 
-  it("throws not logged in when refresh response is missing access token", async () => {
+  it("says the session expired when the refresh token gives no access token", async () => {
     const ctx = makeCtx()
     ctx.host.fs.writeText(
       CRED_PATH,
@@ -324,7 +324,8 @@ describe("kimi plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow("Not logged in")
+    // A refresh token is a login the user has: "Not logged in" would mean nothing is set up.
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `kimi login` to authenticate.")
   })
 
   it("returns badge when no valid quota is available", async () => {

@@ -106,15 +106,24 @@ describe("settings", () => {
     expect(normalized).toEqual({ order: ["b", "a"], disabled: ["a"] })
   })
 
-  it("auto-disables new non-default plugins", () => {
+  it("starts a new install with every provider off, Claude and Codex too", () => {
     const plugins: PluginMeta[] = [
+      { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
-      { id: "copilot", name: "Copilot", iconUrl: "", lines: [], primaryCandidates: [] },
       { id: "devin", name: "Devin", iconUrl: "", lines: [], primaryCandidates: [] },
     ]
     const result = normalizePluginSettings({ order: [], disabled: [] }, plugins)
-    expect(result.order).toEqual(["claude", "copilot", "devin"])
-    expect(result.disabled).toEqual(["copilot", "devin"])
+    expect(result.order).toEqual(["claude", "codex", "devin"])
+    expect(result.disabled).toEqual(["claude", "codex", "devin"])
+  })
+
+  it("turns off only the providers an update adds", () => {
+    const plugins: PluginMeta[] = [
+      { id: "claude", name: "Claude", iconUrl: "", lines: [], primaryCandidates: [] },
+      { id: "codex", name: "Codex", iconUrl: "", lines: [], primaryCandidates: [] },
+    ]
+    const result = normalizePluginSettings({ order: ["claude"], disabled: [] }, plugins)
+    expect(result).toEqual({ order: ["claude", "codex"], disabled: ["codex"] })
   })
 
   it("migrates enabled windsurf settings to enabled devin settings", () => {

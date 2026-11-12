@@ -899,7 +899,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
   })
 
   it("Cloud Code tries multiple base URLs", async () => {
@@ -1147,7 +1147,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
   })
 
   it("tries DB token first, then cached on auth failure", async () => {
@@ -1659,7 +1659,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
   })
 
   it("handles refresh response missing access_token", async () => {
@@ -1682,7 +1682,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
     expect(oauthCalls).toBe(1)
   })
 
@@ -1885,7 +1885,7 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
     expect(refreshCalls).toBe(0)
   })
 
@@ -1911,8 +1911,157 @@ describe("antigravity plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow(LOGIN_MESSAGE)
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
     expect(refreshCalls).toBe(0)
+  })
+
+  it("says unavailable, not expired, when Cloud Code fails after a refresh that worked", async () => {
+    const ctx = makeCtx()
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.old", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("oauth2.googleapis.com")) {
+        return { status: 200, bodyText: JSON.stringify({ access_token: "ya29.new", expires_in: 3600 }) }
+      }
+      if (url.includes("fetchAvailableModels") && opts.headers.Authorization === "Bearer ya29.old") {
+        return { status: 401, bodyText: "" }
+      }
+      return { status: 503, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says unavailable, not expired, when the agy login's Cloud Code calls fail", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) => {
+      if (service === "gemini" && account === "antigravity") {
+        return "go-keyring-base64:" + ctx.base64.encode(JSON.stringify({
+          tokens: { access_token: "agy-keychain-token" },
+        }))
+      }
+      throw new Error("unexpected keychain lookup")
+    })
+    ctx.host.http.request.mockReturnValue({ status: 503, bodyText: "" })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says the session expired for an expired agy login with nothing to refresh it", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+      token: { access_token: "ya29.expired", expiry: new Date(Date.now() - 3600000).toISOString() },
+    }))
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+    expect(ctx.host.http.request).not.toHaveBeenCalled()
+  })
+
+  it("says the session expired when Google refuses an expired agy login's refresh token", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+      token: {
+        access_token: "ya29.expired",
+        refresh_token: "1//revoked",
+        expiry: new Date(Date.now() - 3600000).toISOString(),
+      },
+    }))
+    ctx.host.http.request.mockReturnValue({ status: 400, bodyText: '{"error":"invalid_grant"}' })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+  })
+
+  it("says the session expired when Google refuses an expired SQLite token's refresh token", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", refreshToken: "1//revoked", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockReturnValue({ status: 400, bodyText: '{"error":"invalid_grant"}' })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+  })
+
+  it("says unavailable when the SQLite login is refused but the agy login can't be checked", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", refreshToken: "1//revoked", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({ token: { access_token: "agy-keychain-token" } }))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("oauth2.googleapis.com")) return { status: 400, bodyText: '{"error":"invalid_grant"}' }
+      return { status: 503, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says unavailable when the agy login is refused but the SQLite login can't be checked", async () => {
+    const ctx = makeCtx()
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.valid", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+      token: { access_token: "ya29.agy-expired", expiry: new Date(Date.now() - 3600000).toISOString() },
+    }))
+    ctx.host.http.request.mockReturnValue({ status: 503, bodyText: "" })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says unavailable when one database's refresh is refused and the other's can't reach Google", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteByPath(ctx, {
+      [STATE_DB_V2]: makeOAuthSentinelB64(ctx, { accessToken: "ya29.v2", refreshToken: "1//v2-current", expirySeconds: pastExpiry }),
+      [STATE_DB_V1]: makeOAuthSentinelB64(ctx, { accessToken: "ya29.v1", refreshToken: "1//v1-revoked", expirySeconds: pastExpiry }),
+    })
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.bodyText).includes(encodeURIComponent("1//v1-revoked"))) {
+        return { status: 400, bodyText: '{"error":"invalid_grant"}' }
+      }
+      return { status: 503, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says unavailable when the refresh of an expired SQLite token can't reach Google", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", refreshToken: "1//refresh", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockReturnValue({ status: 503, bodyText: "" })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says the session expired for an expired SQLite token with nothing to refresh it", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+    expect(ctx.host.http.request).not.toHaveBeenCalled()
   })
 
   // --- Regression tests: RetrieveUserQuotaSummary (merged Gemini pool + weekly limits) ---

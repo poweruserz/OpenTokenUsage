@@ -14,6 +14,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }))
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }))
 
 import { useSettingsPluginActions } from "@/hooks/app/use-settings-plugin-actions"
+import { useAppPluginStore } from "@/stores/app-plugin-store"
 
 describe("useSettingsPluginActions", () => {
   beforeEach(() => {
@@ -333,6 +334,32 @@ describe("useSettingsPluginActions", () => {
     expect(setPluginSettings).toHaveBeenCalledWith({ order: ["claude", "claude-wsl-0a1b2c3d", "codex"], disabled: ["codex"] })
     expect(setLoadingForPlugins).toHaveBeenCalledWith(["claude-wsl-0a1b2c3d"])
     expect(startBatch).toHaveBeenCalledWith(["claude-wsl-0a1b2c3d"])
+  })
+
+  it("keeps a provider turned on while the plugin list was being read", async () => {
+    let listed: (metas: unknown) => void = () => {}
+    invokeMock.mockReturnValue(new Promise((resolve) => { listed = resolve }))
+    const setPluginSettings = vi.fn()
+    const { result } = renderHook(() =>
+      useSettingsPluginActions({
+        pluginSettings: { order: ["claude", "codex"], disabled: ["claude", "codex"] },
+        setPluginSettings,
+        setPluginsMeta: vi.fn(),
+        setLoadingForPlugins: vi.fn(),
+        setErrorForPlugins: vi.fn(),
+        startBatch: vi.fn(() => Promise.resolve([])),
+        scheduleTrayIconUpdate: vi.fn(),
+      })
+    )
+
+    const change = result.current.handlePluginsChanged({ added: [{ id: "claude-wsl-0a1b2c3d", plugin: "claude" }], removed: [] })
+    // A new install's detection turns Claude on meanwhile.
+    useAppPluginStore.getState().setPluginSettings({ order: ["claude", "codex"], disabled: ["codex"] })
+    listed(["claude", "claude-wsl-0a1b2c3d", "codex"].map((id) => ({ id, name: id })))
+    await act(() => change)
+
+    expect(setPluginSettings).toHaveBeenCalledWith({ order: ["claude", "claude-wsl-0a1b2c3d", "codex"], disabled: ["codex"] })
+    useAppPluginStore.getState().resetState()
   })
 
   it("keeps a change that arrives before the settings load, and applies it once they do", async () => {

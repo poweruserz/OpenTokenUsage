@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app/app-shell"
 import { useAppPluginViews } from "@/hooks/app/use-app-plugin-views"
 import { useProbe } from "@/hooks/app/use-probe"
 import { useSettingsBootstrap } from "@/hooks/app/use-settings-bootstrap"
+import { useProviderDetection } from "@/hooks/app/use-provider-detection"
 import { useSettingsDisplayActions } from "@/hooks/app/use-settings-display-actions"
 import { useSettingsPluginActions } from "@/hooks/app/use-settings-plugin-actions"
 import { useSettingsPluginList } from "@/hooks/app/use-settings-plugin-list"
@@ -217,6 +218,14 @@ function App() {
     }
   }, [scheduleTrayIconUpdate])
 
+  const { detectProviders } = useProviderDetection({
+    pluginSettings,
+    pluginStates,
+    setPluginSettings,
+    setLoadingForPlugins,
+    startBatch,
+  })
+
   const { applyStartOnLogin } = useSettingsBootstrap({
     setPluginSettings,
     setPluginsMeta,
@@ -244,6 +253,7 @@ function App() {
     setLoadingForPlugins,
     setErrorForPlugins,
     startBatch,
+    detectProviders,
   })
 
   useSettingsTheme(themeMode)

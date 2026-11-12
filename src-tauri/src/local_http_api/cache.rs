@@ -7,7 +7,6 @@ use std::time::Duration;
 
 const CACHE_FILE_NAME: &str = "usage-api-cache.json";
 const SETTINGS_FILE_NAME: &str = "settings.json";
-const DEFAULT_ENABLED_PLUGINS: &[&str] = &["claude", "codex"];
 
 #[cfg(not(test))]
 const CACHE_WRITE_DEBOUNCE: Duration = Duration::from_millis(500);
@@ -316,15 +315,8 @@ fn read_plugin_settings(app_data_dir: &Path) -> (Vec<String>, HashSet<String>, b
 pub(super) fn enabled_snapshots_ordered(state: &CacheState) -> Vec<CachedPluginSnapshot> {
     let (settings_order, disabled, has_settings) = read_plugin_settings(&state.app_data_dir);
 
-    let default_enabled: HashSet<&str> = DEFAULT_ENABLED_PLUGINS.iter().copied().collect();
-
-    let is_enabled = |id: &str| -> bool {
-        if has_settings {
-            !disabled.contains(id)
-        } else {
-            default_enabled.contains(id)
-        }
-    };
+    // Until the app first saves its plugin settings nothing is on: a new install turns on what it detects.
+    let is_enabled = |id: &str| has_settings && !disabled.contains(id);
 
     // Build ordered plugin ids: settings order first, then remaining known ids.
     let mut ordered: Vec<String> = Vec::new();

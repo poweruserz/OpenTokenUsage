@@ -1543,7 +1543,8 @@ describe("cursor plugin", () => {
     })
 
     const plugin = await loadPlugin()
-    expect(() => plugin.probe(ctx)).toThrow("Not logged in")
+    // A refresh token is a login the user has: not "Not logged in", which means nothing is set up.
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Sign in via Cursor app or run `agent login`.")
   })
 
   it("throws token expired when usage remains unauthorized after refresh retry", async () => {

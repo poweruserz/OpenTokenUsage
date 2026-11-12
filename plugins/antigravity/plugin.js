@@ -147,6 +147,8 @@
 
   // --- Google OAuth token refresh ---
 
+  // The new access token; false when Google refused the refresh token (the login needs a new sign-in);
+  // null when it couldn't be checked (network, 5xx, 429, a malformed answer).
   function refreshAccessToken(ctx, refreshTokenValue, cacheFile) {
     if (!refreshTokenValue) {
       ctx.host.log.warn("refresh skipped: no refresh token")
@@ -167,7 +169,8 @@
       })
       if (resp.status < 200 || resp.status >= 300) {
         ctx.host.log.warn("Google OAuth refresh returned status: " + resp.status)
-        return null
+        // 400 is invalid_grant: the refresh token was revoked or expired.
+        return resp.status === 400 || ctx.util.isAuthStatus(resp.status) ? false : null
       }
       var body = ctx.util.tryParseJson(resp.bodyText)
       if (!body || !body.access_token) {
@@ -1064,6 +1067,8 @@
     }
     var cached = loadCachedToken(ctx, agy.refreshToken ? [agy.refreshToken] : [], AGY_TOKEN_CACHE)
     if (cached && tokens.indexOf(cached) === -1) tokens.push(cached)
+    // An expired login with nothing to refresh it reads as refused: probe then says "Session expired".
+    if (tokens.length === 0 && !agy.refreshToken) return { _authFailed: true }
 
     var sawAuthFailure = false
     for (var i = 0; i < tokens.length; i++) {
@@ -1073,6 +1078,7 @@
     }
     if ((sawAuthFailure || tokens.length === 0) && agy.refreshToken) {
       var refreshed = refreshAccessToken(ctx, agy.refreshToken, AGY_TOKEN_CACHE)
+      if (refreshed === false) return { _authFailed: true }
       if (refreshed) return probeAgyCloudCode(ctx, refreshed)
     }
     return sawAuthFailure ? { _authFailed: true } : null
@@ -1121,10 +1127,16 @@
     // probeCloudCodeToken returns null for transient failures (5xx/timeouts); without this
     // guard a Cloud Code incident would trigger a Google OAuth refresh every probe cycle
     // instead of ~once per token lifetime — risking refresh-token throttling or rotation.
+    var refreshWorked = false
+    var refreshRefused = false
+    var refreshUnchecked = false
     if (!ccResult && (sawAuthFailure || tokens.length === 0)) {
       for (var k = 0; k < refreshTokens.length; k++) {
         var refreshed = refreshAccessToken(ctx, refreshTokens[k], DB_TOKEN_CACHE)
+        if (refreshed === false) refreshRefused = true
+        else if (!refreshed) refreshUnchecked = true
         if (!refreshed) continue
+        refreshWorked = true
         var refreshedResult = probeCloudCodeToken(ctx, refreshed)
         if (refreshedResult && !refreshedResult._authFailed) {
           ccResult = refreshedResult
@@ -1134,18 +1146,33 @@
       }
     }
 
+    // Refused: Cloud Code turned a refreshed token down, or a token got a 401 or Google refused the refresh
+    // and no refresh worked, or an expired login has nothing to refresh it. A refused refresh next to one
+    // that couldn't be checked (a stale second database) isn't a refusal.
+    var sqliteRefused = (ccResult && ccResult._authFailed) ||
+      (!refreshWorked && (sawAuthFailure || (refreshRefused && !refreshUnchecked) || (tokens.length === 0 && refreshTokens.length === 0)))
+
+    var agyRefused = false
     if (!ccResult || ccResult._authFailed) {
       var agy = loadAgyKeychainToken(ctx)
       if (agy) {
         var agyResult = probeAgyKeychain(ctx, agy, nowSec)
         if (agyResult && !agyResult._authFailed) return agyResult
-        if (agyResult && agyResult._authFailed) ccResult = agyResult
+        agyRefused = Boolean(agyResult)
       }
     }
 
     if (ccResult && !ccResult._authFailed) return ccResult
 
-    throw LOGIN_MESSAGE
+    // LOGIN_MESSAGE says no login was found; a saved one, even expired, is the user's, and a new install
+    // shows its card (use-provider-detection.ts).
+    if (dbTokenCandidates.length === 0 && !agy) throw LOGIN_MESSAGE
+    // "Session expired" asks the user to sign in again (useLoginRecovery), so every login found must be
+    // refused; one that couldn't be checked (network, 5xx, even after a refresh) makes it "unavailable".
+    if ((dbTokenCandidates.length === 0 || sqliteRefused) && (!agy || agyRefused)) {
+      throw "Session expired. Run `agy` to log in again."
+    }
+    throw "Antigravity quota data unavailable. Try again later."
   }
 
   globalThis.__openusage_plugin = { id: "antigravity", probe: probe }
