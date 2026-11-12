@@ -16,8 +16,9 @@ This file holds the project facts that are easy to get wrong.
 - A new install starts with every provider off and probes them all once (`use-provider-detection.ts`): a card
   turns on unless its error is one `isNotSetUpError` knows. So a plugin with nothing set up must throw such an
   error without a request (`plugins/not-set-up.test.js` checks every shipped plugin). Copilot needs a Copilot plan
-  in its answer (its login is the GitHub CLI's, which any GitHub user has). The settings are saved only when every
-  provider is decided, so a start cut short detects again.
+  in its answer (its login is the GitHub CLI's, which any GitHub user has). The store key `providerDetectionPending`
+  is set before the first settings save and cleared once every provider is decided, so a start cut short detects
+  again. A plugin whose login is rejected must not throw a "not set up" message (use "Session expired …").
 - Every line label a plugin can emit on the overview card must be declared `scope: "overview"` in
   `plugin.json`, or that account type gets a blank card (the card filters by manifest labels).
 - Response bodies are logged (first 500 chars) after `redact_body` in

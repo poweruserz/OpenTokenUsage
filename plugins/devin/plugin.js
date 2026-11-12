@@ -325,7 +325,8 @@
       if (appAttempt.authFailure) sawAuthFailure = true
     }
 
-    if (sawAuthFailure) throw LOGIN_HINT
+    // Not LOGIN_HINT: that says nothing is set up, and a new install would leave the card off.
+    if (sawAuthFailure) throw "Session expired. Sign in via Devin app or run `devin auth login`."
     if (sawApiKey) throw QUOTA_HINT
     throw LOGIN_HINT
   }

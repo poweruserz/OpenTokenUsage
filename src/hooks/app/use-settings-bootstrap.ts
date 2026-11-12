@@ -39,6 +39,8 @@ import {
   migrateLegacyTraySettings,
   migrateWindsurfToDevin,
   loadPluginSettings,
+  loadProviderDetectionPending,
+  saveProviderDetectionPending,
   loadResetTimerDisplayMode,
   loadStartOnLogin,
   loadThemeMode,
@@ -207,9 +209,11 @@ export function useSettingsBootstrap({
         const storedSettings = await loadPluginSettings()
         const migratedSettings = migrateWindsurfToDevin(storedSettings)
         const normalized = normalizePluginSettings(migratedSettings, availablePlugins)
-        // A new install saves them once detection has decided every provider (use-provider-detection.ts).
-        const newInstall = storedSettings.order.length === 0
-        if (!newInstall && !arePluginSettingsEqual(storedSettings, normalized)) {
+        // A new install, or one whose detection was cut short (use-provider-detection.ts). The flag is saved
+        // before the settings, so no later save (a WSL card, a toggle) can hide an unfinished run.
+        const detect = storedSettings.order.length === 0 || (await loadProviderDetectionPending())
+        if (detect) await saveProviderDetectionPending(true)
+        if (!arePluginSettingsEqual(storedSettings, normalized)) {
           await savePluginSettings(normalized)
         }
 
@@ -305,7 +309,7 @@ export function useSettingsBootstrap({
           setTrayMetric(storedTrayMetric)
           setTrayPercentColor(storedTrayPercentColor)
 
-          if (newInstall) {
+          if (detect) {
             await detectProviders(normalized.order)
             return
           }

@@ -579,7 +579,7 @@
         accessToken = refreshed
       } else if (!accessToken) {
         ctx.host.log.error("refresh failed and no access token available")
-        throw "Not logged in. " + LOGIN_HINT
+        throw "Session expired. " + LOGIN_HINT
       }
     }
 

@@ -337,6 +337,15 @@ describe("devin plugin", () => {
     ])
   })
 
+  it("says the session expired when every login is rejected, not that nothing is set up", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.writeText(CREDENTIALS_PATH, makeCredentialsToml())
+    ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "{}" })
+    const plugin = await loadPlugin()
+
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Sign in via Devin app or run `devin auth login`.")
+  })
+
   it("throws the login hint when no auth source is available", async () => {
     const ctx = makeCtx()
     const plugin = await loadPlugin()

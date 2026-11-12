@@ -1,13 +1,19 @@
-import { act, renderHook } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { PluginState } from "@/hooks/app/types"
 import type { PluginOutput } from "@/lib/plugin-types"
 import type { PluginSettings } from "@/lib/settings"
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 
-const { savePluginSettingsMock } = vi.hoisted(() => ({ savePluginSettingsMock: vi.fn() }))
+const { savePluginSettingsMock, saveDetectionPendingMock } = vi.hoisted(() => ({
+  savePluginSettingsMock: vi.fn(),
+  saveDetectionPendingMock: vi.fn(),
+}))
 
-vi.mock("@/lib/settings", () => ({ savePluginSettings: savePluginSettingsMock }))
+vi.mock("@/lib/settings", () => ({
+  savePluginSettings: savePluginSettingsMock,
+  saveProviderDetectionPending: saveDetectionPendingMock,
+}))
 
 import { useProviderDetection } from "@/hooks/app/use-provider-detection"
 
@@ -50,6 +56,8 @@ describe("useProviderDetection", () => {
     useAppPluginStore.getState().resetState()
     savePluginSettingsMock.mockReset()
     savePluginSettingsMock.mockResolvedValue(undefined)
+    saveDetectionPendingMock.mockReset()
+    saveDetectionPendingMock.mockResolvedValue(undefined)
   })
 
   it("turns on what a probe found, and saves once every provider is decided", async () => {
@@ -72,6 +80,9 @@ describe("useProviderDetection", () => {
     hook.rerender({ pluginStates: { ...states, zai: done({ error: "No ZAI_API_KEY found. Set up environment variable first." }) } })
     expect(savePluginSettingsMock).toHaveBeenCalledTimes(1)
     expect(savePluginSettingsMock).toHaveBeenCalledWith({ order: IDS, disabled: ["codex", "zai"] })
+    // Cleared only after the settings are on disk.
+    await waitFor(() => expect(saveDetectionPendingMock).toHaveBeenCalledWith(false))
+    expect(saveDetectionPendingMock.mock.invocationCallOrder[0]).toBeGreaterThan(savePluginSettingsMock.mock.invocationCallOrder[0])
   })
 
   it("saves the all-off settings when nothing is found", async () => {
@@ -128,5 +139,6 @@ describe("useProviderDetection", () => {
     hook.rerender({ pluginStates: { claude: done({ error: "Failed to start probe" }) } })
     expect(setPluginSettings).not.toHaveBeenCalled()
     expect(savePluginSettingsMock).not.toHaveBeenCalled()
+    expect(saveDetectionPendingMock).not.toHaveBeenCalled()
   })
 })

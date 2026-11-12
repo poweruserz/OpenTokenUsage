@@ -66,6 +66,8 @@ vi.mock("@tauri-apps/plugin-autostart", () => ({
   isEnabled: isAutostartEnabledMock,
 }))
 
+const detectionMocks = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }))
+
 vi.mock("@/lib/settings", () => ({
   arePluginSettingsEqual: arePluginSettingsEqualMock,
   DEFAULT_AUTO_UPDATE_INTERVAL: 15,
@@ -102,6 +104,8 @@ vi.mock("@/lib/settings", () => ({
   migrateWindsurfToDevin: migrateWindsurfToDevinMock,
   normalizePluginSettings: normalizePluginSettingsMock,
   savePluginSettings: savePluginSettingsMock,
+  loadProviderDetectionPending: detectionMocks.load,
+  saveProviderDetectionPending: detectionMocks.save,
 }))
 
 import { useSettingsBootstrap } from "@/hooks/app/use-settings-bootstrap"
@@ -326,7 +330,18 @@ describe("useSettingsBootstrap", () => {
     await waitFor(() => expect(args.detectProviders).toHaveBeenCalledWith(["claude", "codex"]))
     expect(args.setPluginSettings).toHaveBeenCalledWith(normalized)
     expect(args.startBatch).not.toHaveBeenCalled()
-    // Saved by detection once it is done, so a start cut short detects again.
-    expect(savePluginSettingsMock).not.toHaveBeenCalled()
+    // The flag first: a settings save alone would make the next start look like an update.
+    expect(detectionMocks.save).toHaveBeenCalledWith(true)
+    expect(detectionMocks.save.mock.invocationCallOrder[0]).toBeLessThan(savePluginSettingsMock.mock.invocationCallOrder[0])
+  })
+
+  it("detects again when an earlier detection was cut short", async () => {
+    const args = createArgs()
+    detectionMocks.load.mockResolvedValueOnce(true)
+
+    renderHook(() => useSettingsBootstrap(args))
+
+    await waitFor(() => expect(args.detectProviders).toHaveBeenCalledWith(["codex"]))
+    expect(args.startBatch).not.toHaveBeenCalled()
   })
 })

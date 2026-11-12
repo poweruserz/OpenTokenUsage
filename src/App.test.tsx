@@ -231,6 +231,8 @@ vi.mock("@/lib/settings", async () => {
     ...actual,
     loadPluginSettings: state.loadPluginSettingsMock,
     savePluginSettings: state.savePluginSettingsMock,
+    loadProviderDetectionPending: async () => false,
+    saveProviderDetectionPending: async () => {},
     loadAutoUpdateInterval: state.loadAutoUpdateIntervalMock,
     saveAutoUpdateInterval: state.saveAutoUpdateIntervalMock,
     loadThemeMode: state.loadThemeModeMock,
@@ -478,7 +480,7 @@ describe("App", () => {
     state.loadPluginSettingsMock.mockResolvedValueOnce({ order: [], disabled: [] })
     render(<App />)
     await waitFor(() => expect(state.startBatchMock).toHaveBeenCalledWith(["a", "b"]))
-    expect(state.savePluginSettingsMock).not.toHaveBeenCalled()
+    expect(state.savePluginSettingsMock).toHaveBeenCalledWith({ order: ["a", "b"], disabled: ["a", "b"] })
 
     state.probeHandlers?.onResult({
       providerId: "a",
@@ -493,8 +495,8 @@ describe("App", () => {
       lines: [{ type: "badge", label: "Error", text: "Not logged in. Run `beta` to authenticate." }],
     })
 
-    await waitFor(() => expect(state.savePluginSettingsMock).toHaveBeenCalledWith({ order: ["a", "b"], disabled: ["b"] }))
-    expect(state.savePluginSettingsMock).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(state.savePluginSettingsMock).toHaveBeenLastCalledWith({ order: ["a", "b"], disabled: ["b"] }))
+    expect(state.savePluginSettingsMock).toHaveBeenCalledTimes(2)
     await screen.findByText("Now")
     expect(screen.queryByText("Beta")).toBeNull()
   })

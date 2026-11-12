@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { PluginState } from "@/hooks/app/types"
 import { isNotSetUpError } from "@/lib/plugin-errors"
-import { savePluginSettings, type PluginSettings } from "@/lib/settings"
+import { savePluginSettings, saveProviderDetectionPending, type PluginSettings } from "@/lib/settings"
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 
 type UseProviderDetectionArgs = {
@@ -21,8 +21,9 @@ function isFound(id: string, state: PluginState) {
 
 /**
  * A new install starts with every provider off and probes them all once: each plugin's own login
- * lookup is the detector, and what it finds is turned on. The settings are saved once every
- * provider is decided, so a start cut short (quit, crash, probes that can't start) detects again.
+ * lookup is the detector, and what it finds is turned on. Once every provider is decided the
+ * settings are saved and the bootstrap's `providerDetectionPending` flag cleared; a start cut short
+ * (quit, crash, probes that can't start) leaves it set and detects again.
  */
 export function useProviderDetection({
   pluginSettings,
@@ -65,7 +66,9 @@ export function useProviderDetection({
     const next = found.size > 0 ? { ...current, disabled: current.disabled.filter((id) => !found.has(id)) } : current
     if (next !== current) setPluginSettings(next)
     if (pending.current.size === 0) {
-      void savePluginSettings(next).catch((error) => console.error("Failed to save detected providers:", error))
+      void savePluginSettings(next)
+        .then(() => saveProviderDetectionPending(false))
+        .catch((error) => console.error("Failed to save detected providers:", error))
     }
   }, [pluginSettings, pluginStates, setPluginSettings])
 
