@@ -71,7 +71,7 @@ const GLOBAL_SHORTCUT_KEY = "globalShortcut";
 const START_ON_LOGIN_KEY = "startOnLogin";
 const LANGUAGE_KEY = "language";
 const UPDATE_RELAUNCH_KEY = "updateRelaunchVersion";
-const PROVIDER_DETECTION_KEY = "providerDetectionPending";
+export const PROVIDER_DETECTION_KEY = "providerDetectionPending";
 const UPDATE_NOTIFIED_KEY = "updateNotifiedVersion";
 const STAR_PROMPT_KEY = "starPrompt";
 

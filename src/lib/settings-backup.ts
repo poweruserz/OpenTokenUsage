@@ -1,5 +1,5 @@
 import { insertAccount, isAccountId, isWslId } from "@/lib/accounts"
-import { backupStore, DEFAULT_ALERT_SETTINGS, DEFAULT_TASKBAR_STRIP_STYLE, normalizeAlertSettings } from "@/lib/settings"
+import { backupStore, DEFAULT_ALERT_SETTINGS, DEFAULT_TASKBAR_STRIP_STYLE, normalizeAlertSettings, PROVIDER_DETECTION_KEY } from "@/lib/settings"
 
 /**
  * The preferences a settings backup carries (store keys). Left out: accounts and logins (never in
@@ -159,6 +159,8 @@ export async function restoreSettingsBackup(text: string): Promise<RestoreResult
   for (const [key, value] of writes) {
     if (value === undefined) await backupStore.delete(key)
     else await backupStore.set(key, value)
+    // The backup decides the cards now: a first-run detection still pending would turn its off ones on.
+    if (key === "plugins") await backupStore.delete(PROVIDER_DETECTION_KEY)
   }
   await backupStore.save()
   return { ok: true }

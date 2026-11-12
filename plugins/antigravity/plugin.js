@@ -1121,10 +1121,12 @@
     // probeCloudCodeToken returns null for transient failures (5xx/timeouts); without this
     // guard a Cloud Code incident would trigger a Google OAuth refresh every probe cycle
     // instead of ~once per token lifetime — risking refresh-token throttling or rotation.
+    var refreshWorked = false
     if (!ccResult && (sawAuthFailure || tokens.length === 0)) {
       for (var k = 0; k < refreshTokens.length; k++) {
         var refreshed = refreshAccessToken(ctx, refreshTokens[k], DB_TOKEN_CACHE)
         if (!refreshed) continue
+        refreshWorked = true
         var refreshedResult = probeCloudCodeToken(ctx, refreshed)
         if (refreshedResult && !refreshedResult._authFailed) {
           ccResult = refreshedResult
@@ -1145,10 +1147,15 @@
 
     if (ccResult && !ccResult._authFailed) return ccResult
 
-    // LOGIN_MESSAGE says no login was found; a saved one that was refused or couldn't be checked is the
-    // user's, and a new install shows its card (use-provider-detection.ts).
-    if (tokens.length === 0 && refreshTokens.length === 0 && !agy) throw LOGIN_MESSAGE
-    if (sawAuthFailure || ccResult || tokens.length === 0) throw "Session expired. Run `agy` to log in again."
+    // LOGIN_MESSAGE says no login was found; a saved one, even expired, is the user's, and a new install
+    // shows its card (use-provider-detection.ts).
+    if (dbTokenCandidates.length === 0 && !agy) throw LOGIN_MESSAGE
+    // "Session expired" asks the user to sign in again (useLoginRecovery), so it needs a refusal or a login
+    // with nothing left to try; a network error or 5xx, even after a refresh, is "unavailable".
+    var refused = (ccResult && ccResult._authFailed) || (sawAuthFailure && !refreshWorked)
+    if (refused || (tokens.length === 0 && refreshTokens.length === 0 && !agy)) {
+      throw "Session expired. Run `agy` to log in again."
+    }
     throw "Antigravity quota data unavailable. Try again later."
   }
 

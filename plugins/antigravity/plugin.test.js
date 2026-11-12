@@ -1915,6 +1915,55 @@ describe("antigravity plugin", () => {
     expect(refreshCalls).toBe(0)
   })
 
+  it("says unavailable, not expired, when Cloud Code fails after a refresh that worked", async () => {
+    const ctx = makeCtx()
+    const futureExpiry = Math.floor(Date.now() / 1000) + 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.old", refreshToken: "1//refresh", expirySeconds: futureExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("oauth2.googleapis.com")) {
+        return { status: 200, bodyText: JSON.stringify({ access_token: "ya29.new", expires_in: 3600 }) }
+      }
+      if (url.includes("fetchAvailableModels") && opts.headers.Authorization === "Bearer ya29.old") {
+        return { status: 401, bodyText: "" }
+      }
+      return { status: 503, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says unavailable, not expired, when the agy login's Cloud Code calls fail", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) => {
+      if (service === "gemini" && account === "antigravity") {
+        return "go-keyring-base64:" + ctx.base64.encode(JSON.stringify({
+          tokens: { access_token: "agy-keychain-token" },
+        }))
+      }
+      throw new Error("unexpected keychain lookup")
+    })
+    ctx.host.http.request.mockReturnValue({ status: 503, bodyText: "" })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
+  it("says the session expired for an expired SQLite token with nothing to refresh it", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+    expect(ctx.host.http.request).not.toHaveBeenCalled()
+  })
+
   // --- Regression tests: RetrieveUserQuotaSummary (merged Gemini pool + weekly limits) ---
 
   const SESSION_MS = 5 * 60 * 60 * 1000

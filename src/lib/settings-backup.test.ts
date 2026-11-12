@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { buildSettingsBackup, restoreSettingsBackup } from "@/lib/settings-backup"
-import { loadAlertSettings, loadThemeMode } from "@/lib/settings"
+import { loadAlertSettings, loadProviderDetectionPending, loadThemeMode } from "@/lib/settings"
 
 const storeState = new Map<string, unknown>()
 
@@ -40,6 +40,14 @@ describe("settings backup", () => {
       expect(await restoreSettingsBackup(bad)).toEqual({ ok: false, reason: "notBackup" })
     }
     expect(storeState.get("themeMode")).toBe("light")
+  })
+
+  it("ends a pending first-run detection when it restores the card list", async () => {
+    storeState.set("plugins", { order: ["claude", "codex"], disabled: ["codex"] })
+    const text = await buildSettingsBackup()
+    storeState.set("providerDetectionPending", true)
+    expect(await restoreSettingsBackup(text)).toEqual({ ok: true })
+    expect(await loadProviderDetectionPending()).toBe(false)
   })
 
   it("puts a preference the backup left at its default back to the default", async () => {
