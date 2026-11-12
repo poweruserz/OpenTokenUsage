@@ -699,6 +699,12 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     inject_http(ctx, &host, plugin_id, deadline)?;
     inject_keychain(ctx, &host, plugin_id)?;
     inject_sqlite(ctx, &host, home.clone())?;
+    let cursor_id = account
+        .map(|account| account.base_id.as_str())
+        .unwrap_or(plugin_id);
+    if cursor_id == "cursor" {
+        inject_cursor_auth(ctx, &host)?;
+    }
     inject_ls(ctx, &host, plugin_id)?;
     // An account copy reads the same kind of local logs as its base plugin (from its own home). A
     // WSL copy reads none: its logs live in WSL, far too slow to scan over \\wsl.localhost.
@@ -716,6 +722,33 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     probe_ctx.set("host", host)?;
     globals.set("__openusage_ctx", probe_ctx)?;
 
+    Ok(())
+}
+
+fn inject_cursor_auth<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> {
+    let cursor_auth = Object::new(ctx.clone())?;
+    cursor_auth.set(
+        "decrypt",
+        Function::new(ctx.clone(), |ctx_inner: Ctx<'_>, raw: String| -> rquickjs::Result<String> {
+            super::cursor_safe_storage::decrypt_cursor_value(&raw)
+                .map_err(|message| Exception::throw_message(&ctx_inner, &message))
+        })?,
+    )?;
+    cursor_auth.set(
+        "protect",
+        Function::new(ctx.clone(), |ctx_inner: Ctx<'_>, plain: String| -> rquickjs::Result<String> {
+            super::cursor_safe_storage::protect_for_cache(&plain)
+                .map_err(|message| Exception::throw_message(&ctx_inner, &message))
+        })?,
+    )?;
+    cursor_auth.set(
+        "unprotect",
+        Function::new(ctx.clone(), |ctx_inner: Ctx<'_>, stored: String| -> rquickjs::Result<String> {
+            super::cursor_safe_storage::unprotect_for_cache(&stored)
+                .map_err(|message| Exception::throw_message(&ctx_inner, &message))
+        })?,
+    )?;
+    host.set("cursorAuth", cursor_auth)?;
     Ok(())
 }
 
@@ -5701,6 +5734,53 @@ wait
                 .eval(r#"__openusage_ctx.host.ccusage.query({}).status"#)
                 .expect("cached ccusage");
             assert_eq!(status, "ok");
+        });
+    }
+
+    #[test]
+    fn cursor_plugin_can_decrypt_plaintext_and_other_plugins_cannot() {
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            let app_data = std::env::temp_dir();
+            inject_host_api(&ctx, "cursor", &app_data, "0.0.0").expect("inject");
+            let plain: String = ctx
+                .eval(r#"__openusage_ctx.host.cursorAuth.decrypt("plain-token")"#)
+                .expect("plaintext decrypt");
+            assert_eq!(plain, "plain-token");
+            #[cfg(windows)]
+            {
+                let protected: String = ctx
+                    .eval(r#"__openusage_ctx.host.cursorAuth.protect("plain-token")"#)
+                    .expect("protect");
+                assert_ne!(protected, "plain-token");
+                let opened: String = ctx
+                    .eval(format!(
+                        r#"__openusage_ctx.host.cursorAuth.unprotect("{protected}")"#
+                    ))
+                    .expect("unprotect");
+                assert_eq!(opened, "plain-token");
+            }
+        });
+
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            let app_data = std::env::temp_dir();
+            inject_host_api(&ctx, "claude", &app_data, "0.0.0").expect("inject");
+            let missing: rquickjs::Result<rquickjs::Value> = ctx.eval(
+                r#"__openusage_ctx.host.cursorAuth.decrypt("plain-token")"#,
+            );
+            assert!(missing.is_err(), "claude must not receive cursorAuth");
+        });
+
+        let ctx = Context::full(&rt).expect("context");
+        ctx.with(|ctx| {
+            let app_data = std::env::temp_dir();
+            inject_host_api(&ctx, "cursor-x", &app_data, "0.0.0").expect("inject");
+            let missing: rquickjs::Result<rquickjs::Value> = ctx.eval(
+                r#"__openusage_ctx.host.cursorAuth.decrypt("plain-token")"#,
+            );
+            assert!(missing.is_err(), "cursor-x must not receive cursorAuth");
         });
     }
 }

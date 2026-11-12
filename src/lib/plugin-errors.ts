@@ -36,6 +36,8 @@ export const PLUGIN_ERROR_PATTERNS: readonly { pattern: RegExp; key: PluginError
   { pattern: /^Request failed \(HTTP (?<status>\d+)\)$/, key: "requestFailedHttpShort" },
   { pattern: /^Could not parse usage data\.$/, key: "parseFailed" },
   { pattern: /^WSL isn't running\. Start it to update this card\.$/, key: "wslNotRunning" },
+  { pattern: /^Cursor secure storage is unavailable\.$/, key: "cursorSecureStorageUnavailable" },
+  { pattern: /^Cursor secure storage could not be read\.$/, key: "cursorSecureStorageUnreadable" },
 
   { pattern: /^Usage request failed\. Check your connection\.$/, key: "usageRequestFailed" },
   { pattern: /^Usage request failed \(HTTP (?<status>\d+)\)\. Try again later\.$/, key: "usageRequestFailedHttp" },

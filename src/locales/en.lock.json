@@ -424,5 +424,7 @@
   "plugin-errors.pluginFailed": "6252c16f47",
   "plugin-errors.probeStartFailed": "0af5da2403",
   "plugin-errors.updateFailed": "c10c914d19",
-  "plugin-errors.wslNotRunning": "26e5198224"
+  "plugin-errors.wslNotRunning": "26e5198224",
+  "plugin-errors.cursorSecureStorageUnavailable": "0b699ea09f",
+  "plugin-errors.cursorSecureStorageUnreadable": "bb3834cfa0"
 }

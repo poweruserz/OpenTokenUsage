@@ -72,6 +72,8 @@ const koKR: PluginErrorMessages = {
   probeStartFailed: "데이터 조회를 시작하지 못했습니다",
   updateFailed: "데이터를 업데이트하지 못했습니다. 다시 시도하시겠습니까?",
   wslNotRunning: "WSL이 실행 중이 아닙니다. 이 카드를 업데이트하려면 WSL을 시작하세요.",
+  cursorSecureStorageUnavailable: "Cursor 보안 저장소를 사용할 수 없습니다.",
+  cursorSecureStorageUnreadable: "Cursor 보안 저장소를 읽을 수 없습니다.",
 }
 
 export default koKR

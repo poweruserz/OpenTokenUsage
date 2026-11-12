@@ -72,6 +72,8 @@ const ptBR: PluginErrorMessages = {
   probeStartFailed: "Falha ao iniciar a coleta de dados",
   updateFailed: "Não foi possível atualizar os dados. Tentar novamente?",
   wslNotRunning: "O WSL não está em execução. Inicie-o para atualizar este cartão.",
+  cursorSecureStorageUnavailable: "O armazenamento seguro do Cursor não está disponível.",
+  cursorSecureStorageUnreadable: "Não foi possível ler o armazenamento seguro do Cursor.",
 }
 
 export default ptBR

@@ -72,6 +72,8 @@ const jaJP: PluginErrorMessages = {
   probeStartFailed: "データの取得を開始できませんでした",
   updateFailed: "データを更新できませんでした。もう一度やり直しますか?",
   wslNotRunning: "WSL が実行されていません。このカードを更新するには WSL を起動してください。",
+  cursorSecureStorageUnavailable: "Cursor の安全なストレージは利用できません。",
+  cursorSecureStorageUnreadable: "Cursor の安全なストレージを読み取れませんでした。",
 }
 
 export default jaJP

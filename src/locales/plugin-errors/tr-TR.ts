@@ -72,6 +72,8 @@ const trTR: PluginErrorMessages = {
   probeStartFailed: "Veri sorgusu başlatılamadı",
   updateFailed: "Veriler güncelleştirilemedi. Yeniden denensin mi?",
   wslNotRunning: "WSL çalışmıyor. Bu kartı güncellemek için WSL'yi başlatın.",
+  cursorSecureStorageUnavailable: "Cursor güvenli depolaması kullanılamıyor.",
+  cursorSecureStorageUnreadable: "Cursor güvenli depolaması okunamadı.",
 }
 
 export default trTR

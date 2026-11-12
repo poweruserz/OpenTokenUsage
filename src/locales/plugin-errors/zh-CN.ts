@@ -72,6 +72,8 @@ const zhCN: PluginErrorMessages = {
   probeStartFailed: "无法启动数据查询",
   updateFailed: "无法更新数据。要重试吗？",
   wslNotRunning: "WSL 未运行。启动 WSL 以更新此卡片。",
+  cursorSecureStorageUnavailable: "Cursor 安全存储不可用。",
+  cursorSecureStorageUnreadable: "无法读取 Cursor 安全存储。",
 }
 
 export default zhCN
