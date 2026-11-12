@@ -54,6 +54,8 @@ const FIXTURES: [string, PluginErrorKey][] = [
   ["Team request-based usage data unavailable. Try again later.", "teamRequestUsageUnavailable"],
   ["Cursor request-based usage data unavailable. Try again later.", "requestUsageUnavailable"],
   ["No active Cursor subscription.", "noActiveSubscription"],
+  ["Cursor secure storage is unavailable.", "cursorSecureStorageUnavailable"],
+  ["Cursor secure storage could not be read.", "cursorSecureStorageUnreadable"],
   ["Total usage limit missing from API response.", "totalLimitMissing"],
   // devin
   ["Run devin auth login or sign in to Devin and try again.", "runOrSignIn"],

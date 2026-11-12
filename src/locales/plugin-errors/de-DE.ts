@@ -72,6 +72,8 @@ const deDE: PluginErrorMessages = {
   probeStartFailed: "Abfrage konnte nicht gestartet werden",
   updateFailed: "Daten konnten nicht aktualisiert werden. Erneut versuchen?",
   wslNotRunning: "WSL läuft nicht. Starten Sie WSL, um diese Karte zu aktualisieren.",
+  cursorSecureStorageUnavailable: "Der sichere Speicher von Cursor ist nicht verfügbar.",
+  cursorSecureStorageUnreadable: "Der sichere Speicher von Cursor konnte nicht gelesen werden.",
 }
 
 export default deDE

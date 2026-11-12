@@ -17,6 +17,8 @@
   const CLIENT_ID = "KbZUR41cY7W6zRSdpSUJ7I7mLYBKOCmB"
   const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh 5 minutes before expiration
   const LOGIN_HINT = "Sign in via Cursor app or run `agent login`."
+  const SAFE_STORAGE_PREFIX = "cursor-safe-storage:v1:"
+  const CACHED_ACCESS_TOKEN_FILE = "access-token.json"
 
   function readStateValue(ctx, key) {
     try {
@@ -83,9 +85,121 @@
     }
   }
 
+  function isSafeStorageValue(value) {
+    return typeof value === "string" && value.indexOf(SAFE_STORAGE_PREFIX) === 0
+  }
+
+  function decodeStoredToken(ctx, raw) {
+    if (typeof raw !== "string" || raw.length === 0) return null
+    if (!isSafeStorageValue(raw)) return raw
+    if (!ctx.host.cursorAuth || typeof ctx.host.cursorAuth.decrypt !== "function") {
+      throw "Cursor secure storage is unavailable."
+    }
+    try {
+      const plain = ctx.host.cursorAuth.decrypt(raw)
+      if (typeof plain !== "string" || plain.length === 0) {
+        throw "Cursor secure storage could not be read."
+      }
+      return plain
+    } catch (e) {
+      if (typeof e === "string") throw e
+      ctx.host.log.error("cursor secure storage decrypt failed")
+      throw "Cursor secure storage could not be read."
+    }
+  }
+
+  function cachedAccessTokenPath(ctx) {
+    return ctx.app.pluginDataDir + "/" + CACHED_ACCESS_TOKEN_FILE
+  }
+
+  function refreshFingerprint(ctx, refreshTokenValue) {
+    if (typeof refreshTokenValue !== "string" || refreshTokenValue.length === 0) return null
+    if (!ctx.host.crypto || typeof ctx.host.crypto.sha256Hex !== "function") return null
+    return ctx.host.crypto.sha256Hex(refreshTokenValue)
+  }
+
+  function readCacheRecord(ctx) {
+    const path = cachedAccessTokenPath(ctx)
+    try {
+      if (!ctx.host.fs.exists(path)) return null
+      const data = ctx.util.tryParseJson(ctx.host.fs.readText(path))
+      if (!data || typeof data.protected !== "string" || data.protected.length === 0) {
+        if (data && typeof data.accessToken === "string" && data.accessToken.length > 0) {
+          discardCachedAccessToken(ctx)
+        }
+        return null
+      }
+      if (!ctx.host.cursorAuth || typeof ctx.host.cursorAuth.unprotect !== "function") return null
+      const token = ctx.host.cursorAuth.unprotect(data.protected)
+      if (typeof token !== "string" || token.length === 0) {
+        discardCachedAccessToken(ctx)
+        return null
+      }
+      return {
+        token: token,
+        refreshFingerprint: typeof data.refreshFingerprint === "string" ? data.refreshFingerprint : "",
+      }
+    } catch (e) {
+      ctx.host.log.warn("failed to read cached access token: " + String(e))
+      discardCachedAccessToken(ctx)
+      return null
+    }
+  }
+
+  function writeCacheRecord(ctx, accessToken, refreshTokenValue) {
+    const fingerprint = refreshFingerprint(ctx, refreshTokenValue)
+    if (!fingerprint) {
+      ctx.host.log.warn("cannot fingerprint the refresh token; not caching the access token")
+      return
+    }
+    if (!ctx.host.cursorAuth || typeof ctx.host.cursorAuth.protect !== "function") {
+      ctx.host.log.warn("cannot protect the access token; not caching it")
+      return
+    }
+    try {
+      const protectedToken = ctx.host.cursorAuth.protect(accessToken)
+      if (typeof protectedToken !== "string" || protectedToken.length === 0 || protectedToken === accessToken) {
+        ctx.host.log.warn("cannot protect the access token; not caching it")
+        return
+      }
+      ctx.host.fs.writeText(cachedAccessTokenPath(ctx), JSON.stringify({
+        protected: protectedToken,
+        refreshFingerprint: fingerprint,
+      }))
+    } catch (e) {
+      ctx.host.log.warn("failed to cache access token: " + String(e))
+    }
+  }
+
+  function discardCachedAccessToken(ctx) {
+    const path = cachedAccessTokenPath(ctx)
+    try {
+      if (!ctx.host.fs.exists(path)) return
+      ctx.host.fs.writeText(path, "{}")
+    } catch (e) {
+      ctx.host.log.warn("failed to discard cached access token: " + String(e))
+    }
+  }
+
+  function takeCachedAccessToken(ctx, loadedAccessToken, refreshTokenValue) {
+    const record = readCacheRecord(ctx)
+    if (!record) return null
+    const expected = refreshFingerprint(ctx, refreshTokenValue)
+    const cachedSubject = getTokenSubject(ctx, record.token)
+    const loadedSubject = getTokenSubject(ctx, loadedAccessToken)
+    if (!expected || record.refreshFingerprint !== expected || !cachedSubject || !loadedSubject || cachedSubject !== loadedSubject) {
+      discardCachedAccessToken(ctx)
+      return null
+    }
+    return record.token
+  }
+
   function loadAuthState(ctx) {
-    const sqliteAccessToken = readStateValue(ctx, "cursorAuth/accessToken")
-    const sqliteRefreshToken = readStateValue(ctx, "cursorAuth/refreshToken")
+    const sqliteAccessRaw = readStateValue(ctx, "cursorAuth/accessToken")
+    const sqliteRefreshRaw = readStateValue(ctx, "cursorAuth/refreshToken")
+    const sqliteAccessToken = decodeStoredToken(ctx, sqliteAccessRaw)
+    const sqliteRefreshToken = decodeStoredToken(ctx, sqliteRefreshRaw)
+    const writeSqlite = !isSafeStorageValue(sqliteAccessRaw) && !isSafeStorageValue(sqliteRefreshRaw)
     const sqliteMembershipTypeRaw = readStateValue(ctx, "cursorAuth/stripeMembershipType")
     const sqliteMembershipType = typeof sqliteMembershipTypeRaw === "string"
       ? sqliteMembershipTypeRaw.trim().toLowerCase()
@@ -107,6 +221,7 @@
           refreshToken: keychainRefreshToken,
           membershipType: null,
           source: "keychain",
+          writeSqlite: false,
         }
       }
 
@@ -115,6 +230,7 @@
         refreshToken: sqliteRefreshToken,
         membershipType: sqliteMembershipType || null,
         source: "sqlite",
+        writeSqlite: writeSqlite,
       }
     }
 
@@ -125,6 +241,7 @@
         refreshToken: keychainRefreshToken,
         membershipType: null,
         source: "keychain",
+        writeSqlite: false,
       }
     }
 
@@ -132,6 +249,7 @@
       accessToken: null,
       refreshToken: null,
       source: null,
+      writeSqlite: false,
     }
   }
 
@@ -143,17 +261,31 @@
     return subject || null
   }
 
-  function persistAccessToken(ctx, source, accessToken) {
+  function persistAccessToken(ctx, source, accessToken, writeSqlite, refreshTokenValue) {
     if (source === "keychain") {
+      discardCachedAccessToken(ctx)
       return writeKeychainValue(ctx, KEYCHAIN_ACCESS_TOKEN_SERVICE, accessToken)
     }
-    return writeStateValue(ctx, "cursorAuth/accessToken", accessToken)
+    if (!writeSqlite) {
+      writeCacheRecord(ctx, accessToken, refreshTokenValue)
+      ctx.host.log.info("refresh succeeded, token kept for the next probe")
+      return true
+    }
+    discardCachedAccessToken(ctx)
+    const wrote = writeStateValue(ctx, "cursorAuth/accessToken", accessToken)
+    if (wrote) ctx.host.log.info("refresh succeeded, token persisted")
+    return wrote
   }
 
   function getTokenExpiration(ctx, token) {
     const payload = ctx.jwt.decodePayload(token)
     if (!payload || typeof payload.exp !== "number") return null
     return payload.exp * 1000 // Convert to milliseconds
+  }
+
+  // A token inside the refresh buffer still works until this is true.
+  function hasExpired(ctx, accessToken, nowMs) {
+    return ctx.util.needsRefreshByExpiry({ nowMs, expiresAtMs: getTokenExpiration(ctx, accessToken), bufferMs: 0 })
   }
 
   function needsRefresh(ctx, accessToken, nowMs) {
@@ -166,7 +298,7 @@
     })
   }
 
-  function refreshToken(ctx, refreshTokenValue, source) {
+  function refreshToken(ctx, refreshTokenValue, source, writeSqlite) {
     if (!refreshTokenValue) {
       ctx.host.log.warn("refresh skipped: no refresh token")
       return null
@@ -192,6 +324,7 @@
         const shouldLogout = errorInfo && errorInfo.shouldLogout === true
         ctx.host.log.error("refresh failed: status=" + resp.status + " shouldLogout=" + shouldLogout)
         if (shouldLogout) {
+          discardCachedAccessToken(ctx)
           throw "Session expired. " + LOGIN_HINT
         }
         throw "Token expired. " + LOGIN_HINT
@@ -211,6 +344,7 @@
       // Check if server wants us to logout
       if (body.shouldLogout === true) {
         ctx.host.log.error("refresh response indicates shouldLogout=true")
+        discardCachedAccessToken(ctx)
         throw "Session expired. " + LOGIN_HINT
       }
 
@@ -221,8 +355,7 @@
       }
 
       // Persist updated access token to source where auth was loaded from.
-      persistAccessToken(ctx, source, newAccessToken)
-      ctx.host.log.info("refresh succeeded, token persisted")
+      persistAccessToken(ctx, source, newAccessToken, writeSqlite, refreshTokenValue)
 
       // Note: Cursor refresh returns access_token which is used as both
       // access and refresh token in some flows
@@ -556,6 +689,7 @@
     const authSource = authState.source
 
     if (!accessToken && !refreshTokenValue) {
+      discardCachedAccessToken(ctx)
       ctx.host.log.error("probe failed: no access or refresh token in sqlite/keychain")
       throw "Not logged in. " + LOGIN_HINT
     }
@@ -563,13 +697,20 @@
     ctx.host.log.info("tokens loaded from " + authSource + ": accessToken=" + (accessToken ? "yes" : "no") + " refreshToken=" + (refreshTokenValue ? "yes" : "no"))
 
     const nowMs = Date.now()
+    const cached = authSource === "sqlite" && !authState.writeSqlite && needsRefresh(ctx, accessToken, nowMs)
+      ? takeCachedAccessToken(ctx, accessToken, refreshTokenValue)
+      : null
+    // Inside the buffer it is refreshed below and kept if that refresh fails.
+    if (cached && !hasExpired(ctx, cached, nowMs)) {
+      accessToken = cached
+    }
 
     // Proactively refresh if token is expired or about to expire
     if (needsRefresh(ctx, accessToken, nowMs)) {
       ctx.host.log.info("token needs refresh (expired or expiring soon)")
       let refreshed = null
       try {
-        refreshed = refreshToken(ctx, refreshTokenValue, authSource)
+        refreshed = refreshToken(ctx, refreshTokenValue, authSource, authState.writeSqlite)
       } catch (e) {
         // If refresh fails but we have an access token, try it anyway
         ctx.host.log.warn("refresh failed but have access token, will try: " + String(e))
@@ -601,7 +742,13 @@
         refresh: () => {
           ctx.host.log.info("usage returned 401, attempting refresh")
           didRefresh = true
-          const refreshed = refreshToken(ctx, refreshTokenValue, authSource)
+          const failed = accessToken
+          discardCachedAccessToken(ctx)
+          if (authState.accessToken && authState.accessToken !== failed && !hasExpired(ctx, authState.accessToken, Date.now())) {
+            accessToken = authState.accessToken
+            return authState.accessToken
+          }
+          const refreshed = refreshToken(ctx, refreshTokenValue, authSource, authState.writeSqlite)
           if (refreshed) accessToken = refreshed
           return refreshed
         },
@@ -614,6 +761,8 @@
 
     if (ctx.util.isAuthStatus(usageResp.status)) {
       ctx.host.log.error("usage returned auth error after all retries: status=" + usageResp.status)
+      // A refresh may have just cached the token the server refused.
+      discardCachedAccessToken(ctx)
       throw "Token expired. " + LOGIN_HINT
     }
 
