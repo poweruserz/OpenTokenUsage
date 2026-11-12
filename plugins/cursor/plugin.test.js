@@ -2394,7 +2394,7 @@ describe("cursor plugin", () => {
     const storedAccess = "cursor-safe-storage:v1:access"
     const expired = makeJwt({ exp: 1, sub: "user-1" })
     const cachedFresh = makeJwt({ exp: 9999999999, sub: "user-1" })
-    const databaseFresh = makeJwt({ exp: 9999999999, sub: "user-1" })
+    const databaseFresh = makeJwt({ exp: 9999999998, sub: "user-1" })
     let loaded = expired
     let refreshCalls = 0
     ctx.host.sqlite.query.mockImplementation((db, sql) => {
@@ -2460,6 +2460,75 @@ describe("cursor plugin", () => {
     phase = "second"
     vi.resetModules()
     delete globalThis.__openusage_plugin
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Token expired")
+    expect(ctx.host.fs.readText(ctx.app.pluginDataDir + "/access-token.json")).toBe("{}")
+  })
+
+  it("falls back to a database token inside the refresh buffer when the cached token is refused", async () => {
+    const ctx = makeCtx()
+    const expired = makeJwt({ exp: 1, sub: "user-1" })
+    const cachedFresh = makeJwt({ exp: 9999999999, sub: "user-1" })
+    const fourMinutesLeft = makeJwt({ exp: Math.floor(Date.now() / 1000) + 240, sub: "user-1" })
+    let loaded = expired
+    let phase = "first"
+    let refreshCalls = 0
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) return JSON.stringify([{ value: "cursor-safe-storage:v1:access" }])
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "cursor-safe-storage:v1:refresh" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = cursorAuthMock((raw) => (String(raw).endsWith("access") ? loaded : "refresh-plain"))
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("/oauth/token")) {
+        refreshCalls += 1
+        return { status: 200, bodyText: JSON.stringify({ access_token: cachedFresh }) }
+      }
+      if (url.includes("GetCurrentPeriodUsage") && phase === "second" && opts.headers.Authorization === "Bearer " + cachedFresh) {
+        return { status: 401, bodyText: "" }
+      }
+      return {
+        status: 200,
+        bodyText: JSON.stringify({ enabled: true, planUsage: { totalSpend: 0, limit: 100 } }),
+      }
+    })
+
+    ;(await loadPlugin()).probe(ctx)
+    loaded = fourMinutesLeft
+    phase = "second"
+    vi.resetModules()
+    delete globalThis.__openusage_plugin
+    ;(await loadPlugin()).probe(ctx)
+
+    expect(refreshCalls).toBe(1)
+    const usageAuth = ctx.host.http.request.mock.calls
+      .filter((call) => String(call[0].url).includes("GetCurrentPeriodUsage"))
+      .map((call) => call[0].headers.Authorization)
+    expect(usageAuth[usageAuth.length - 1]).toBe("Bearer " + fourMinutesLeft)
+  })
+
+  it("drops the cached token when the refreshed token is refused too", async () => {
+    const ctx = makeCtx()
+    const expired = makeJwt({ exp: 1, sub: "user-1" })
+    const fresh = makeJwt({ exp: 9999999999, sub: "user-1" })
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) return JSON.stringify([{ value: "cursor-safe-storage:v1:access" }])
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "cursor-safe-storage:v1:refresh" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = cursorAuthMock((raw) => (String(raw).endsWith("access") ? expired : "refresh-plain"))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("/oauth/token")) {
+        return { status: 200, bodyText: JSON.stringify({ access_token: fresh }) }
+      }
+      return { status: 401, bodyText: "" }
+    })
+
     const plugin = await loadPlugin()
     expect(() => plugin.probe(ctx)).toThrow("Token expired")
     expect(ctx.host.fs.readText(ctx.app.pluginDataDir + "/access-token.json")).toBe("{}")

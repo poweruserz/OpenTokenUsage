@@ -738,7 +738,13 @@
           didRefresh = true
           const failed = accessToken
           discardCachedAccessToken(ctx)
-          if (authState.accessToken && authState.accessToken !== failed && !needsRefresh(ctx, authState.accessToken, Date.now())) {
+          // The database token works until it actually expires, even inside the refresh buffer.
+          const databaseTokenWorks = authState.accessToken && authState.accessToken !== failed && !ctx.util.needsRefreshByExpiry({
+            nowMs: Date.now(),
+            expiresAtMs: getTokenExpiration(ctx, authState.accessToken),
+            bufferMs: 0,
+          })
+          if (databaseTokenWorks) {
             accessToken = authState.accessToken
             return authState.accessToken
           }
@@ -755,6 +761,8 @@
 
     if (ctx.util.isAuthStatus(usageResp.status)) {
       ctx.host.log.error("usage returned auth error after all retries: status=" + usageResp.status)
+      // A refresh may have just cached the token the server refused.
+      discardCachedAccessToken(ctx)
       throw "Token expired. " + LOGIN_HINT
     }
 
