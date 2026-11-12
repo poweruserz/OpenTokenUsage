@@ -1966,6 +1966,45 @@ describe("antigravity plugin", () => {
     expect(ctx.host.http.request).not.toHaveBeenCalled()
   })
 
+  it("says the session expired when Google refuses an expired agy login's refresh token", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+      token: {
+        access_token: "ya29.expired",
+        refresh_token: "1//revoked",
+        expiry: new Date(Date.now() - 3600000).toISOString(),
+      },
+    }))
+    ctx.host.http.request.mockReturnValue({ status: 400, bodyText: '{"error":"invalid_grant"}' })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+  })
+
+  it("says the session expired when Google refuses an expired SQLite token's refresh token", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", refreshToken: "1//revoked", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockReturnValue({ status: 400, bodyText: '{"error":"invalid_grant"}' })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+  })
+
+  it("says unavailable when the refresh of an expired SQLite token can't reach Google", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteMock(ctx, makeOAuthSentinelB64(ctx, { accessToken: "ya29.expired", refreshToken: "1//refresh", expirySeconds: pastExpiry }))
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockReturnValue({ status: 503, bodyText: "" })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
   it("says the session expired for an expired SQLite token with nothing to refresh it", async () => {
     const ctx = makeCtx()
     const pastExpiry = Math.floor(Date.now() / 1000) - 3600

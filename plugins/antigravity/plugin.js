@@ -147,6 +147,8 @@
 
   // --- Google OAuth token refresh ---
 
+  // The new access token; false when Google refused the refresh token (the login needs a new sign-in);
+  // null when it couldn't be checked (network, 5xx, 429, a malformed answer).
   function refreshAccessToken(ctx, refreshTokenValue, cacheFile) {
     if (!refreshTokenValue) {
       ctx.host.log.warn("refresh skipped: no refresh token")
@@ -167,7 +169,8 @@
       })
       if (resp.status < 200 || resp.status >= 300) {
         ctx.host.log.warn("Google OAuth refresh returned status: " + resp.status)
-        return null
+        // 400 is invalid_grant: the refresh token was revoked or expired.
+        return resp.status === 400 || ctx.util.isAuthStatus(resp.status) ? false : null
       }
       var body = ctx.util.tryParseJson(resp.bodyText)
       if (!body || !body.access_token) {
@@ -1075,6 +1078,7 @@
     }
     if ((sawAuthFailure || tokens.length === 0) && agy.refreshToken) {
       var refreshed = refreshAccessToken(ctx, agy.refreshToken, AGY_TOKEN_CACHE)
+      if (refreshed === false) return { _authFailed: true }
       if (refreshed) return probeAgyCloudCode(ctx, refreshed)
     }
     return sawAuthFailure ? { _authFailed: true } : null
@@ -1124,9 +1128,11 @@
     // guard a Cloud Code incident would trigger a Google OAuth refresh every probe cycle
     // instead of ~once per token lifetime — risking refresh-token throttling or rotation.
     var refreshWorked = false
+    var refreshRefused = false
     if (!ccResult && (sawAuthFailure || tokens.length === 0)) {
       for (var k = 0; k < refreshTokens.length; k++) {
         var refreshed = refreshAccessToken(ctx, refreshTokens[k], DB_TOKEN_CACHE)
+        if (refreshed === false) refreshRefused = true
         if (!refreshed) continue
         refreshWorked = true
         var refreshedResult = probeCloudCodeToken(ctx, refreshed)
@@ -1154,7 +1160,7 @@
     if (dbTokenCandidates.length === 0 && !agy) throw LOGIN_MESSAGE
     // "Session expired" asks the user to sign in again (useLoginRecovery), so it needs a refusal or a login
     // with nothing left to try; a network error or 5xx, even after a refresh, is "unavailable".
-    var refused = (ccResult && ccResult._authFailed) || (sawAuthFailure && !refreshWorked)
+    var refused = (ccResult && ccResult._authFailed) || ((sawAuthFailure || refreshRefused) && !refreshWorked)
     if (refused || (tokens.length === 0 && refreshTokens.length === 0 && !agy)) {
       throw "Session expired. Run `agy` to log in again."
     }
