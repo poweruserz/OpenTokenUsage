@@ -1994,6 +1994,25 @@ describe("antigravity plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
   })
 
+  it("says unavailable when one database's refresh is refused and the other's can't reach Google", async () => {
+    const ctx = makeCtx()
+    const pastExpiry = Math.floor(Date.now() / 1000) - 3600
+    setupSqliteByPath(ctx, {
+      [STATE_DB_V2]: makeOAuthSentinelB64(ctx, { accessToken: "ya29.v2", refreshToken: "1//v2-current", expirySeconds: pastExpiry }),
+      [STATE_DB_V1]: makeOAuthSentinelB64(ctx, { accessToken: "ya29.v1", refreshToken: "1//v1-revoked", expirySeconds: pastExpiry }),
+    })
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.bodyText).includes(encodeURIComponent("1//v1-revoked"))) {
+        return { status: 400, bodyText: '{"error":"invalid_grant"}' }
+      }
+      return { status: 503, bodyText: "" }
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
+  })
+
   it("says unavailable when the refresh of an expired SQLite token can't reach Google", async () => {
     const ctx = makeCtx()
     const pastExpiry = Math.floor(Date.now() / 1000) - 3600

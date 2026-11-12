@@ -1129,10 +1129,12 @@
     // instead of ~once per token lifetime — risking refresh-token throttling or rotation.
     var refreshWorked = false
     var refreshRefused = false
+    var refreshUnchecked = false
     if (!ccResult && (sawAuthFailure || tokens.length === 0)) {
       for (var k = 0; k < refreshTokens.length; k++) {
         var refreshed = refreshAccessToken(ctx, refreshTokens[k], DB_TOKEN_CACHE)
         if (refreshed === false) refreshRefused = true
+        else if (!refreshed) refreshUnchecked = true
         if (!refreshed) continue
         refreshWorked = true
         var refreshedResult = probeCloudCodeToken(ctx, refreshed)
@@ -1160,7 +1162,9 @@
     if (dbTokenCandidates.length === 0 && !agy) throw LOGIN_MESSAGE
     // "Session expired" asks the user to sign in again (useLoginRecovery), so it needs a refusal or a login
     // with nothing left to try; a network error or 5xx, even after a refresh, is "unavailable".
-    var refused = (ccResult && ccResult._authFailed) || ((sawAuthFailure || refreshRefused) && !refreshWorked)
+    // A refused refresh counts only when no other login's refresh is still unknown (a stale second database).
+    var refused = (ccResult && ccResult._authFailed) ||
+      (!refreshWorked && (sawAuthFailure || (refreshRefused && !refreshUnchecked)))
     if (refused || (tokens.length === 0 && refreshTokens.length === 0 && !agy)) {
       throw "Session expired. Run `agy` to log in again."
     }
