@@ -1953,6 +1953,19 @@ describe("antigravity plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Antigravity quota data unavailable. Try again later.")
   })
 
+  it("says the session expired for an expired agy login with nothing to refresh it", async () => {
+    const ctx = makeCtx()
+    setupSqliteMock(ctx, null)
+    ctx.host.ls.discover.mockReturnValue(null)
+    ctx.host.keychain.readGenericPassword.mockReturnValue(JSON.stringify({
+      token: { access_token: "ya29.expired", expiry: new Date(Date.now() - 3600000).toISOString() },
+    }))
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Session expired. Run `agy` to log in again.")
+    expect(ctx.host.http.request).not.toHaveBeenCalled()
+  })
+
   it("says the session expired for an expired SQLite token with nothing to refresh it", async () => {
     const ctx = makeCtx()
     const pastExpiry = Math.floor(Date.now() / 1000) - 3600

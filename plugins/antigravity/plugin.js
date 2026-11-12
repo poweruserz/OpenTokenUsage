@@ -1064,6 +1064,8 @@
     }
     var cached = loadCachedToken(ctx, agy.refreshToken ? [agy.refreshToken] : [], AGY_TOKEN_CACHE)
     if (cached && tokens.indexOf(cached) === -1) tokens.push(cached)
+    // An expired login with nothing to refresh it reads as refused: probe then says "Session expired".
+    if (tokens.length === 0 && !agy.refreshToken) return { _authFailed: true }
 
     var sawAuthFailure = false
     for (var i = 0; i < tokens.length; i++) {
