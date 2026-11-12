@@ -131,6 +131,7 @@ function createArgs() {
     setLoadingForPlugins: vi.fn(),
     setErrorForPlugins: vi.fn(),
     startBatch: vi.fn().mockResolvedValue(undefined),
+    detectProviders: vi.fn().mockResolvedValue(undefined),
   }
 }
 
@@ -310,5 +311,22 @@ describe("useSettingsBootstrap", () => {
       expect(args.setPluginSettings).toHaveBeenCalledWith(migratedSettings)
       expect(args.startBatch).toHaveBeenCalledWith(["devin"])
     })
+    expect(args.detectProviders).not.toHaveBeenCalled()
+  })
+
+  it("on a new install probes every provider to find the ones this PC has", async () => {
+    const args = createArgs()
+    const normalized = { order: ["claude", "codex"], disabled: ["claude", "codex"] }
+    loadPluginSettingsMock.mockResolvedValueOnce({ order: [], disabled: [] })
+    normalizePluginSettingsMock.mockReturnValueOnce(normalized)
+    arePluginSettingsEqualMock.mockReturnValueOnce(false)
+
+    renderHook(() => useSettingsBootstrap(args))
+
+    await waitFor(() => expect(args.detectProviders).toHaveBeenCalledWith(["claude", "codex"]))
+    expect(args.setPluginSettings).toHaveBeenCalledWith(normalized)
+    expect(args.startBatch).not.toHaveBeenCalled()
+    // Saved by detection once it is done, so a start cut short detects again.
+    expect(savePluginSettingsMock).not.toHaveBeenCalled()
   })
 })

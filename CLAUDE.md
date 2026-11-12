@@ -13,6 +13,11 @@ This file holds the project facts that are easy to get wrong.
 - `plugins/<id>/plugin.js` runs in **a fresh QuickJS runtime per probe**: module-level variables
   do NOT survive between refreshes (vitest reuses one instance, so tests hide this). Persist
   anything cross-probe under `ctx.app.pluginDataDir` (see claude `live-plan.json`).
+- A new install starts with every provider off and probes them all once (`use-provider-detection.ts`): a card
+  turns on unless its error is one `isNotSetUpError` knows. So a plugin with nothing set up must throw such an
+  error without a request (`plugins/not-set-up.test.js` checks every shipped plugin). Copilot needs a Copilot plan
+  in its answer (its login is the GitHub CLI's, which any GitHub user has). The settings are saved only when every
+  provider is decided, so a start cut short detects again.
 - Every line label a plugin can emit on the overview card must be declared `scope: "overview"` in
   `plugin.json`, or that account type gets a blank card (the card filters by manifest labels).
 - Response bodies are logged (first 500 chars) after `redact_body` in

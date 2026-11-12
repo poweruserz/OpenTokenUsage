@@ -7,7 +7,8 @@ import { normalizeCurrency, type CurrencySetting } from "@/lib/currency";
 // Refresh cooldown duration in milliseconds (5 minutes)
 export const REFRESH_COOLDOWN_MS = 300_000;
 
-// Spec: persist plugin order + disabled list; new plugins append, default disabled unless in DEFAULT_ENABLED_PLUGINS.
+// Spec: persist plugin order + disabled list; new plugins append, disabled (a new install turns on
+// what `use-provider-detection.ts` finds).
 export type PluginSettings = {
   order: string[];
   disabled: string[];
@@ -145,8 +146,6 @@ export const TIME_FORMAT_OPTIONS: SettingOption<TimeFormatMode>[] = [
 
 const store = new LazyStore(SETTINGS_STORE_PATH);
 
-const DEFAULT_ENABLED_PLUGINS = new Set(["claude", "codex"]);
-
 const PREFERRED_ORDER = ["claude", "codex", "gemini"];
 
 export const DEFAULT_PLUGIN_SETTINGS: PluginSettings = {
@@ -249,11 +248,8 @@ export function normalizePluginSettings(
   }
 
   const disabled = settings.disabled.filter((id) => knownSet.has(id));
-  const defaultDisabledIds = hasSavedOrder ? newlyAdded : order;
-  for (const id of defaultDisabledIds) {
-    if (!DEFAULT_ENABLED_PLUGINS.has(id) && !disabled.includes(id)) {
-      disabled.push(id);
-    }
+  for (const id of hasSavedOrder ? newlyAdded : order) {
+    if (!disabled.includes(id)) disabled.push(id);
   }
   return { order, disabled };
 }

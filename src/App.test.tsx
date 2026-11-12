@@ -474,6 +474,31 @@ describe("App", () => {
     await screen.findByText("Now")
   })
 
+  it("on a new install shows only the providers this PC has", async () => {
+    state.loadPluginSettingsMock.mockResolvedValueOnce({ order: [], disabled: [] })
+    render(<App />)
+    await waitFor(() => expect(state.startBatchMock).toHaveBeenCalledWith(["a", "b"]))
+    expect(state.savePluginSettingsMock).not.toHaveBeenCalled()
+
+    state.probeHandlers?.onResult({
+      providerId: "a",
+      displayName: "Alpha",
+      iconUrl: "icon-a",
+      lines: [{ type: "text", label: "Now", value: "Later" }],
+    })
+    state.probeHandlers?.onResult({
+      providerId: "b",
+      displayName: "Beta",
+      iconUrl: "icon-b",
+      lines: [{ type: "badge", label: "Error", text: "Not logged in. Run `beta` to authenticate." }],
+    })
+
+    await waitFor(() => expect(state.savePluginSettingsMock).toHaveBeenCalledWith({ order: ["a", "b"], disabled: ["b"] }))
+    expect(state.savePluginSettingsMock).toHaveBeenCalledTimes(1)
+    await screen.findByText("Now")
+    expect(screen.queryByText("Beta")).toBeNull()
+  })
+
   it("updates tray icon on probe results when plugin has a primary progress", async () => {
     state.invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "list_plugins") {
@@ -949,8 +974,7 @@ describe("App", () => {
   })
 
   it("toggles plugins in settings", async () => {
-    // Use already-normalised settings so no init save fires (b is disabled
-    // because "b" is not in DEFAULT_ENABLED_PLUGINS = ["claude","codex"])
+    // Use already-normalised settings so no init save fires
     state.loadPluginSettingsMock.mockResolvedValue({ order: ["a", "b"], disabled: ["b"] })
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })

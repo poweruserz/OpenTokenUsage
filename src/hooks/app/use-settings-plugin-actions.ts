@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { insertAccount, type AccountsChange, type PluginsChange } from "@/lib/accounts"
 import type { PluginMeta } from "@/lib/plugin-types"
 import { normalizePluginSettings, savePluginSettings, type PluginSettings } from "@/lib/settings"
+import { useAppPluginStore } from "@/stores/app-plugin-store"
 
 const TRAY_SETTINGS_DEBOUNCE_MS = 2000
 
@@ -110,9 +111,11 @@ export function useSettingsPluginActions({
       try {
         const metas = await invoke<PluginMeta[]>("list_plugins")
         setPluginsMeta(metas)
+        // Read after the await: a provider a new install's detection turned on meanwhile must stay on.
+        const current = useAppPluginStore.getState().pluginSettings ?? pluginSettings
         const removed = new Set(change.removed)
-        let order = pluginSettings.order.filter((id) => !removed.has(id))
-        let disabled = pluginSettings.disabled.filter((id) => !removed.has(id))
+        let order = current.order.filter((id) => !removed.has(id))
+        let disabled = current.disabled.filter((id) => !removed.has(id))
         for (const added of change.added) {
           order = insertAccount(order, added.id, added.plugin)
           disabled = disabled.filter((id) => id !== added.id)

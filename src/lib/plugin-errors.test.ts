@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { afterEach, describe, expect, it } from "vitest"
 import { LANGUAGES, useLocaleStore } from "@/lib/i18n"
-import { getPluginErrorAction, PLUGIN_ERROR_PATTERNS, translatePluginError } from "@/lib/plugin-errors"
+import { getPluginErrorAction, isNotSetUpError, PLUGIN_ERROR_PATTERNS, translatePluginError } from "@/lib/plugin-errors"
 import enUS, { type PluginErrorKey } from "@/locales/plugin-errors/en-US"
 import deDE from "@/locales/plugin-errors/de-DE"
 import es419 from "@/locales/plugin-errors/es-419"
@@ -226,6 +226,21 @@ describe("plugin error dictionaries", () => {
       }
     })
   }
+})
+
+describe("isNotSetUpError", () => {
+  it("is true only when nothing of the provider is on this PC", () => {
+    expect(isNotSetUpError("Not logged in. Run `claude` to authenticate.")).toBe(true)
+    expect(isNotSetUpError("No ZAI_API_KEY found. Set up environment variable first.")).toBe(true)
+    expect(isNotSetUpError("Amp not installed. Install Amp Code to get started.")).toBe(true)
+    // The user has the provider: an old login, a bad key, a busy or unreachable server.
+    expect(isNotSetUpError("Token expired. Run `claude` to log in again.")).toBe(false)
+    expect(isNotSetUpError("API key invalid. Check your Z.ai API key.")).toBe(false)
+    expect(isNotSetUpError("Rate limited by Claude, retry in ~5m")).toBe(false)
+    expect(isNotSetUpError("Request failed. Check your connection.")).toBe(false)
+    expect(isNotSetUpError("quota exceeded for org")).toBe(false)
+    expect(isNotSetUpError("")).toBe(false)
+  })
 })
 
 describe("getPluginErrorAction", () => {

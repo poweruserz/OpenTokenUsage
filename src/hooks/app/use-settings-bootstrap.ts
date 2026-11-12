@@ -89,6 +89,7 @@ type UseSettingsBootstrapArgs = {
   setLoadingForPlugins: (ids: string[]) => void
   setErrorForPlugins: (ids: string[], error: string) => void
   startBatch: (pluginIds?: string[]) => Promise<string[] | undefined>
+  detectProviders: (ids: string[]) => Promise<void>
 }
 
 export function useSettingsBootstrap({
@@ -118,6 +119,7 @@ export function useSettingsBootstrap({
   setLoadingForPlugins,
   setErrorForPlugins,
   startBatch,
+  detectProviders,
 }: UseSettingsBootstrapArgs) {
   const applyStartOnLogin = useCallback(async (value: boolean) => {
     if (!isTauri()) return
@@ -205,7 +207,9 @@ export function useSettingsBootstrap({
         const storedSettings = await loadPluginSettings()
         const migratedSettings = migrateWindsurfToDevin(storedSettings)
         const normalized = normalizePluginSettings(migratedSettings, availablePlugins)
-        if (!arePluginSettingsEqual(storedSettings, normalized)) {
+        // A new install saves them once detection has decided every provider (use-provider-detection.ts).
+        const newInstall = storedSettings.order.length === 0
+        if (!newInstall && !arePluginSettingsEqual(storedSettings, normalized)) {
           await savePluginSettings(normalized)
         }
 
@@ -301,6 +305,10 @@ export function useSettingsBootstrap({
           setTrayMetric(storedTrayMetric)
           setTrayPercentColor(storedTrayPercentColor)
 
+          if (newInstall) {
+            await detectProviders(normalized.order)
+            return
+          }
           const enabledIds = getEnabledPluginIds(normalized)
           setLoadingForPlugins(enabledIds)
           try {
@@ -324,6 +332,7 @@ export function useSettingsBootstrap({
     }
   }, [
     applyStartOnLogin,
+    detectProviders,
     setAutoUpdateInterval,
     setDisplayMode,
     setErrorForPlugins,

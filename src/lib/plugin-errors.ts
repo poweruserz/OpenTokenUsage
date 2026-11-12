@@ -131,7 +131,29 @@ export function translatePluginError(message: string): string {
   return MESSAGES[getLocale()][match.key].replace(/\{(\w+)\}/g, (text, name: string) => match.vars[name] ?? text)
 }
 
-export type PluginErrorAction = { kind: "run"; command: string } | { kind: "env"; names: string[] }
+/** What a provider says when nothing of it is on this PC: no login, no API key, not installed. */
+const NOT_SET_UP: ReadonlySet<PluginErrorKey> = new Set<PluginErrorKey>([
+  "notLoggedInRun",
+  "notLoggedInRunFirst",
+  "notLoggedInSignInOrRun",
+  "startAppOrRun",
+  "runOrSignIn",
+  "productNotLoggedInRun",
+  "openAppSignIn",
+  "apiKeyMissingSetEnv",
+  "apiKeyNotFoundSetEnvOrFile",
+  "envKeyNotFound",
+  "notDetectedLogIn",
+  "notInstalled",
+  "jetbrainsNotDetected",
+])
+
+export function isNotSetUpError(message: string) {
+  const key = matchPluginError(message)?.key
+  return key !== undefined && NOT_SET_UP.has(key)
+}
+
+export type PluginErrorAction ={ kind: "run"; command: string } | { kind: "env"; names: string[] }
 
 /**
  * One-click fix for a known error: a login command to run in a terminal, or API-key environment
