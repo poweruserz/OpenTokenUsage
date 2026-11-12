@@ -2510,6 +2510,43 @@ describe("cursor plugin", () => {
     expect(usageAuth[usageAuth.length - 1]).toBe("Bearer " + fourMinutesLeft)
   })
 
+  it("keeps using a cached token inside the refresh buffer when the refresh fails", async () => {
+    const ctx = makeCtx()
+    const expired = makeJwt({ exp: 1, sub: "user-1" })
+    const fourMinutesLeft = makeJwt({ exp: Math.floor(Date.now() / 1000) + 240, sub: "user-1" })
+    let refreshWorks = true
+    ctx.host.sqlite.query.mockImplementation((db, sql) => {
+      if (String(sql).includes("cursorAuth/accessToken")) return JSON.stringify([{ value: "cursor-safe-storage:v1:access" }])
+      if (String(sql).includes("cursorAuth/refreshToken")) {
+        return JSON.stringify([{ value: "cursor-safe-storage:v1:refresh" }])
+      }
+      return JSON.stringify([])
+    })
+    ctx.host.cursorAuth = cursorAuthMock((raw) => (String(raw).endsWith("access") ? expired : "refresh-plain"))
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("/oauth/token")) {
+        if (!refreshWorks) return { status: 503, bodyText: "" }
+        return { status: 200, bodyText: JSON.stringify({ access_token: fourMinutesLeft }) }
+      }
+      if (opts.headers.Authorization === "Bearer " + expired) return { status: 401, bodyText: "" }
+      return {
+        status: 200,
+        bodyText: JSON.stringify({ enabled: true, planUsage: { totalSpend: 0, limit: 100 } }),
+      }
+    })
+
+    ;(await loadPlugin()).probe(ctx)
+    refreshWorks = false
+    vi.resetModules()
+    delete globalThis.__openusage_plugin
+    ;(await loadPlugin()).probe(ctx)
+
+    const usageAuth = ctx.host.http.request.mock.calls
+      .filter((call) => String(call[0].url).includes("GetCurrentPeriodUsage"))
+      .map((call) => call[0].headers.Authorization)
+    expect(usageAuth[usageAuth.length - 1]).toBe("Bearer " + fourMinutesLeft)
+  })
+
   it("drops the cached token when the refreshed token is refused too", async () => {
     const ctx = makeCtx()
     const expired = makeJwt({ exp: 1, sub: "user-1" })

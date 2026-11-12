@@ -283,6 +283,11 @@
     return payload.exp * 1000 // Convert to milliseconds
   }
 
+  // A token inside the refresh buffer still works until this is true.
+  function hasExpired(ctx, accessToken, nowMs) {
+    return ctx.util.needsRefreshByExpiry({ nowMs, expiresAtMs: getTokenExpiration(ctx, accessToken), bufferMs: 0 })
+  }
+
   function needsRefresh(ctx, accessToken, nowMs) {
     if (!accessToken) return true
     const expiresAt = getTokenExpiration(ctx, accessToken)
@@ -695,7 +700,8 @@
     const cached = authSource === "sqlite" && !authState.writeSqlite && needsRefresh(ctx, accessToken, nowMs)
       ? takeCachedAccessToken(ctx, accessToken, refreshTokenValue)
       : null
-    if (cached && !needsRefresh(ctx, cached, nowMs)) {
+    // Inside the buffer it is refreshed below and kept if that refresh fails.
+    if (cached && !hasExpired(ctx, cached, nowMs)) {
       accessToken = cached
     }
 
@@ -738,13 +744,7 @@
           didRefresh = true
           const failed = accessToken
           discardCachedAccessToken(ctx)
-          // The database token works until it actually expires, even inside the refresh buffer.
-          const databaseTokenWorks = authState.accessToken && authState.accessToken !== failed && !ctx.util.needsRefreshByExpiry({
-            nowMs: Date.now(),
-            expiresAtMs: getTokenExpiration(ctx, authState.accessToken),
-            bufferMs: 0,
-          })
-          if (databaseTokenWorks) {
+          if (authState.accessToken && authState.accessToken !== failed && !hasExpired(ctx, authState.accessToken, Date.now())) {
             accessToken = authState.accessToken
             return authState.accessToken
           }
