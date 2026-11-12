@@ -59,14 +59,14 @@ pub fn read_wrapped_key(local_state_json: &str) -> Result<Vec<u8>, String> {
 }
 
 #[cfg(windows)]
-pub fn unwrap_dpapi(payload: &[u8]) -> Result<Vec<u8>, String> {
+fn dpapi_call(protect: bool, payload: &[u8], failure: &str) -> Result<Vec<u8>, String> {
     use std::ptr;
     use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
-    use windows_sys::Win32::Security::Cryptography::{CryptUnprotectData, CRYPT_INTEGER_BLOB};
+    use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CryptUnprotectData, CRYPT_INTEGER_BLOB};
 
     const UI_FORBIDDEN: u32 = 0x1;
     let input = CRYPT_INTEGER_BLOB {
-        cbData: u32::try_from(payload.len()).map_err(|_| "Windows DPAPI could not unwrap the key".to_string())?,
+        cbData: u32::try_from(payload.len()).map_err(|_| failure.to_string())?,
         pbData: payload.as_ptr() as *mut u8,
     };
     let mut output = CRYPT_INTEGER_BLOB {
@@ -74,27 +74,92 @@ pub fn unwrap_dpapi(payload: &[u8]) -> Result<Vec<u8>, String> {
         pbData: ptr::null_mut(),
     };
     let ok = unsafe {
-        CryptUnprotectData(
-            &input,
-            ptr::null_mut(),
-            ptr::null(),
-            ptr::null_mut(),
-            ptr::null(),
-            UI_FORBIDDEN,
-            &mut output,
-        )
+        if protect {
+            CryptProtectData(
+                &input,
+                ptr::null(),
+                ptr::null(),
+                ptr::null_mut(),
+                ptr::null(),
+                UI_FORBIDDEN,
+                &mut output,
+            )
+        } else {
+            CryptUnprotectData(
+                &input,
+                ptr::null_mut(),
+                ptr::null(),
+                ptr::null_mut(),
+                ptr::null(),
+                UI_FORBIDDEN,
+                &mut output,
+            )
+        }
     };
     if ok == 0 || output.pbData.is_null() {
-        return Err("Windows DPAPI could not unwrap the key".to_string());
+        return Err(failure.to_string());
     }
-    let key = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec() };
+    let bytes = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec() };
     unsafe {
         LocalFree(output.pbData as HLOCAL);
     }
+    Ok(bytes)
+}
+
+#[cfg(windows)]
+fn dpapi_protect(plain: &[u8]) -> Result<Vec<u8>, String> {
+    dpapi_call(true, plain, "Windows DPAPI could not protect the token")
+}
+
+#[cfg(windows)]
+fn dpapi_unprotect(payload: &[u8]) -> Result<Vec<u8>, String> {
+    dpapi_call(false, payload, "Windows DPAPI could not unwrap the key")
+}
+
+#[cfg(windows)]
+pub fn unwrap_dpapi(payload: &[u8]) -> Result<Vec<u8>, String> {
+    let key = dpapi_unprotect(payload)?;
     if key.len() != 32 {
         return Err("Windows DPAPI returned an unexpected key".to_string());
     }
     Ok(key)
+}
+
+pub fn protect_for_cache(plain: &str) -> Result<String, String> {
+    if plain.is_empty() {
+        return Err("nothing to protect".to_string());
+    }
+    #[cfg(windows)]
+    {
+        let protected = dpapi_protect(plain.as_bytes())?;
+        return Ok(BASE64_STANDARD.encode(protected));
+    }
+    #[cfg(not(windows))]
+    {
+        Err("not supported on this platform".to_string())
+    }
+}
+
+pub fn unprotect_for_cache(stored: &str) -> Result<String, String> {
+    if stored.is_empty() {
+        return Err("cached token could not be read".to_string());
+    }
+    #[cfg(windows)]
+    {
+        let blob = BASE64_STANDARD
+            .decode(stored.trim())
+            .map_err(|_| "cached token could not be read".to_string())?;
+        let plain = dpapi_unprotect(&blob).map_err(|_| "cached token could not be read".to_string())?;
+        let text = String::from_utf8(plain).map_err(|_| "cached token could not be read".to_string())?;
+        if text.is_empty() {
+            return Err("cached token could not be read".to_string());
+        }
+        return Ok(text);
+    }
+    #[cfg(not(windows))]
+    {
+        Err("not supported on this platform".to_string())
+    }
 }
 
 pub fn decrypt_cursor_value(raw: &str) -> Result<String, String> {
@@ -137,37 +202,6 @@ mod tests {
         blob.extend_from_slice(nonce);
         blob.extend_from_slice(&sealed);
         blob
-    }
-
-    #[cfg(all(test, windows))]
-    fn protect_dpapi(plain: &[u8]) -> Vec<u8> {
-        use std::ptr;
-        use windows_sys::Win32::Foundation::{LocalFree, HLOCAL};
-        use windows_sys::Win32::Security::Cryptography::{CryptProtectData, CRYPT_INTEGER_BLOB};
-
-        let input = CRYPT_INTEGER_BLOB {
-            cbData: plain.len() as u32,
-            pbData: plain.as_ptr() as *mut u8,
-        };
-        let mut output = CRYPT_INTEGER_BLOB {
-            cbData: 0,
-            pbData: ptr::null_mut(),
-        };
-        let ok = unsafe {
-            CryptProtectData(
-                &input,
-                ptr::null(),
-                ptr::null(),
-                ptr::null_mut(),
-                ptr::null(),
-                0x1,
-                &mut output,
-            )
-        };
-        assert_eq!(ok, 1, "CryptProtectData");
-        let protected = unsafe { std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec() };
-        unsafe { LocalFree(output.pbData as HLOCAL); }
-        protected
     }
 
     #[test]
@@ -256,8 +290,11 @@ mod tests {
     #[test]
     fn dpapi_round_trip_returns_32_bytes() {
         let key = [3_u8; 32];
-        let protected = protect_dpapi(&key);
+        let protected = dpapi_protect(&key).expect("protect");
         let opened = unwrap_dpapi(&protected).expect("unwrap");
         assert_eq!(opened, key);
+        let cache = protect_for_cache("plain-token").expect("cache protect");
+        assert_ne!(cache, "plain-token");
+        assert_eq!(unprotect_for_cache(&cache).expect("cache unprotect"), "plain-token");
     }
 }
