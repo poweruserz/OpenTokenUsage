@@ -28,6 +28,7 @@ describe("Smart refresh schedule", () => {
   it("keeps Claude's cards, extra accounts and WSL logins at 10 minutes or more", () => {
     expect(["claude", "claude-1a2b3c4d", "claude-wsl-91f17ddf"].map(smartFloorMinutes)).toEqual([10, 10, 10])
     expect(["codex", "codex-1a2b3c4d", "cursor"].map(smartFloorMinutes)).toEqual([0, 0, 0])
+    expect(smartFloorMinutes("muse")).toBe(5)
 
     let now = 100_000
     let state = newSmartSchedule(now, 10)

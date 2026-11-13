@@ -75,6 +75,7 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Kiro**](docs/providers/kiro.md) / credits, bonus credits, overages
 - [**Kimi Code**](docs/providers/kimi.md) / session, weekly
 - [**MiniMax**](docs/providers/minimax.md) / coding plan session
+- [**Muse Code**](docs/providers/muse.md) / session, weekly (turn it on in Settings)
 - [**OpenCode Go**](docs/providers/opencode-go.md) / 5h, weekly, monthly usage limits
 - [**OpenRouter**](docs/providers/openrouter.md) / credits, API key spending cap, daily and monthly spend
 - [**Devin**](docs/providers/devin.md) / weekly and daily quota, extra usage

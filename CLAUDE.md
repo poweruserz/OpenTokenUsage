@@ -19,6 +19,8 @@ This file holds the project facts that are easy to get wrong.
   in its answer (its login is the GitHub CLI's, which any GitHub user has). The store key `providerDetectionPending`
   is set before the first settings save and cleared once every provider is decided, so a start cut short detects
   again. A plugin whose login is rejected must not throw a "not set up" message (use "Session expired …").
+  Muse Code (`MANUAL_ONLY`) is never probed there: its only quota source is Meta's key endpoint, so only the user
+  turns it on. Its plugin reads that endpoint at most every 5 minutes (Smart floor 5, `smartFloorMinutes`).
 - Every line label a plugin can emit on the overview card must be declared `scope: "overview"` in
   `plugin.json`, or that account type gets a blank card (the card filters by manifest labels).
 - Response bodies are logged (first 500 chars) after `redact_body` in
