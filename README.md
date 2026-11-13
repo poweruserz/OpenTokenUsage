@@ -68,7 +68,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
 - **Taskbar strip (experimental).** Provider logos with session and weekly usage right in the taskbar, in your own fonts, colors and order, on one monitor or all of them.
 - **Pace.** Every limit says whether you're ahead or behind, and when it runs out at this rate. A weekly limit's pace can count work days only.
 - **Since you last looked.** When the panel opens, what you used while it was closed blinks hatched, then the bar fills over it.
-- **Notifications.** At the usage levels you pick, for every provider or each on its own (the bars show a notch at each level), when you're on pace to run out before a reset, and when a limit resets, with a built-in sound or your own.
+- **Notifications.** At the usage levels you pick, for every provider or each on its own (the bars show a notch at each level), when you're on pace to run out before a reset, when a limit resets, and when a Claude or Codex session uses tokens far faster than usual (often an agent stuck in a loop), with a built-in sound or your own.
 - **Banked resets.** Codex and Claude reset counts, what each one clears, its expiry date and a live countdown, with reminders 7 days and 24 hours before.
 - **One-click fixes.** Errors come with the fix: run the login command in a terminal, or open the provider's API key page and Windows' Environment Variables. A Claude or Codex card that lost its sign-in refreshes the moment you sign in again.
 - **Service status.** A badge on the card when the provider's status page reports an incident.

@@ -24,6 +24,7 @@ import { useAppUpdate } from "@/hooks/use-app-update"
 import { useUsageAlerts } from "@/hooks/app/use-usage-alerts"
 import { useStoredDetailSections } from "@/components/detail-section"
 import { useProjectBudgetAlerts } from "@/hooks/app/use-project-budget-alerts"
+import { useUsageSpikeAlerts } from "@/hooks/app/use-usage-spike-alerts"
 import { useLoginRecovery } from "@/hooks/app/use-login-recovery"
 import { useProviderTrayIcons } from "@/hooks/app/use-provider-tray-icons"
 import { useTaskbarStrip } from "@/hooks/app/use-taskbar-strip"
@@ -163,6 +164,7 @@ function App() {
   useUsageAlerts({ pluginStates, pluginsMeta, pluginSettings, enabled: usageAlerts, settings: alertSettings, displayMode })
   const enabledIds = useMemo(() => (pluginSettings ? getEnabledPluginIds(pluginSettings) : []), [pluginSettings])
   useProjectBudgetAlerts({ pluginsMeta, enabledIds, enabled: usageAlerts, settings: alertSettings })
+  useUsageSpikeAlerts({ pluginsMeta, enabledIds, enabled: usageAlerts, settings: alertSettings })
   useStoredDetailSections()
   useLoginRecovery({
     pluginStates,

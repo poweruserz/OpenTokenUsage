@@ -418,9 +418,11 @@ export type AlertSettings = {
   sound: AlertSound;
   /** Name of the user's file; the converted sound lives in the app data folder. */
   customSoundName: string | null;
+  /** Whether a Claude or Codex session using tokens far faster than usual (often a loop) notifies. On unless false. */
+  spikes?: boolean;
 };
 
-export const DEFAULT_ALERT_SETTINGS: AlertSettings = { levels: [80, 95], sound: "windows", customSoundName: null };
+export const DEFAULT_ALERT_SETTINGS: AlertSettings = { levels: [80, 95], sound: "windows", customSoundName: null, spikes: true };
 
 function knownLevels(value: unknown[]): number[] {
   return USAGE_ALERT_LEVELS.filter((level) => value.includes(level));
@@ -440,7 +442,7 @@ export function normalizeAlertSettings(value: unknown): AlertSettings {
       if (/^[a-z0-9-]+$/.test(id) && Array.isArray(own)) providerLevels[id] = knownLevels(own);
     }
   }
-  return { levels, providerLevels, sound, customSoundName };
+  return { levels, providerLevels, sound, customSoundName, spikes: raw.spikes !== false };
 }
 
 /** The usage levels that notify for one provider: its own, or everyone's. */

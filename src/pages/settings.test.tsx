@@ -143,6 +143,22 @@ describe("SettingsPage", () => {
     }
   })
 
+  it("turns usage spike notifications off and on again", async () => {
+    const saved = useAppPreferencesStore.getState()
+    useAppPreferencesStore.setState({ usageAlerts: true, alertSettings: DEFAULT_ALERT_SETTINGS })
+    try {
+      render(<SettingsPage {...defaultProps} />)
+      const spikes = screen.getByRole("checkbox", { name: /far faster than usual/ })
+      expect(spikes).toBeChecked()
+      await userEvent.click(spikes)
+      expect(useAppPreferencesStore.getState().alertSettings.spikes).toBe(false)
+      await userEvent.click(spikes)
+      expect(useAppPreferencesStore.getState().alertSettings.spikes).toBe(true)
+    } finally {
+      useAppPreferencesStore.setState({ usageAlerts: saved.usageAlerts, alertSettings: saved.alertSettings })
+    }
+  })
+
   it("refuses a file that isn't a settings backup and says so", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
     render(<SettingsPage {...defaultProps} />)

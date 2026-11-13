@@ -55,7 +55,7 @@ type Usage = HashMap<(String, String, String), Parts>;
 /// What a token of each kind costs next to an uncached input token. Anthropic and OpenAI price their
 /// models in these ratios (Anthropic's 5-minute cache writes, OpenAI's GPT-5 family), so sharing a
 /// model's dollars by them is exact but for 1-hour cache writes and long-context rates.
-fn weight(log: Log, model: &str, parts: &Parts) -> f64 {
+pub(crate) fn weight(log: Log, model: &str, parts: &Parts) -> f64 {
     let (output, cache_write, cache_read) = match log {
         Log::Claude => (5.0, 1.25, claude_cache_read(model)),
         Log::Codex => (8.0, 1.0, 0.1),

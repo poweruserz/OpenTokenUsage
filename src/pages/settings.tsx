@@ -497,6 +497,15 @@ function AlertOptions({ plugins }: { plugins: PluginConfig[] }) {
 
       <ProviderAlertLevels plugins={plugins} settings={settings} update={update} />
 
+      <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+        <Checkbox
+          className="mt-0.5"
+          checked={settings.spikes !== false}
+          onCheckedChange={(checked) => update({ ...settings, spikes: checked === true })}
+        />
+        {t("settings.alerts.spikes")}
+      </label>
+
       <div>
         <label className="mb-1 block text-xs text-muted-foreground" htmlFor="alert-sound">
           {t("settings.alerts.sound")}
