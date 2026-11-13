@@ -620,6 +620,7 @@ pub fn run() {
             usage_heatmap::usage_heatmap,
             usage_projects::usage_projects,
             usage_projects::export_projects_csv,
+            usage_projects::usage_by_day,
             usage_spikes::usage_spikes,
             settings_backup::export_settings,
             alert_sound::play_alert_sound,

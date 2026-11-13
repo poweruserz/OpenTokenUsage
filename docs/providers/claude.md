@@ -159,6 +159,10 @@ Each entry names what it resets, as Claude Code does: a grant with `gives_back_w
 
 Implementation reference: [T3 Code Claude reset credits](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/claudeResetCredits.ts). T3 Code also implements explicit redemption; OpenTokenUsage opens the provider’s usage page instead.
 
+## Weekly limit by day
+
+Above the grid, the Claude detail page splits the weekly limit used so far over the local days of the current weekly limit (from its start, or the reset minute, up to now): each day gets the share of the used percent that its tokens make of the week's, weighted by what each kind of token costs, the same weights the projects list uses. It's an estimate, since the provider counts its limit in its own units, and the rounded days can add up to a point more or less than the bar. Read from the same logs as the grid, every 5 minutes while shown; nothing leaves the PC.
+
 ## Usage by hour
 
 The Claude detail page shows a 7 × 24 grid of tokens per weekday and local hour over the last 4 weeks (input, output, cache writes and cache reads), read from Claude Code's own transcripts: `projects/**/*.jsonl` in `CLAUDE_CONFIG_DIR` or `~/.claude`, extra accounts in their own folders, never a WSL copy. Only usage and timestamps are read, and nothing leaves the PC. Claude Code writes a line per content block of a message, each with the message's usage so far; a message counts once, at its largest usage. Each file is read once and afterwards only from where the last read stopped (the first read after the app starts can take a few seconds on gigabytes of transcripts); the grid refreshes every 5 minutes while it's shown. A log it can't read is left out and counted under the grid. Arrow keys move between cells; the header then reads out the focused hour. Each weekday's total shows as a bar beside its row, the busiest weekday's solid.

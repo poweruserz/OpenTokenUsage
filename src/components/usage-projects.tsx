@@ -63,7 +63,7 @@ export function weekRange(endMs: number, periodMs: number, now: Date) {
 }
 
 /** A weekly line's reset time to the minute: Claude's `resets_at` moves by milliseconds on every probe. */
-const minute = (resetsAt: string | undefined) => (resetsAt ? Math.round(Date.parse(resetsAt) / 60_000) * 60_000 : NaN)
+export const resetMinute = (resetsAt: string | undefined) => (resetsAt ? Math.round(Date.parse(resetsAt) / 60_000) * 60_000 : NaN)
 
 /** Claude Code writes `HEAD` when it can't name the branch (detached, or not a repository). */
 const branchLabel = (name: string) => (name && name !== "HEAD" ? name : t("projects.noBranch"))
@@ -109,7 +109,7 @@ export function UsageProjects({ pluginId, weekly }: { pluginId: string; weekly?:
   const budgets = useAppPreferencesStore((state) => state.projectBudgets)
   const setProjectBudgets = useAppPreferencesStore((state) => state.setProjectBudgets)
   const [picked, setPicked] = useState<number | "week">(0)
-  const weekEnd = minute(weekly?.resetsAt)
+  const weekEnd = resetMinute(weekly?.resetsAt)
   const weekPeriod = weekly?.periodDurationMs ?? 0
   const hasWeek = Number.isFinite(weekEnd) && weekPeriod > 0
   // A card without a weekly limit (or the next card picked) falls back to this month.

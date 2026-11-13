@@ -338,6 +338,65 @@ fn month_usage(log: Log, dirs: &[PathBuf], start_ms: i64, end_ms: i64) -> (Usage
     (usage, unreadable)
 }
 
+/// Price-weighted tokens between each two of `bounds` (ms), by the minute the scan keeps.
+fn days_usage(log: Log, dirs: &[PathBuf], bounds: &[i64]) -> Vec<f64> {
+    let minutes: Vec<i64> = bounds
+        .iter()
+        .map(|ms| ms.div_euclid(1000 * SPOT_SECS))
+        .collect();
+    let mut days = vec![0.0; bounds.len().saturating_sub(1)];
+    let since = UNIX_EPOCH + Duration::from_millis(bounds.first().copied().unwrap_or(0).max(0) as u64);
+    scan_logs(log, dirs, since, |scan| {
+        for (spot, parts) in &scan.spots {
+            // How many bounds the minute is at or after: 1 is the first day, len is past the last.
+            let at = minutes.partition_point(|m| *m <= spot.slot);
+            if at >= 1 && at < minutes.len() {
+                days[at - 1] += weight(log, &spot.model, parts);
+            }
+        }
+    });
+    days
+}
+
+/// 2 to 10 ascending bounds over at most 9 days (a weekly limit's days and a DST change or two).
+fn valid_days(bounds: &[i64]) -> bool {
+    (2..=10).contains(&bounds.len())
+        && bounds.windows(2).all(|pair| pair[0] < pair[1])
+        && bounds[bounds.len() - 1]
+            .checked_sub(bounds[0])
+            .is_some_and(|span| span <= 9 * 24 * 3_600_000)
+}
+
+/// The price-weighted tokens of a Claude or Codex card's login (the usual one or an extra account)
+/// between each two of `bounds` (ms): the local days of its weekly limit, so the detail page can
+/// share out the limit used so far. Empty for other cards and for a WSL copy.
+#[tauri::command]
+pub async fn usage_by_day(
+    state: tauri::State<'_, Mutex<AppState>>,
+    plugin_id: String,
+    bounds: Vec<i64>,
+) -> Result<Vec<f64>, String> {
+    if !valid_days(&bounds) {
+        return Err("invalid days".into());
+    }
+    let source = {
+        let state = state.lock().map_err(|e| e.to_string())?;
+        let plugin = state.plugins.iter().find(|p| p.manifest.id == plugin_id);
+        match plugin.and_then(crate::login_stamp::cli_dirs) {
+            Some(("claude", dirs, _)) => Some((Log::Claude, dirs, "projects")),
+            Some(("codex", dirs, _)) => Some((Log::Codex, dirs, "sessions")),
+            _ => None,
+        }
+    };
+    let Some((log, dirs, folder)) = source else {
+        return Ok(Vec::new());
+    };
+    let dirs: Vec<PathBuf> = dirs.iter().map(|dir| dir.join(folder)).collect();
+    tauri::async_runtime::spawn_blocking(move || days_usage(log, &dirs, &bounds))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 fn is_date(value: &str) -> bool {
     value.len() == 8 && value.bytes().all(|b| b.is_ascii_digit())
 }
@@ -835,6 +894,52 @@ mod tests {
         assert_eq!(unreadable, 0);
         let total: u64 = usage.values().map(Parts::total).sum();
         assert_eq!(total, 2);
+    }
+
+    #[test]
+    fn weighs_each_day_of_a_weekly_limit_and_checks_its_bounds() {
+        let root = std::env::temp_dir().join(format!("openusage-days-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let line = |id: &str, at: &str, input: u64, output: u64| {
+            serde_json::json!({ "type": "assistant", "timestamp": at, "cwd": "C:/work/shop", "gitBranch": "main",
+                "message": { "id": id, "model": "opus", "usage": { "input_tokens": input, "output_tokens": output } } })
+            .to_string()
+                + "\n"
+        };
+        let text = [
+            line("before", "2026-11-05T10:06:00Z", 1, 0),
+            line("thu", "2026-11-05T10:07:00Z", 10, 0),
+            line("fri", "2026-11-06T09:00:00Z", 100, 2), // output weighs 5 on Claude
+            line("after", "2026-11-07T00:00:00Z", 1000, 0),
+        ]
+        .concat();
+        std::fs::write(root.join("session.jsonl"), text).unwrap();
+        let ms = |at: &str| {
+            time::OffsetDateTime::parse(at, &time::format_description::well_known::Rfc3339)
+                .unwrap()
+                .unix_timestamp()
+                * 1000
+        };
+        let bounds = [
+            ms("2026-11-05T10:07:00Z"),
+            ms("2026-11-06T00:00:00Z"),
+            ms("2026-11-07T00:00:00Z"),
+        ];
+        assert_eq!(days_usage(Log::Claude, &[root], &bounds), [10.0, 110.0]);
+
+        assert!(valid_days(&bounds));
+        let day = 24 * 3_600_000;
+        for bad in [
+            vec![0],                       // no day
+            vec![day, 0],                  // not ascending
+            vec![0, day, day],             // an empty day
+            vec![0, 10 * day],             // longer than a weekly limit
+            vec![i64::MIN, 0],             // would wrap
+            (0..11).map(|i| i * 3_600_000).collect(), // too many
+        ] {
+            assert!(!valid_days(&bad), "{bad:?}");
+        }
     }
 
     #[test]

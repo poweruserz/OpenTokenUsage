@@ -150,6 +150,10 @@ When the usage summary reports resets, `GET /backend-api/wham/rate-limit-reset-c
 
 Implementation reference: [T3 Code Codex usage mapping](https://github.com/pingdotgg/t3code/blob/main/apps/server/src/provider/codexUsageLimits.ts). This app uses its existing read-only HTTP integration rather than starting a Codex app-server.
 
+## Weekly limit by day
+
+Above the grid, the Codex detail page splits the weekly limit used so far over the local days of the current weekly limit (from its start, or the reset minute, up to now): each day gets the share of the used percent that its tokens make of the week's, weighted by what each kind of token costs, the same weights the projects list uses. It's an estimate, since the provider counts its limit in its own units, and the rounded days can add up to a point more or less than the bar. Read from the same logs as the grid, every 5 minutes while shown; nothing leaves the PC.
+
 ## Usage by hour
 
 The Codex detail page shows a 7 × 24 grid of tokens per weekday and local hour over the last 4 weeks, read from Codex's own session logs: `sessions/**/*.jsonl` in `CODEX_HOME` (or `~/.codex` and `~/.config/codex`), extra accounts in their own folders, never a WSL copy. Only usage and timestamps are read, and nothing leaves the PC. Current logs have a `token_usage_record` line per model response, which is what's counted. Older logs only have `token_count` events, and a repeat with an unchanged total is skipped. Each file is read once and afterwards only from where the last read stopped; the grid refreshes every 5 minutes while it's shown. A log it can't read is left out and counted under the grid. Arrow keys move between cells; the header then reads out the focused hour. Each weekday's total shows as a bar beside its row, the busiest weekday's solid.
