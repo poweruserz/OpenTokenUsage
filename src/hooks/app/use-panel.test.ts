@@ -37,9 +37,6 @@ vi.mock("@/lib/settings", async (original) => ({
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: getCurrentWindowMock,
   currentMonitor: currentMonitorMock,
-  LogicalSize: class LogicalSize {
-    constructor(public width: number, public height: number) {}
-  },
   PhysicalSize: class PhysicalSize {
     width: number
     height: number
@@ -67,11 +64,7 @@ describe("usePanel", () => {
     invokeMock.mockResolvedValue(undefined)
     listenMock.mockResolvedValue(vi.fn())
     currentMonitorMock.mockResolvedValue(null)
-    getCurrentWindowMock.mockReturnValue({
-      setSize: vi.fn().mockResolvedValue(undefined),
-      setMinSize: vi.fn().mockResolvedValue(undefined),
-      setMaxSize: vi.fn().mockResolvedValue(undefined),
-    })
+    getCurrentWindowMock.mockReturnValue({ setSize: vi.fn().mockResolvedValue(undefined) })
   })
 
   it("handles tray show-about event", async () => {
@@ -385,17 +378,14 @@ describe("usePanel", () => {
     requestAnimationFrameSpy.mockRestore()
   })
 
-  it("opens at the width the panel was dragged to, within bounds, and keeps a new drag", async () => {
+  it("opens at the kept width; an edge drag resizes through the host, within bounds, and is kept", async () => {
     const setSize = vi.fn().mockResolvedValue(undefined)
-    const setMinSize = vi.fn().mockResolvedValue(undefined)
-    const setMaxSize = vi.fn().mockResolvedValue(undefined)
-    getCurrentWindowMock.mockReturnValue({ setSize, setMinSize, setMaxSize })
+    getCurrentWindowMock.mockReturnValue({ setSize })
     loadPanelWidthMock.mockResolvedValue(480)
-    const innerWidth = window.innerWidth
     const container = document.createElement("div")
     document.body.appendChild(container)
     try {
-      const { rerender } = renderHook(
+      const { result, rerender } = renderHook(
         ({ view }: { view: string }) => {
           const panel = usePanel({ activeView: view, setActiveView: vi.fn(), showAbout: false, setShowAbout: vi.fn(), displayPlugins: [] })
           panel.containerRef.current = container
@@ -403,30 +393,28 @@ describe("usePanel", () => {
         },
         { initialProps: { view: "home" } }
       )
-      expect(setMinSize).toHaveBeenCalledWith(expect.objectContaining({ width: 400 }))
-      expect(setMaxSize).toHaveBeenCalledWith(expect.objectContaining({ width: 560 }))
       await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 480 })))
 
-      // The user drags an edge: the window is 520 wide now. Saved once the edge rests, and kept on the next resize.
-      Object.defineProperty(window, "innerWidth", { configurable: true, value: 520 })
-      act(() => {
-        window.dispatchEvent(new Event("resize"))
+      // Dragged past the bound on the left edge: the host gets the bound and keeps the right edge.
+      await act(async () => {
+        await result.current.resizePanel(700, "West")
       })
-      await waitFor(() => expect(savePanelWidthMock).toHaveBeenCalledWith(520))
+      expect(invokeMock).toHaveBeenCalledWith("resize_panel", { width: 560, keepRight: true })
+      expect(result.current.panelWidth()).toBe(560)
+
+      // The same width again sends nothing; the next content resize keeps the new width.
+      invokeMock.mockClear()
+      await act(async () => {
+        await result.current.resizePanel(560.2, "East")
+      })
+      expect(invokeMock).not.toHaveBeenCalledWith("resize_panel", expect.anything())
       setSize.mockClear()
       rerender({ view: "settings" })
-      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 520 })))
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 560 })))
 
-      // A pixel off (a fractional display scale) isn't a drag.
-      savePanelWidthMock.mockClear()
-      Object.defineProperty(window, "innerWidth", { configurable: true, value: 521 })
-      act(() => {
-        window.dispatchEvent(new Event("resize"))
-      })
-      await new Promise((resolve) => setTimeout(resolve, 600))
-      expect(savePanelWidthMock).not.toHaveBeenCalled()
+      act(() => result.current.keepPanelWidth())
+      expect(savePanelWidthMock).toHaveBeenCalledWith(560)
     } finally {
-      Object.defineProperty(window, "innerWidth", { configurable: true, value: innerWidth })
       document.body.removeChild(container)
     }
   })

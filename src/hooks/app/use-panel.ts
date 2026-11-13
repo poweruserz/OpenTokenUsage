@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
-import { getCurrentWindow, LogicalSize, PhysicalSize, currentMonitor } from "@tauri-apps/api/window"
+import { getCurrentWindow, PhysicalSize, currentMonitor } from "@tauri-apps/api/window"
 import type { ActiveView } from "@/components/side-nav"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
-import { loadPanelWidth, normalizePanelWidth, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, savePanelWidth } from "@/lib/settings"
+import { loadPanelWidth, normalizePanelWidth, PANEL_MIN_WIDTH, savePanelWidth } from "@/lib/settings"
 
-/** A dragged width is saved once the edge rests this long. */
-const WIDTH_SAVE_DELAY_MS = 500
 const MAX_HEIGHT_FALLBACK_PX = 600
 const MAX_HEIGHT_FRACTION_OF_MONITOR = 0.8
 
@@ -42,11 +40,9 @@ export function usePanel({
   const [canScrollDown, setCanScrollDown] = useState(false)
   const [maxPanelHeightPx, setMaxPanelHeightPx] = useState<number | null>(null)
   const maxPanelHeightPxRef = useRef<number | null>(null)
-  // The width (logical px) the panel keeps; read from settings before the first resize, then followed
-  // as the user drags an edge. Width changes count as the user's only once the panel has its own.
+  // The width (logical px) the panel keeps: read from settings before the first resize, changed by an edge drag.
   const widthRef = useRef(PANEL_MIN_WIDTH)
   const [widthReady, setWidthReady] = useState(false)
-  const followWidthRef = useRef(false)
   const focusContainer = useCallback(() => {
     window.requestAnimationFrame(() => {
       containerRef.current?.focus({ preventScroll: true })
@@ -74,35 +70,29 @@ export function usePanel({
     invoke("init_panel").catch(console.error)
   }, [])
 
-  // Windows keeps an edge drag within the bounds (the height follows the content below).
   useEffect(() => {
     if (!isTauri()) return
-    const win = getCurrentWindow()
-    win.setMinSize(new LogicalSize(PANEL_MIN_WIDTH, 100)).catch((e) => console.error("Failed to set the panel's min size:", e))
-    win.setMaxSize(new LogicalSize(PANEL_MAX_WIDTH, 100_000)).catch((e) => console.error("Failed to set the panel's max size:", e))
     loadPanelWidth()
       .then((width) => {
         widthRef.current = width
       })
       .catch((e) => console.error("Failed to load the panel width:", e))
       .finally(() => setWidthReady(true))
+  }, [])
 
-    // A width the window gets that isn't the one asked for is the user's drag: follow it and keep it.
-    let saveTimer: ReturnType<typeof setTimeout> | undefined
-    const onResize = () => {
-      if (!followWidthRef.current) return
-      const dragged = normalizePanelWidth(window.innerWidth)
-      // ±1: a width set in physical px can come back a pixel off at fractional scales.
-      if (Math.abs(dragged - widthRef.current) <= 1) return
-      widthRef.current = dragged
-      clearTimeout(saveTimer)
-      saveTimer = setTimeout(
-        () => void savePanelWidth(dragged).catch((e) => console.error("Failed to save the panel width:", e)),
-        WIDTH_SAVE_DELAY_MS
-      )
-    }
-    window.addEventListener("resize", onResize)
-    return () => window.removeEventListener("resize", onResize)
+  /**
+   * An edge drag: the panel at `width` (clamped), resized by the host in one move, its right edge kept for the
+   * left edge. Not Windows' own sizing loop: in it this transparent window's webview lags behind its frame.
+   */
+  const resizePanel = useCallback(async (width: number, side: "West" | "East") => {
+    const next = normalizePanelWidth(width)
+    if (next === widthRef.current) return
+    widthRef.current = next
+    await invoke("resize_panel", { width: next, keepRight: side === "West" })
+  }, [])
+  const panelWidth = useCallback(() => widthRef.current, [])
+  const keepPanelWidth = useCallback(() => {
+    savePanelWidth(widthRef.current).catch((e) => console.error("Failed to save the panel width:", e))
   }, [])
 
   useEffect(() => {
@@ -230,7 +220,6 @@ export function usePanel({
       try {
         const win = getCurrentWindow()
         await win.setSize(new PhysicalSize(width, height))
-        followWidthRef.current = true
 
         // Re-anchor the window so its bottom edge stays near the taskbar after every resize.
         await invoke("reanchor_window")
@@ -275,5 +264,8 @@ export function usePanel({
     scrollRef,
     canScrollDown,
     maxPanelHeightPx,
+    panelWidth,
+    resizePanel,
+    keepPanelWidth,
   }
 }

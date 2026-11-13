@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
@@ -18,22 +18,68 @@ import { cn } from "@/lib/utils"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { useAppUiStore } from "@/stores/app-ui-store"
 
+type EdgeDrag = { startX: number; startWidth: number; pending: number | null; busy: boolean; done: boolean }
+
 /**
- * A strip along the panel's left or right edge that drags it wider or narrower (`usePanel` keeps the width).
- * 4 px, so the right one stays clear of the scrollbar's thumb in the middle of its 12 px track.
+ * A strip along the panel's left or right edge that drags it wider or narrower. It follows the pointer itself
+ * and sends one width at a time, the newest, so a fast drag never queues resizes. 4 px, so the right one stays
+ * clear of the scrollbar's thumb in the middle of its 12 px track.
  */
-function ResizeEdge({ side }: { side: "West" | "East" }) {
+function ResizeEdge({
+  side,
+  width,
+  resize,
+  keep,
+}: {
+  side: "West" | "East"
+  width: () => number
+  resize: (width: number, side: "West" | "East") => Promise<void>
+  keep: () => void
+}) {
+  const drag = useRef<EdgeDrag | null>(null)
+  const pump = (state: EdgeDrag) => {
+    if (state.busy) return
+    if (state.pending === null) {
+      if (state.done) keep()
+      return
+    }
+    const next = state.pending
+    state.pending = null
+    state.busy = true
+    resize(next, side)
+      .catch((error) => console.error("Failed to resize the panel:", error))
+      .finally(() => {
+        state.busy = false
+        pump(state)
+      })
+  }
+  const end = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const state = drag.current
+    if (!state) return
+    drag.current = null
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    state.done = true
+    pump(state)
+  }
   return (
     <div
       aria-hidden
-      onMouseDown={(event) => {
+      onPointerDown={(event) => {
         if (event.button !== 0 || !isTauri()) return
         event.preventDefault()
-        getCurrentWindow()
-          .startResizeDragging(side)
-          .catch((error) => console.error("Failed to resize the panel:", error))
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+        drag.current = { startX: event.screenX, startWidth: width(), pending: null, busy: false, done: false }
       }}
-      className={cn("absolute inset-y-0 z-30 w-1 cursor-ew-resize", side === "West" ? "left-0" : "right-0")}
+      onPointerMove={(event) => {
+        const state = drag.current
+        if (!state) return
+        const moved = event.screenX - state.startX
+        state.pending = state.startWidth + (side === "East" ? moved : -moved)
+        pump(state)
+      }}
+      onPointerUp={end}
+      onPointerCancel={end}
+      className={cn("absolute inset-y-0 z-30 w-1 cursor-ew-resize touch-none", side === "West" ? "left-0" : "right-0")}
     />
   )
 }
@@ -144,6 +190,9 @@ export function AppShell({
     scrollRef,
     canScrollDown,
     maxPanelHeightPx,
+    panelWidth,
+    resizePanel,
+    keepPanelWidth,
   } = usePanel({
     activeView,
     setActiveView,
@@ -158,8 +207,8 @@ export function AppShell({
 
   return (
     <div ref={containerRef} tabIndex={-1} className="relative flex flex-col bg-background outline-none">
-      <ResizeEdge side="West" />
-      <ResizeEdge side="East" />
+      <ResizeEdge side="West" width={panelWidth} resize={resizePanel} keep={keepPanelWidth} />
+      <ResizeEdge side="East" width={panelWidth} resize={resizePanel} keep={keepPanelWidth} />
       {/* A tall dialog (data-panel-dialog) makes a short panel grow while it's open; the window follows the content height. */}
       <div
         className="relative overflow-hidden select-none w-full flex flex-col has-[[data-panel-dialog]]:min-h-[470px]"
