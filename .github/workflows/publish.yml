@@ -28,6 +28,10 @@ jobs:
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write # Sigstore certificate for the build provenance attestation
+      attestations: write
     defaults:
       run:
         shell: bash
@@ -71,8 +75,10 @@ jobs:
           fi
 
       - name: Validate app version matches tag
+        id: version
         run: |
           TAG_VERSION="${RELEASE_TAG#v}"
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
 
           TAURI_CONF_VERSION=$(node -p 'require("./src-tauri/tauri.conf.json").version')
           CARGO_VERSION=$(awk -F'"' '/^version =/ { print $2; exit }' ./src-tauri/Cargo.toml)
@@ -125,6 +131,18 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+
+      # Signed build provenance for the setup the release now holds (the same file tauri-action uploaded; named
+      # in full, as the rust cache could bring back an older setup):
+      # `gh attestation verify <setup.exe> -R PowerUserZ/OpenTokenUsage` shows it was built here, from this tag.
+      # No storage record: those exist only for organization-owned repositories. The release is already public
+      # here, so a failure (a Sigstore or API outage) is left as a failed step rather than stopping the checks and
+      # WinGet; a re-run would rebuild and replace the setup people may have downloaded.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        continue-on-error: true
+        with:
+          subject-path: src-tauri/target/release/bundle/nsis/OpenTokenUsage_${{ steps.version.outputs.version }}_x64-setup.exe
+          create-storage-record: false
 
       - name: Verify Windows installers uploaded
         env:
