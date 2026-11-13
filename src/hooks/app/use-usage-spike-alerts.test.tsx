@@ -14,7 +14,7 @@ vi.mock("@tauri-apps/plugin-notification", () => ({
 }))
 
 const META = [{ id: "claude", name: "Claude" }, { id: "cursor", name: "Cursor" }] as PluginMeta[]
-const SHOP = { folder: "shop", tokens: 12_400_000, times: 5.6 }
+const SHOP = { folder: "shop", path: "C:\\work\\shop", tokens: 12_400_000, times: 5.6 }
 
 beforeEach(() => {
   vi.mocked(invoke).mockReset()
@@ -51,6 +51,14 @@ it("checks the cards with local logs and notifies a folder once an hour, not on 
   rerender({ settings: { ...DEFAULT_ALERT_SETTINGS, sound: "chime" } })
   await waitFor(() => expect(spikeCalls()).toHaveLength(2))
   expect(sendNotification).toHaveBeenCalledTimes(1)
+})
+
+it("tells apart two folders of the same name", async () => {
+  vi.mocked(invoke).mockImplementation(async (command) =>
+    command === "usage_spikes" ? [SHOP, { ...SHOP, path: "D:\\personal\\shop" }] : undefined
+  )
+  renderHook(() => useUsageSpikeAlerts({ pluginsMeta: META, enabledIds: ["claude"], enabled: true, settings: DEFAULT_ALERT_SETTINGS }))
+  await waitFor(() => expect(sendNotification).toHaveBeenCalledTimes(2))
 })
 
 it("reads nothing with notifications or spike alerts off", () => {

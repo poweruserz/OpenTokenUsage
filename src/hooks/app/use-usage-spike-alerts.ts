@@ -7,7 +7,7 @@ import type { PluginMeta } from "@/lib/plugin-types"
 import type { AlertSettings } from "@/lib/settings"
 
 /** `usage_spikes.rs`: a session using tokens far faster than usual right now. */
-export type Spike = { folder: string; tokens: number; times: number }
+export type Spike = { folder: string; path: string; tokens: number; times: number }
 
 /** How often the logs are checked; a spike is measured over the last 15 minutes. */
 export const SPIKE_CHECK_MS = 5 * 60_000
@@ -55,7 +55,8 @@ export function useUsageSpikeAlerts({
         const keys: string[] = []
         for (const id of ids) {
           for (const spike of await invoke<Spike[]>("usage_spikes", { pluginId: id })) {
-            const key = `${id}|${spike.folder}`
+            // By path: two folders of the same name are different work.
+            const key = `${id}|${spike.path}`
             const last = lastRef.current.get(key)
             // One per folder: a session and its sub-agents (each its own log) can all run hot at once.
             if (keys.includes(key) || (last !== undefined && Date.now() - last < SPIKE_REPEAT_MS)) continue

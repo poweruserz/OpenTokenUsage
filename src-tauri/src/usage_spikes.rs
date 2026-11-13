@@ -35,6 +35,8 @@ const QUARTER_SPOTS: i64 = 900 / SPOT_SECS;
 pub struct Spike {
     /// The folder the session worked in (its last path part).
     folder: String,
+    /// Its full path, which tells apart two folders of the same name.
+    path: String,
     /// Tokens the session used in that quarter hour.
     tokens: u64,
     /// How many times the usual busy quarter hour that is, by price-weighted tokens.
@@ -49,7 +51,7 @@ struct Spikes {
     /// Price-weighted tokens of every busy quarter hour of every session in the history.
     history: Vec<f64>,
     /// Each session active in the current or last quarter hour: its folder, tokens and weighted tokens.
-    recent: Vec<(String, u64, f64)>,
+    recent: Vec<(String, u64, f64)>, // (cwd, tokens, weighted)
 }
 
 impl Spikes {
@@ -89,7 +91,7 @@ impl Spikes {
                 .into_iter()
                 .max_by(|a, b| a.1.total_cmp(&b.1))
                 .map_or("", |(cwd, _)| cwd);
-            self.recent.push((folder_name(cwd), tokens, weighted));
+            self.recent.push((cwd.to_string(), tokens, weighted));
         }
     }
 
@@ -103,8 +105,9 @@ impl Spikes {
             .recent
             .into_iter()
             .filter(|(_, _, w)| *w >= MIN_WEIGHT && *w >= usual * FACTOR)
-            .map(|(folder, tokens, w)| Spike {
-                folder,
+            .map(|(path, tokens, w)| Spike {
+                folder: folder_name(&path),
+                path,
                 tokens,
                 times: w / usual,
             })
@@ -219,6 +222,7 @@ mod tests {
             find(&sessions),
             [Spike {
                 folder: "shop".into(),
+                path: "C:\\work\\shop".into(),
                 tokens: 1_200_000,
                 times: 12.0
             }]
