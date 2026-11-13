@@ -176,10 +176,15 @@ vi.mock("@tauri-apps/api/path", () => ({
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     setSize: state.setSizeMock,
+    setMinSize: vi.fn(async () => undefined),
+    setMaxSize: vi.fn(async () => undefined),
     setTheme: vi.fn(async () => undefined),
     setAlwaysOnTop: vi.fn(async () => undefined),
     outerPosition: vi.fn(async () => ({ x: 10, y: 20 })),
   }),
+  LogicalSize: class {
+    constructor(public width: number, public height: number) {}
+  },
   PhysicalSize: class {
     width: number
     height: number

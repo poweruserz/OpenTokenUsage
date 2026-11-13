@@ -18,6 +18,26 @@ import { cn } from "@/lib/utils"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { useAppUiStore } from "@/stores/app-ui-store"
 
+/**
+ * A strip along the panel's left or right edge that drags it wider or narrower (`usePanel` keeps the width).
+ * 4 px, so the right one stays clear of the scrollbar's thumb in the middle of its 12 px track.
+ */
+function ResizeEdge({ side }: { side: "West" | "East" }) {
+  return (
+    <div
+      aria-hidden
+      onMouseDown={(event) => {
+        if (event.button !== 0 || !isTauri()) return
+        event.preventDefault()
+        getCurrentWindow()
+          .startResizeDragging(side)
+          .catch((error) => console.error("Failed to resize the panel:", error))
+      }}
+      className={cn("absolute inset-y-0 z-30 w-1 cursor-ew-resize", side === "West" ? "left-0" : "right-0")}
+    />
+  )
+}
+
 type AppShellProps = {
   onRefreshAll: () => void
   navPlugins: NavPlugin[]
@@ -137,7 +157,9 @@ export function AppShell({
   const { updateStatus, triggerInstall, checkForUpdates } = appUpdate
 
   return (
-    <div ref={containerRef} tabIndex={-1} className="flex flex-col bg-background outline-none">
+    <div ref={containerRef} tabIndex={-1} className="relative flex flex-col bg-background outline-none">
+      <ResizeEdge side="West" />
+      <ResizeEdge side="East" />
       {/* A tall dialog (data-panel-dialog) makes a short panel grow while it's open; the window follows the content height. */}
       <div
         className="relative overflow-hidden select-none w-full flex flex-col has-[[data-panel-dialog]]:min-h-[470px]"
@@ -155,8 +177,9 @@ export function AppShell({
           />
           {/* NavigationView content layer: rounded top-left corner over the Mica base */}
           <div className="flex-1 flex flex-col px-3 pt-2 pb-1.5 min-w-0 bg-card border-t border-l rounded-tl-lg">
-            <div className="relative flex-1 min-h-0">
-              <div ref={scrollRef} className="h-full overflow-y-auto">
+            {/* Out to the card's edge, so the scrollbar sits there and the content keeps its right padding, as on the left. */}
+            <div className="relative flex-1 min-h-0 -mr-3">
+              <div ref={scrollRef} className="h-full overflow-y-auto pr-3">
                 <AppContent
                   {...appContentProps}
                   displayPlugins={displayPlugins}
@@ -165,7 +188,7 @@ export function AppShell({
                 />
               </div>
               <div
-                className={`pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-card to-transparent transition-opacity duration-200 ${canScrollDown ? "opacity-100" : "opacity-0"}`}
+                className={`pointer-events-none absolute left-0 right-3 bottom-0 h-14 bg-gradient-to-t from-card to-transparent transition-opacity duration-200 ${canScrollDown ? "opacity-100" : "opacity-0"}`}
               />
               <StarPromptCard />
             </div>

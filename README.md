@@ -63,7 +63,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
 
 ## What It Does
 
-- **One glance.** All your AI tools in one panel, opened from the tray or a global shortcut. Pin it above other windows, or have it open where you left it.
+- **One glance.** All your AI tools in one panel, opened from the tray or a global shortcut. Pin it above other windows, have it open where you left it, or drag its left or right edge to make it wider.
 - **Next to the clock.** The tray shows the app icon, a percent, bars, or one number or logo ring per provider.
 - **Taskbar strip (experimental).** Provider logos with session and weekly usage right in the taskbar, in your own fonts, colors and order, on one monitor or all of them.
 - **Pace.** Every limit says whether you're ahead or behind, and when it runs out at this rate. A weekly limit's pace can count work days only.

@@ -17,6 +17,7 @@ export const BACKUP_KEYS = [
   "menubarIconStyle",
   "paceWorkdays",
   "panelPinned",
+  "panelWidth",
   "plugins",
   "projectBudgets",
   "rememberPanelPosition",

@@ -163,6 +163,11 @@ This file holds the project facts that are easy to get wrong.
   strip keeps to the gaps between the buttons that `taskbar_strip/uia.rs` measures every second with UI
   Automation (Windows 11's Start, Widgets and app buttons are XAML, no windows to measure), on its own
   thread because those calls wait on Explorer.
+- Panel width: 400 to 560 logical px (`panelWidth`, in `BACKUP_KEYS`). `ResizeEdge` strips (4 px, clear of the scrollbar
+  thumb) call `startResizeDragging`; Windows holds the drag to those bounds (`setMinSize`/`setMaxSize`). `use-panel.ts`
+  sizes the window to that width and the content's height, and takes a width it didn't ask for (more than 1 px off) as
+  the user's drag: it follows it and saves it. The content's scroller reaches the card's right edge (`-mr-3`, `pr-3`)
+  so the scrollbar sits there and the content keeps the same 12 px on both sides.
 - Panel: the title bar pin (`panelPinned`) keeps it always on top. "Remember position": `tray.rs`
   records every position it sets itself (`place`); any other move while visible is the user's drag
   and is saved as `panelPosition` (outer top-left, physical px) in settings.json, then used by

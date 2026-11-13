@@ -12,6 +12,7 @@ import {
   alertLevelsFor,
   arePluginSettingsEqual,
   normalizeAlertSettings,
+  normalizePanelWidth,
   getEnabledPluginIds,
   loadAutoUpdateInterval,
   loadDisplayMode,
@@ -482,6 +483,15 @@ describe("alert settings", () => {
     expect(alertLevelsFor(settings, "cursor")).toEqual([])
     expect(alertLevelsFor(settings, "codex")).toEqual([80, 95])
     expect(normalizeAlertSettings(undefined).providerLevels).toEqual({})
+  })
+
+  it("keeps the panel width within its bounds, whole pixels", () => {
+    expect(normalizePanelWidth(undefined)).toBe(400)
+    expect(normalizePanelWidth("480")).toBe(400)
+    expect(normalizePanelWidth(Number.NaN)).toBe(400)
+    expect(normalizePanelWidth(300)).toBe(400)
+    expect(normalizePanelWidth(480.6)).toBe(481)
+    expect(normalizePanelWidth(9000)).toBe(560)
   })
 
   it("keeps usage spike notifications on unless they were turned off", () => {

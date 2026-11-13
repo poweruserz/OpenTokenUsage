@@ -56,6 +56,7 @@ const CURRENCY_KEY = "currency";
 const PROJECT_BUDGETS_KEY = "projectBudgets";
 const COLLAPSED_SECTIONS_KEY = "collapsedSections";
 const PANEL_PINNED_KEY = "panelPinned";
+const PANEL_WIDTH_KEY = "panelWidth";
 // Read by src-tauri/src/tray.rs, which also writes the position while the user drags the panel.
 const REMEMBER_PANEL_POSITION_KEY = "rememberPanelPosition";
 const PANEL_POSITION_KEY = "panelPosition";
@@ -526,6 +527,24 @@ async function saveBoolean(key: string, value: boolean): Promise<void> {
 /** Title bar pin: keep the panel above other windows. */
 export const loadPanelPinned = () => loadBoolean(PANEL_PINNED_KEY, false);
 export const savePanelPinned = (value: boolean) => saveBoolean(PANEL_PINNED_KEY, value);
+
+/** The panel's width in logical px: dragging its left or right edge makes it up to 40% wider. */
+export const PANEL_MIN_WIDTH = 400;
+export const PANEL_MAX_WIDTH = 560;
+
+export function normalizePanelWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return PANEL_MIN_WIDTH;
+  return Math.round(Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, value)));
+}
+
+export async function loadPanelWidth(): Promise<number> {
+  return normalizePanelWidth(await store.get<unknown>(PANEL_WIDTH_KEY));
+}
+
+export async function savePanelWidth(value: number): Promise<void> {
+  await store.set(PANEL_WIDTH_KEY, normalizePanelWidth(value));
+  await store.save();
+}
 
 /** Open the panel where the user last dragged it instead of above the taskbar (`tray.rs`). */
 export const loadRememberPanelPosition = () => loadBoolean(REMEMBER_PANEL_POSITION_KEY, false);
