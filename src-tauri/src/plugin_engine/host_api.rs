@@ -426,6 +426,7 @@ fn redact_body(body: &str) -> String {
         "workspace_id",
         "guardrail_id",
         "budget_id",
+        "user_email",
     ];
     for key in sensitive_keys {
         // Match "key": "value" or "key":"value"
@@ -438,6 +439,16 @@ fn redact_body(body: &str) -> String {
                 })
                 .to_string();
         }
+    }
+
+    // Muse's key endpoint: a name, a card (a string or an object) and a link that may carry a
+    // checkout session. Nothing of them is kept: first4...last4 would show a card's last digits.
+    if let Ok(re) = regex_lite::Regex::new(
+        r#""(user_full_name|payment_method|last_four|last4|action_url)":\s*(?:"[^"]*"|\{[^{}]*\})"#,
+    ) {
+        result = re
+            .replace_all(&result, |caps: &regex_lite::Captures| format!("\"{}\": \"[REDACTED]\"", &caps[1]))
+            .to_string();
     }
 
     // Reset inventories use a generic `id`; scope it to credit/grant arrays so model ids
@@ -4070,6 +4081,28 @@ mod tests {
             "email should show first4...last4, got: {}",
             redacted
         );
+    }
+
+    #[test]
+    fn redact_body_redacts_muse_key_endpoint_account_fields() {
+        let body = r#"{"action_url":"https://dev.meta.ai/checkout?session=cs_live_abcdef123456","api_key":"LLM|1234567890abcdefghij","has_payment_method":true,"is_subs_active":true,"payment_method":"Visa ending in 4242","card":{"payment_method":{"brand":"visa","exp":"12/30"},"last_four":"4242","last4":"4242"},"subs_tier_name":"Muse Code Everyday Usage","user_email":"jane@example.com","user_full_name":"Jonathan Example","subs_usage":{"weekly":{"used_percent":24}}}"#;
+        let redacted = redact_body(body);
+        for secret in [
+            "1234567890abcdefghij",
+            "4242",
+            "12/30",
+            "cs_live",
+            "jane@example.com",
+            "Jonathan",
+            "mple",
+        ] {
+            assert!(
+                !redacted.contains(secret),
+                "{secret} should be redacted, got: {redacted}"
+            );
+        }
+        assert!(redacted.contains("\"subs_tier_name\":\"Muse Code Everyday Usage\""));
+        assert!(redacted.contains("\"used_percent\":24"));
     }
 
     #[test]

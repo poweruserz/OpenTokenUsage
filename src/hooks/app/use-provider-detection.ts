@@ -12,6 +12,9 @@ type UseProviderDetectionArgs = {
   startBatch: (pluginIds?: string[]) => Promise<string[] | undefined>
 }
 
+/** Never probed nor turned on here, only by the user: Muse Code's only quota source is its key endpoint. */
+const MANUAL_ONLY = new Set(["muse"])
+
 /** Usage, or any error but "nothing set up": an expired login or a 429 still means the user has it. */
 function isFound(id: string, state: PluginState) {
   // Copilot signs in with the GitHub CLI's login, which any GitHub user has: only a Copilot plan proves Copilot.
@@ -35,7 +38,10 @@ export function useProviderDetection({
   const pending = useRef(new Set<string>())
 
   const detectProviders = useCallback(
-    async (ids: string[]) => {
+    async (allIds: string[]) => {
+      // One the user already turned on (a detection cut short and run again) is probed like any enabled card.
+      const disabled = new Set(useAppPluginStore.getState().pluginSettings?.disabled ?? allIds)
+      const ids = allIds.filter((id) => !MANUAL_ONLY.has(id) || !disabled.has(id))
       for (const id of ids) pending.current.add(id)
       setLoadingForPlugins(ids)
       try {

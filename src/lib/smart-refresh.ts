@@ -8,8 +8,10 @@ const IDLE_MINUTES = [2, 5, 10, 15]
 
 /** Fewest minutes between an account's checks. Anthropic budgets usage reads per login, shared with
  *  Claude Code's own reads and other monitors, and answers a read over it with a 1-hour wait; so
- *  Claude's cards (extra accounts and WSL logins too) ask at most every 10 minutes. */
-export const smartFloorMinutes = (pluginId: string): number => (/^claude(-|$)/.test(pluginId) ? 10 : 0)
+ *  Claude's cards (extra accounts and WSL logins too) ask at most every 10 minutes. Muse Code's
+ *  plugin reads its key endpoint at most every 5 minutes and keeps the answer in between. */
+export const smartFloorMinutes = (pluginId: string): number =>
+  /^claude(-|$)/.test(pluginId) ? 10 : pluginId === "muse" ? 5 : 0
 
 export type SmartSchedule = {
   signature: string | null

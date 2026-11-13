@@ -86,6 +86,16 @@ const FIXTURES: [string, PluginErrorKey][] = [
   ["Session expired. Run `kimi login` to authenticate.", "sessionExpiredRunAuth"],
   ["Not logged in. Run `kimi login` to authenticate.", "notLoggedInRun"],
   ["Token expired. Run `kimi login` to authenticate.", "tokenExpiredRunAuth"],
+  // muse
+  ["Not logged in. Run `muse login` to authenticate.", "notLoggedInRun"],
+  ["Session expired. Run `muse login` to log in again.", "sessionExpiredRun"],
+  [
+    "Couldn't read Muse Code's auth.json. Check its file permissions or log into Muse Code again.",
+    "authFileUnreadable",
+  ],
+  ["No active Muse Code subscription.", "noActiveSubscription"],
+  ["Muse Code quota data unavailable. Try again later.", "quotaUnavailable"],
+  ["Rate limited by Muse Code, retry in ~10m", "rateLimitedRetry"],
   // kiro
   ["Open Kiro and sign in, then try again.", "openAppSignIn"],
   ["Kiro session expired. Open Kiro and sign in again.", "productSessionExpiredOpenApp"],

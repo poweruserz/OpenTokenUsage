@@ -5,7 +5,7 @@ use std::process::Command;
 
 /// Login commands the bundled plugins tell the user to run. Error text can carry server strings,
 /// so only these exact commands are ever started.
-const ALLOWED_COMMANDS: [&str; 9] = [
+const ALLOWED_COMMANDS: [&str; 10] = [
     "claude",
     "codex",
     "droid",
@@ -15,6 +15,7 @@ const ALLOWED_COMMANDS: [&str; 9] = [
     "gh auth login",
     "grok login",
     "kimi login",
+    "muse login",
 ];
 
 fn is_allowed(command: &str) -> bool {

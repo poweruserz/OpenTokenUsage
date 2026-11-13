@@ -105,6 +105,20 @@ describe("useProviderDetection", () => {
     expect(settings()?.disabled).toEqual([])
   })
 
+  it("leaves Muse Code off without probing it: only the user turns it on", async () => {
+    const { hook, startBatch, detect } = setup(["claude", "muse"])
+    await detect()
+    expect(startBatch).toHaveBeenCalledWith(["claude"])
+    hook.rerender({ pluginStates: { claude: done({ data: usage("claude") }) } })
+    expect(savePluginSettingsMock).toHaveBeenCalledWith({ order: ["claude", "muse"], disabled: ["muse"] })
+
+    // A detection run again after the user turned Muse Code on probes it like any enabled card.
+    const again = setup(["claude", "muse"])
+    setSettings({ order: ["claude", "muse"], disabled: ["claude"] })
+    await again.detect()
+    expect(again.startBatch).toHaveBeenCalledWith(["claude", "muse"])
+  })
+
   it("decides each provider once, so turning one off later sticks", async () => {
     const { hook, detect } = setup(["claude"])
     await detect()

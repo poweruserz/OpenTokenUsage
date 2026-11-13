@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "muse",
+  "name": "Muse Code",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#0668E1",
+  "links": [
+    { "label": "Dashboard", "url": "https://dev.meta.ai" }
+  ],
+  "lines": [
+    { "type": "progress", "label": "Session", "scope": "overview", "primaryOrder": 1 },
+    { "type": "progress", "label": "Weekly", "scope": "overview", "period": "weekly", "primaryOrder": 2 }
+  ]
+}
