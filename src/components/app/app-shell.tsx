@@ -25,7 +25,7 @@ type EdgeDrag = { startX: number; startWidth: number; pending: number | null; bu
  * and sends one width at a time, the newest, so a fast drag never queues resizes. 4 px, so the right one stays
  * clear of the scrollbar's thumb in the middle of its 12 px track.
  */
-function ResizeEdge({
+export function ResizeEdge({
   side,
   width,
   resize,
@@ -57,7 +57,9 @@ function ResizeEdge({
     const state = drag.current
     if (!state) return
     drag.current = null
-    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
     state.done = true
     pump(state)
   }
@@ -73,12 +75,15 @@ function ResizeEdge({
       onPointerMove={(event) => {
         const state = drag.current
         if (!state) return
+        // The button came up where no pointerup reached us (another window took the mouse).
+        if ((event.buttons & 1) === 0) return end(event)
         const moved = event.screenX - state.startX
         state.pending = state.startWidth + (side === "East" ? moved : -moved)
         pump(state)
       }}
       onPointerUp={end}
       onPointerCancel={end}
+      onLostPointerCapture={end}
       className={cn("absolute inset-y-0 z-30 w-1 cursor-ew-resize touch-none", side === "West" ? "left-0" : "right-0")}
     />
   )

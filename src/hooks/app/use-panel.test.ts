@@ -399,7 +399,7 @@ describe("usePanel", () => {
       await act(async () => {
         await result.current.resizePanel(700, "West")
       })
-      expect(invokeMock).toHaveBeenCalledWith("resize_panel", { width: 560, keepRight: true })
+      expect(invokeMock).toHaveBeenCalledWith("resize_panel", { fromWidth: 480, width: 560, keepRight: true })
       expect(result.current.panelWidth()).toBe(560)
 
       // The same width again sends nothing; the next content resize keeps the new width.

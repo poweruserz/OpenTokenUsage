@@ -16,7 +16,7 @@
         "title": "OpenTokenUsage",
         "width": 400,
         "height": 500,
-        "resizable": true,
+        "resizable": false,
         "decorations": false,
         "transparent": true,
         "skipTaskbar": true,

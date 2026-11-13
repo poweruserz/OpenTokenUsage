@@ -86,9 +86,15 @@ export function usePanel({
    */
   const resizePanel = useCallback(async (width: number, side: "West" | "East") => {
     const next = normalizePanelWidth(width)
-    if (next === widthRef.current) return
+    const previous = widthRef.current
+    if (next === previous) return
     widthRef.current = next
-    await invoke("resize_panel", { width: next, keepRight: side === "West" })
+    try {
+      await invoke("resize_panel", { fromWidth: previous, width: next, keepRight: side === "West" })
+    } catch (error) {
+      widthRef.current = previous
+      throw error
+    }
   }, [])
   const panelWidth = useCallback(() => widthRef.current, [])
   const keepPanelWidth = useCallback(() => {
@@ -187,7 +193,6 @@ export function usePanel({
 
     const resizeWindow = async () => {
       const factor = window.devicePixelRatio
-      const width = Math.ceil(widthRef.current * factor)
       const desiredHeightLogical = Math.max(1, container.scrollHeight)
 
       let maxHeightPhysical: number | null = null
@@ -219,6 +224,8 @@ export function usePanel({
 
       try {
         const win = getCurrentWindow()
+        // Read after the await above: an edge drag may have changed the width meanwhile.
+        const width = Math.ceil(widthRef.current * factor)
         await win.setSize(new PhysicalSize(width, height))
 
         // Re-anchor the window so its bottom edge stays near the taskbar after every resize.

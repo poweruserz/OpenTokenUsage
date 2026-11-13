@@ -614,19 +614,23 @@ fn fit_into(x: i32, y: i32, width: i32, height: i32, area: (i32, i32, i32, i32))
 }
 
 /// Where the panel's left edge goes when an edge drag makes it `new_width` wide (physical px): it stays for the
-/// right edge; for the left one the right edge stays.
-fn edge_resize_x(x: i32, width: i32, new_width: i32, keep_right: bool) -> i32 {
-    if keep_right {
-        x + width - new_width
-    } else {
-        x
-    }
+/// right edge; for the left one the right edge stays. Kept inside the work area the way `anchor_panel` would, so
+/// the re-anchor after the resize doesn't move it a second time.
+fn edge_resize_x(
+    x: i32,
+    width: i32,
+    new_width: i32,
+    keep_right: bool,
+    area: (i32, i32, i32, i32),
+) -> i32 {
+    let x = if keep_right { x + width - new_width } else { x };
+    x.min(area.2 - new_width).max(area.0)
 }
 
 /// An edge drag (`resize_panel`): the panel `width` logical px wide, in one SetWindowPos (a size and then a
 /// position would show it growing the wrong way for a frame). The move is ours, not a drag of the panel; with
-/// "Remember position" on, a left-edge drag also moves the remembered spot.
-pub fn resize_panel(window: &tauri::WebviewWindow, width: f64, keep_right: bool) {
+/// "Remember position" on, a move of the left edge also moves the remembered spot.
+pub fn resize_panel(window: &tauri::WebviewWindow, from_width: f64, width: f64, keep_right: bool) {
     use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
     let (Ok(pos), Ok(size), Ok(scale), Ok(hwnd)) = (
         window.outer_position(),
@@ -636,9 +640,28 @@ pub fn resize_panel(window: &tauri::WebviewWindow, width: f64, keep_right: bool)
     ) else {
         return;
     };
+    let Some(monitor) = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten())
+    else {
+        return;
+    };
     // The same rounding as the frontend's setSize, so the next content resize keeps this width.
     let new_width = (width * scale).ceil() as i32;
-    let x = edge_resize_x(pos.x, size.width as i32, new_width, keep_right);
+    // The width the frontend last set, not the window's: its setSize is async and can land after this sync
+    // command, leaving the window at an older width for a moment (the left edge stays right, though).
+    let old_width = (from_width * scale).ceil() as i32;
+    let x = edge_resize_x(
+        pos.x,
+        old_width,
+        new_width,
+        keep_right,
+        work_area_of(&monitor),
+    );
+    // Checked at the old width, before the move.
+    let remembered = remembered_position(window);
     if let Ok(mut slot) = placed_slot().lock() {
         *slot = Some((x, pos.y));
     }
@@ -653,11 +676,13 @@ pub fn resize_panel(window: &tauri::WebviewWindow, width: f64, keep_right: bool)
             SWP_NOZORDER | SWP_NOACTIVATE,
         );
     }
-    if keep_right {
+    // The remembered spot moves with the left edge; its y, and a spot that is gone or off screen, stay as they are.
+    if let (Some((saved_x, saved_y)), true) = (remembered, x != pos.x) {
         if let Some(store) = remember_position_store(window.app_handle()) {
-            if store.get(PANEL_POSITION_KEY).is_some() {
-                store.set(PANEL_POSITION_KEY, serde_json::json!({ "x": x, "y": pos.y }));
-            }
+            store.set(
+                PANEL_POSITION_KEY,
+                serde_json::json!({ "x": saved_x + x - pos.x, "y": saved_y }),
+            );
         }
     }
 }
@@ -887,9 +912,12 @@ mod flyout_tests {
     #[test]
     fn an_edge_drag_keeps_the_other_edge() {
         // 500 px at x 1000, made 600 wide: the left edge stays for the right one, the right edge for the left.
-        assert_eq!(super::edge_resize_x(1000, 500, 600, false), 1000);
-        assert_eq!(super::edge_resize_x(1000, 500, 600, true), 900);
-        assert_eq!(super::edge_resize_x(1000, 600, 500, true), 1100);
+        assert_eq!(super::edge_resize_x(1000, 500, 600, false, AREA), 1000);
+        assert_eq!(super::edge_resize_x(1000, 500, 600, true, AREA), 900);
+        assert_eq!(super::edge_resize_x(1000, 600, 500, true, AREA), 1100);
+        // At the screen's edges the panel grows the other way instead of sticking out.
+        assert_eq!(super::edge_resize_x(2148, 400, 500, false, AREA), 2060);
+        assert_eq!(super::edge_resize_x(20, 400, 500, true, AREA), 0);
     }
 
     #[test]
