@@ -128,18 +128,18 @@ jobs:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: ${{ env.RELEASE_TAG }}
           releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: false
+          # Releases are immutable (repo setting): a published release takes no more assets, so tauri-action
+          # fills a draft and the last step publishes it. A re-run finds the same draft by its tag.
+          releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
 
-      # Signed build provenance for the setup the release now holds (the same file tauri-action uploaded; named
+      # Signed build provenance for the setup the draft now holds (the same file tauri-action uploaded; named
       # in full, as the rust cache could bring back an older setup):
       # `gh attestation verify <setup.exe> -R PowerUserZ/OpenTokenUsage` shows it was built here, from this tag.
-      # No storage record: those exist only for organization-owned repositories. The release is already public
-      # here, so a failure (a Sigstore or API outage) is left as a failed step rather than stopping the checks and
-      # WinGet; a re-run would rebuild and replace the setup people may have downloaded.
+      # No storage record: those exist only for organization-owned repositories. A failure leaves the draft
+      # unpublished, so no release goes out without it.
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        continue-on-error: true
         with:
           subject-path: src-tauri/target/release/bundle/nsis/OpenTokenUsage_${{ steps.version.outputs.version }}_x64-setup.exe
           create-storage-record: false
@@ -156,14 +156,31 @@ jobs:
           printf '%s\n' "$ASSETS" | grep -Eq '\.sig$' || { echo "Missing updater signatures (.sig)"; exit 1; }
 
           # MSI installs look up windows-x86_64-msi, then windows-x86_64: both must lead to the NSIS setup.
+          # A draft's asset URLs say "untagged-…" (dead once published); tauri-action rewrites them to the tag.
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir "$RUNNER_TEMP" --clobber
           node -e '
             const p = require(process.argv[1]).platforms;
-            if (p["windows-x86_64-msi"] || !p["windows-x86_64"]?.url.endsWith("-setup.exe")) {
+            const url = p["windows-x86_64"]?.url ?? "";
+            if (p["windows-x86_64-msi"] || !url.endsWith("-setup.exe")) {
               console.error("latest.json must send every Windows install to the NSIS setup.exe:", Object.keys(p));
               process.exit(1);
             }
+            if (!url.includes("/download/" + process.env.RELEASE_TAG + "/")) {
+              console.error("latest.json must point at this tag, not at the draft:", url);
+              process.exit(1);
+            }
           ' "$RUNNER_TEMP/latest.json"
+
+      # Last, once everything above passed: publishing makes the release immutable (its assets and tag can't
+      # change any more) and the in-app updater's releases/latest/download/latest.json moves to it.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          # The token can't read the repository setting, so ask the published release: the README promises immutable ones.
+          [ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq .isImmutable)" = true ] ||
+            echo "::warning::$RELEASE_TAG was published mutable: turn on immutable releases in the repository settings."
 
   # Auto-submit a winget-pkgs update PR for each release. No-ops unless the
   # WINGET_TOKEN secret (a classic PAT with public_repo + workflow) is configured.

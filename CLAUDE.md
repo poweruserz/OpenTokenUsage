@@ -269,7 +269,11 @@ This file holds the project facts that are easy to get wrong.
 - Release: bump the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
   (+ `Cargo.lock`), add a `## vX.Y.Z` section to `CHANGELOG.md` (required: it becomes the release
   body the in-app changelog shows), then push a `v*` tag → `publish.yml` (windows-latest) builds
-  the NSIS setup and signs updater artifacts with the `TAURI_SIGNING_*` repo secrets. The updater points
+  the NSIS setup and signs updater artifacts with the `TAURI_SIGNING_*` repo secrets. Releases are immutable
+  (repo setting, from 0.8.7): tauri-action fills a draft, `actions/attest` records build provenance for the setup,
+  the asset checks run, and only then does the job publish the draft. A published release's assets and tag can never
+  change: fix a bad release with a new version, never by re-uploading or moving the tag. A run that failed before
+  publishing: "Re-run failed jobs" (tauri-action reuses the draft); after publishing, never "Re-run all jobs". The updater points
   at this fork's `latest.json`, never upstream's. `git fetch upstream` must not bring upstream's
   Swift `v0.7.x` tags (`remote.upstream.tagOpt --no-tags`).
 - Workflow actions are pinned to full commit SHAs (version in a comment) and Bun to an exact

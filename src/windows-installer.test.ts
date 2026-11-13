@@ -27,8 +27,18 @@ it("keeps MSI removal and notifications working after the identifier change", ()
 
 it("fails the release if an MSI ships or latest.json points elsewhere", () => {
   expect(publish).toContain("Unexpected MSI (.msi)")
-  expect(publish).toContain('!p["windows-x86_64"]?.url.endsWith("-setup.exe")')
+  expect(publish).toContain('const url = p["windows-x86_64"]?.url ?? ""')
+  expect(publish).toContain('!url.endsWith("-setup.exe")')
   // WinGet gets the same per-user setup, never an MSI.
   expect(publish).toContain("installers-regex: 'OpenTokenUsage_.*_x64-setup\\.exe$'")
   expect(publish).not.toMatch(/installers-regex:.*\.msi/)
+})
+
+it("publishes the release only once it is complete (immutable releases)", () => {
+  // A published immutable release takes no more assets: tauri-action fills a draft, the job publishes it last.
+  expect(publish).toContain("releaseDraft: true")
+  expect(publish).toContain('!url.includes("/download/" + process.env.RELEASE_TAG + "/")')
+  expect(publish).toContain('gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false')
+  expect(publish.indexOf("--draft=false")).toBeGreaterThan(publish.indexOf("Verify Windows installers uploaded"))
+  expect(publish.indexOf("--draft=false")).toBeGreaterThan(publish.indexOf("actions/attest@"))
 })

@@ -16,7 +16,7 @@ on Claude Code, Codex, Cursor, Copilot and 15 more AI coding tools.
 
 </div>
 
-![The OpenTokenUsage panel above the Windows 11 taskbar, with Claude, Codex and Cursor usage next to the clock](docs/images/hero.webp)
+![The OpenTokenUsage panel above the Windows 11 taskbar, with Claude, Codex and Cursor usage next to the clock, over the logos of all 19 providers and the WinGet install command](docs/images/hero.webp)
 
 OpenTokenUsage sits in the notification area and reads your usage with the sign-in each tool already keeps on your PC. No API keys to paste for Claude or Codex, no dashboards to dig through, no mental math: one glance shows how much is left, when it resets, and whether it lasts until then.
 
@@ -47,11 +47,14 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
   Get-FileHash .\OpenTokenUsage_<version>_x64-setup.exe
   ```
 
-  From 0.8.7 on, GitHub also keeps a signed build provenance record for each setup, filed under its SHA-256 (nothing is added to the file itself). With the [GitHub CLI](https://cli.github.com/), this shows the setup was built by this repository's release workflow:
+- **Releases can't be changed.** From 0.8.7 on, releases are immutable: once published, a release's files and tag are locked, so a download can't be swapped later. GitHub also keeps signed records for each setup, filed under its SHA-256 (nothing is added to the file itself). With the [GitHub CLI](https://cli.github.com/):
 
   ```powershell
+  # The file is the one published in that release:
+  gh release verify-asset v<version> .\OpenTokenUsage_<version>_x64-setup.exe -R PowerUserZ/OpenTokenUsage
+  # It was built by this repository's release workflow:
   gh attestation verify .\OpenTokenUsage_<version>_x64-setup.exe -R PowerUserZ/OpenTokenUsage `
-    --signer-workflow PowerUserZ/OpenTokenUsage/.github/workflows/publish.yml
+    --signer-workflow poweruserz/OpenTokenUsage/.github/workflows/publish.yml
   ```
 
 - **Signed updates.** The app installs an update only if it's signed with the release key whose public half is built into the app.
