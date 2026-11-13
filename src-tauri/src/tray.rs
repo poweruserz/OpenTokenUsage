@@ -630,7 +630,12 @@ fn edge_resize_x(
 /// An edge drag (`resize_panel`): the panel `width` logical px wide, in one SetWindowPos (a size and then a
 /// position would show it growing the wrong way for a frame). The move is ours, not a drag of the panel; with
 /// "Remember position" on, a move of the left edge also moves the remembered spot.
-pub fn resize_panel(window: &tauri::WebviewWindow, from_width: f64, width: f64, keep_right: bool) {
+pub fn resize_panel(
+    window: &tauri::WebviewWindow,
+    from_width: f64,
+    width: f64,
+    keep_right: Option<bool>,
+) {
     use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
     let (Ok(pos), Ok(size), Ok(scale), Ok(hwnd)) = (
         window.outer_position(),
@@ -653,6 +658,13 @@ pub fn resize_panel(window: &tauri::WebviewWindow, from_width: f64, width: f64, 
     // The width the frontend last set, not the window's: its setSize is async and can land after this sync
     // command, leaving the window at an older width for a moment (the left edge stays right, though).
     let old_width = (from_width * scale).ceil() as i32;
+    // Checked at the old width, before the move.
+    let remembered = remembered_position(window);
+    // An edge drag names the edge that stays. A view change (settings is wider) keeps the one the re-anchor after it
+    // keeps, the left at a remembered spot and the right near the tray, and never moves the remembered spot, so
+    // leaving settings puts the panel back.
+    let dragged = keep_right.is_some();
+    let keep_right = keep_right.unwrap_or(remembered.is_none());
     let x = edge_resize_x(
         pos.x,
         old_width,
@@ -660,8 +672,6 @@ pub fn resize_panel(window: &tauri::WebviewWindow, from_width: f64, width: f64, 
         keep_right,
         work_area_of(&monitor),
     );
-    // Checked at the old width, before the move.
-    let remembered = remembered_position(window);
     if let Ok(mut slot) = placed_slot().lock() {
         *slot = Some((x, pos.y));
     }
@@ -677,7 +687,7 @@ pub fn resize_panel(window: &tauri::WebviewWindow, from_width: f64, width: f64, 
         );
     }
     // The remembered spot moves with the left edge; its y, and a spot that is gone or off screen, stay as they are.
-    if let (Some((saved_x, saved_y)), true) = (remembered, x != pos.x) {
+    if let (Some((saved_x, saved_y)), true) = (remembered, dragged && x != pos.x) {
         if let Some(store) = remember_position_store(window.app_handle()) {
             store.set(
                 PANEL_POSITION_KEY,

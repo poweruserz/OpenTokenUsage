@@ -212,8 +212,13 @@ export function AppShell({
 
   return (
     <div ref={containerRef} tabIndex={-1} className="relative flex flex-col bg-background outline-none">
-      <ResizeEdge side="West" width={panelWidth} resize={resizePanel} keep={keepPanelWidth} />
-      <ResizeEdge side="East" width={panelWidth} resize={resizePanel} keep={keepPanelWidth} />
+      {/* Settings has its own, wider width (two columns). */}
+      {activeView !== "settings" && (
+        <>
+          <ResizeEdge side="West" width={panelWidth} resize={resizePanel} keep={keepPanelWidth} />
+          <ResizeEdge side="East" width={panelWidth} resize={resizePanel} keep={keepPanelWidth} />
+        </>
+      )}
       {/* A tall dialog (data-panel-dialog) makes a short panel grow while it's open; the window follows the content height. */}
       <div
         className="relative overflow-hidden select-none w-full flex flex-col has-[[data-panel-dialog]]:min-h-[470px]"

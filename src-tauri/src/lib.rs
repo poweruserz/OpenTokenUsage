@@ -185,17 +185,17 @@ fn reanchor_window(app_handle: tauri::AppHandle) {
     }
 }
 
-/// An edge drag on the panel (`ResizeEdge`): from `from_width` to `width` logical px, both within the bounds
-/// `normalizePanelWidth` keeps.
+/// The panel from `from_width` to `width` logical px: an edge drag (`ResizeEdge`, `keep_right` set) within the
+/// bounds `normalizePanelWidth` keeps, or into or out of the settings view (760 px, `SETTINGS_PANEL_WIDTH`).
 #[tauri::command]
 fn resize_panel(
     app_handle: tauri::AppHandle,
     from_width: f64,
     width: f64,
-    keep_right: bool,
+    keep_right: Option<bool>,
 ) -> Result<(), String> {
     use tauri::Manager;
-    let bounds = 400.0..=560.0;
+    let bounds = 400.0..=760.0;
     if !bounds.contains(&width) || !bounds.contains(&from_width) {
         return Err("invalid width".into());
     }

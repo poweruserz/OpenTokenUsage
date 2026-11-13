@@ -4,7 +4,13 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWindow, PhysicalSize, currentMonitor } from "@tauri-apps/api/window"
 import type { ActiveView } from "@/components/side-nav"
 import type { DisplayPluginState } from "@/hooks/app/use-app-plugin-views"
-import { loadPanelWidth, normalizePanelWidth, PANEL_MIN_WIDTH, savePanelWidth } from "@/lib/settings"
+import {
+  loadPanelWidth,
+  normalizePanelWidth,
+  PANEL_MIN_WIDTH,
+  savePanelWidth,
+  SETTINGS_PANEL_WIDTH,
+} from "@/lib/settings"
 
 const MAX_HEIGHT_FALLBACK_PX = 600
 const MAX_HEIGHT_FRACTION_OF_MONITOR = 0.8
@@ -42,6 +48,8 @@ export function usePanel({
   const maxPanelHeightPxRef = useRef<number | null>(null)
   // The width (logical px) the panel keeps: read from settings before the first resize, changed by an edge drag.
   const widthRef = useRef(PANEL_MIN_WIDTH)
+  // The width (logical px) the window was last given: the kept width, or the settings view's.
+  const shownWidthRef = useRef<number | null>(null)
   const [widthReady, setWidthReady] = useState(false)
   const focusContainer = useCallback(() => {
     window.requestAnimationFrame(() => {
@@ -89,10 +97,12 @@ export function usePanel({
     const previous = widthRef.current
     if (next === previous) return
     widthRef.current = next
+    shownWidthRef.current = next
     try {
       await invoke("resize_panel", { fromWidth: previous, width: next, keepRight: side === "West" })
     } catch (error) {
       widthRef.current = previous
+      shownWidthRef.current = previous
       throw error
     }
   }, [])
@@ -191,6 +201,7 @@ export function usePanel({
     const container = containerRef.current
     if (!container) return
 
+    let disposed = false
     const resizeWindow = async () => {
       const factor = window.devicePixelRatio
       const desiredHeightLogical = Math.max(1, container.scrollHeight)
@@ -207,6 +218,7 @@ export function usePanel({
       } catch {
         // fall through to fallback
       }
+      if (disposed) return // a run from before a view change; the new view's runs size the panel
 
       if (maxHeightLogical === null) {
         const screenAvailHeight = Number(window.screen?.availHeight) || MAX_HEIGHT_FALLBACK_PX
@@ -225,8 +237,14 @@ export function usePanel({
       try {
         const win = getCurrentWindow()
         // Read after the await above: an edge drag may have changed the width meanwhile.
-        const width = Math.ceil(widthRef.current * factor)
-        await win.setSize(new PhysicalSize(width, height))
+        const logicalWidth = activeView === "settings" ? SETTINGS_PANEL_WIDTH : widthRef.current
+        const shown = shownWidthRef.current
+        shownWidthRef.current = logicalWidth
+        if (shown !== null && shown !== logicalWidth) {
+          // Into or out of settings: the host moves the edge the panel's spot needs; setSize then sets the height.
+          await invoke("resize_panel", { fromWidth: shown, width: logicalWidth })
+        }
+        await win.setSize(new PhysicalSize(Math.ceil(logicalWidth * factor), height))
 
         // Re-anchor the window so its bottom edge stays near the taskbar after every resize.
         await invoke("reanchor_window")
@@ -239,7 +257,10 @@ export function usePanel({
     resizeWindow()
     const observer = new ResizeObserver(() => resizeWindow())
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      disposed = true
+      observer.disconnect()
+    }
   }, [activeView, displayPlugins, widthReady])
 
   useEffect(() => {

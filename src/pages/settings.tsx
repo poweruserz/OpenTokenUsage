@@ -732,210 +732,214 @@ export function SettingsPage({
   };
 
   return (
-    <div className="py-2 space-y-1">
-      <SettingsSection title={t("settings.autoRefresh.title")} description={t("settings.autoRefresh.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.autoRefresh.title")}
-          options={AUTO_UPDATE_OPTIONS}
-          value={autoUpdateInterval}
-          onChange={onAutoUpdateIntervalChange}
-        />
-        {autoUpdateInterval === "smart" && (
-          <p className="mt-2 text-xs text-muted-foreground">{t("settings.autoRefresh.smartHint")}</p>
-        )}
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.usageMode.title")} description={t("settings.usageMode.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.usageMode.title")}
-          options={DISPLAY_MODE_OPTIONS}
-          value={displayMode}
-          onChange={onDisplayModeChange}
-        />
-        <PaceWorkdaysToggle />
-      </SettingsSection>
-
-      <CurrencySection />
-
-      <SettingsSection title={t("settings.resetTimers.title")} description={t("settings.resetTimers.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.resetTimers.title")}
-          options={RESET_TIMER_DISPLAY_OPTIONS}
-          value={resetTimerDisplayMode}
-          onChange={onResetTimerDisplayModeChange}
-          itemClassName="h-auto py-1"
-          renderOption={(option, isActive) => (
-            <OptionWithExample
-              label={t(option.labelKey)}
-              isActive={isActive}
-              example={
-                option.value === "relative"
-                  ? t("duration.hm", { h: 5, m: 12 })
-                  : t("settings.resetTimers.todayAt", { time: getTimeFormatter(timeFormatMode).format(EXAMPLE_TIME) })
-              }
-            />
-          )}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.timeFormat.title")} description={t("settings.timeFormat.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.timeFormat.title")}
-          options={TIME_FORMAT_OPTIONS}
-          value={timeFormatMode}
-          onChange={onTimeFormatModeChange}
-          itemClassName="h-auto py-1"
-          renderOption={(option, isActive) => (
-            <OptionWithExample
-              label={t(option.labelKey)}
-              isActive={isActive}
-              example={getTimeFormatter(option.value).format(EXAMPLE_TIME)}
-            />
-          )}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.tray.title")} description={t("settings.tray.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.tray.title")}
-          options={MENUBAR_ICON_STYLE_OPTIONS}
-          value={menubarIconStyle}
-          onChange={handleMenubarIconStyleChange}
-          itemClassName="h-9 flex items-center justify-center"
-          renderOption={(option) => (
-            <TrayIconStylePreview style={option.value} traySettingsPreview={traySettingsPreview} />
-          )}
-        />
-        {menubarIconStyle !== "icon" && (
-          <div className="flex gap-2 mt-2">
-            {!isPerProviderTrayStyle(menubarIconStyle) && (
-            <label className="flex-1 text-xs text-muted-foreground">
-              <span className="mb-1 block">{t("settings.tray.provider")}</span>
-              <select
-                aria-label={t("settings.tray.provider")}
-                value={trayProvider}
-                onChange={(e) => onTrayProviderChange(e.target.value)}
-                className="fluent-control w-full"
-              >
-                <option value="auto">{t("settings.tray.auto")}</option>
-                <option value="tightest">{t("settings.tray.tightest")}</option>
-                {plugins.filter((p) => p.enabled).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </label>
-            )}
-            <label className="flex-1 text-xs text-muted-foreground">
-              <span className="mb-1 block">{t("settings.tray.metric")}</span>
-              <select
-                aria-label={t("settings.tray.metric")}
-                value={trayMetric}
-                onChange={(e) => onTrayMetricChange(e.target.value)}
-                className="fluent-control w-full"
-              >
-                <option value="auto">{t("settings.tray.auto")}</option>
-                <option value="Session">{t("label.Session")}</option>
-                <option value="Weekly">{t("label.Weekly")}</option>
-              </select>
-            </label>
-            {menubarIconStyle === "percent" && trayPercentColor !== TRAY_PACE_COLOR && (
-              <label className="w-14 text-xs text-muted-foreground">
-                <span className="mb-1 block">{t("settings.tray.color")}</span>
-                <input
-                  type="color"
-                  value={trayPercentColor}
-                  onChange={(e) => onTrayPercentColorChange(e.target.value)}
-                  className="fluent-control w-full cursor-pointer px-1"
-                  title={t("settings.tray.colorTitle")}
-                />
-              </label>
-            )}
-          </div>
-        )}
-        {menubarIconStyle === "percent" && (
-          <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
-            <Checkbox
-              key={`tray-pace-color-${trayPercentColor === TRAY_PACE_COLOR}`}
-              checked={trayPercentColor === TRAY_PACE_COLOR}
-              className="mt-0.5"
-              onCheckedChange={(checked) =>
-                onTrayPercentColorChange(checked === true ? TRAY_PACE_COLOR : DEFAULT_TRAY_PERCENT_COLOR)
-              }
-            />
-            <span>
-              {t("settings.tray.paceColor")}
-              <span className="block text-xs text-muted-foreground">{t("settings.tray.paceColorHint")}</span>
-            </span>
-          </label>
-        )}
-        {menubarIconStyle === "logos" && <TrayLogoColorsToggle />}
-        {isPerProviderTrayStyle(menubarIconStyle) && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t("settings.tray.perProviderHint")}{" "}
-            <button
-              type="button"
-              className="text-primary underline-offset-2 hover:underline"
-              onClick={() => invoke("open_taskbar_settings").catch((e) => console.error("open_taskbar_settings failed:", e))}
-            >
-              {t("settings.tray.openTaskbarSettings")}
-            </button>
-          </p>
-        )}
-      </SettingsSection>
-
-      <TaskbarStripSection onMenubarIconStyleChange={onMenubarIconStyleChange} />
-
-      <SettingsSection title={t("settings.theme.title")} description={t("settings.theme.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.theme.title")}
-          options={THEME_OPTIONS}
-          value={themeMode}
-          onChange={onThemeModeChange}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.plugins.title")} description={t("settings.plugins.desc")}>
-        <div className="-mx-1">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={sortedPlugins.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-              {sortedPlugins.map((plugin) => (
-                <SortablePluginItem
-                  key={plugin.id}
-                  plugin={plugin}
-                  onToggle={onToggle}
-                  inTray={!trayHiddenPlugins.includes(plugin.id)}
-                  onToggleTray={handleToggleTray}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-      </SettingsSection>
-
-      <AccountsSection onAccountsChanged={onAccountsChanged} />
-
-      <ClaudeCodeSection />
-
-      <LanguageSection />
-
-      <GlobalShortcutSection globalShortcut={globalShortcut} onGlobalShortcutChange={onGlobalShortcutChange} />
-
-      <PanelSection />
-
-      <NotificationsSection plugins={plugins} />
-
-      <SettingsSection title={t("settings.startOnLogin.title")} description={t("settings.startOnLogin.desc")}>
-        <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
-          <Checkbox
-            key={`start-on-login-${startOnLogin}`}
-            checked={startOnLogin}
-            onCheckedChange={(checked) => onStartOnLoginChange(checked === true)}
+    <div className="py-2 grid grid-cols-2 items-start gap-1">
+      {/* The wider settings view (SETTINGS_PANEL_WIDTH): how usage shows, language and shortcut on the left; providers, accounts, alerts and the app on the right. */}
+      <div className="min-w-0 space-y-1">
+        <SettingsSection title={t("settings.autoRefresh.title")} description={t("settings.autoRefresh.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.autoRefresh.title")}
+            options={AUTO_UPDATE_OPTIONS}
+            value={autoUpdateInterval}
+            onChange={onAutoUpdateIntervalChange}
           />
-          {t("settings.startOnLogin.label")}
-        </label>
-      </SettingsSection>
+          {autoUpdateInterval === "smart" && (
+            <p className="mt-2 text-xs text-muted-foreground">{t("settings.autoRefresh.smartHint")}</p>
+          )}
+        </SettingsSection>
 
-      <SettingsBackupSection />
+        <SettingsSection title={t("settings.usageMode.title")} description={t("settings.usageMode.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.usageMode.title")}
+            options={DISPLAY_MODE_OPTIONS}
+            value={displayMode}
+            onChange={onDisplayModeChange}
+          />
+          <PaceWorkdaysToggle />
+        </SettingsSection>
+
+        <CurrencySection />
+
+        <SettingsSection title={t("settings.resetTimers.title")} description={t("settings.resetTimers.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.resetTimers.title")}
+            options={RESET_TIMER_DISPLAY_OPTIONS}
+            value={resetTimerDisplayMode}
+            onChange={onResetTimerDisplayModeChange}
+            itemClassName="h-auto py-1"
+            renderOption={(option, isActive) => (
+              <OptionWithExample
+                label={t(option.labelKey)}
+                isActive={isActive}
+                example={
+                  option.value === "relative"
+                    ? t("duration.hm", { h: 5, m: 12 })
+                    : t("settings.resetTimers.todayAt", { time: getTimeFormatter(timeFormatMode).format(EXAMPLE_TIME) })
+                }
+              />
+            )}
+          />
+        </SettingsSection>
+
+        <SettingsSection title={t("settings.timeFormat.title")} description={t("settings.timeFormat.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.timeFormat.title")}
+            options={TIME_FORMAT_OPTIONS}
+            value={timeFormatMode}
+            onChange={onTimeFormatModeChange}
+            itemClassName="h-auto py-1"
+            renderOption={(option, isActive) => (
+              <OptionWithExample
+                label={t(option.labelKey)}
+                isActive={isActive}
+                example={getTimeFormatter(option.value).format(EXAMPLE_TIME)}
+              />
+            )}
+          />
+        </SettingsSection>
+
+        <SettingsSection title={t("settings.tray.title")} description={t("settings.tray.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.tray.title")}
+            options={MENUBAR_ICON_STYLE_OPTIONS}
+            value={menubarIconStyle}
+            onChange={handleMenubarIconStyleChange}
+            itemClassName="h-9 flex items-center justify-center"
+            renderOption={(option) => (
+              <TrayIconStylePreview style={option.value} traySettingsPreview={traySettingsPreview} />
+            )}
+          />
+          {menubarIconStyle !== "icon" && (
+            <div className="flex gap-2 mt-2">
+              {!isPerProviderTrayStyle(menubarIconStyle) && (
+              <label className="flex-1 text-xs text-muted-foreground">
+                <span className="mb-1 block">{t("settings.tray.provider")}</span>
+                <select
+                  aria-label={t("settings.tray.provider")}
+                  value={trayProvider}
+                  onChange={(e) => onTrayProviderChange(e.target.value)}
+                  className="fluent-control w-full"
+                >
+                  <option value="auto">{t("settings.tray.auto")}</option>
+                  <option value="tightest">{t("settings.tray.tightest")}</option>
+                  {plugins.filter((p) => p.enabled).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </label>
+              )}
+              <label className="flex-1 text-xs text-muted-foreground">
+                <span className="mb-1 block">{t("settings.tray.metric")}</span>
+                <select
+                  aria-label={t("settings.tray.metric")}
+                  value={trayMetric}
+                  onChange={(e) => onTrayMetricChange(e.target.value)}
+                  className="fluent-control w-full"
+                >
+                  <option value="auto">{t("settings.tray.auto")}</option>
+                  <option value="Session">{t("label.Session")}</option>
+                  <option value="Weekly">{t("label.Weekly")}</option>
+                </select>
+              </label>
+              {menubarIconStyle === "percent" && trayPercentColor !== TRAY_PACE_COLOR && (
+                <label className="w-14 text-xs text-muted-foreground">
+                  <span className="mb-1 block">{t("settings.tray.color")}</span>
+                  <input
+                    type="color"
+                    value={trayPercentColor}
+                    onChange={(e) => onTrayPercentColorChange(e.target.value)}
+                    className="fluent-control w-full cursor-pointer px-1"
+                    title={t("settings.tray.colorTitle")}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+          {menubarIconStyle === "percent" && (
+            <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
+              <Checkbox
+                key={`tray-pace-color-${trayPercentColor === TRAY_PACE_COLOR}`}
+                checked={trayPercentColor === TRAY_PACE_COLOR}
+                className="mt-0.5"
+                onCheckedChange={(checked) =>
+                  onTrayPercentColorChange(checked === true ? TRAY_PACE_COLOR : DEFAULT_TRAY_PERCENT_COLOR)
+                }
+              />
+              <span>
+                {t("settings.tray.paceColor")}
+                <span className="block text-xs text-muted-foreground">{t("settings.tray.paceColorHint")}</span>
+              </span>
+            </label>
+          )}
+          {menubarIconStyle === "logos" && <TrayLogoColorsToggle />}
+          {isPerProviderTrayStyle(menubarIconStyle) && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("settings.tray.perProviderHint")}{" "}
+              <button
+                type="button"
+                className="text-primary underline-offset-2 hover:underline"
+                onClick={() => invoke("open_taskbar_settings").catch((e) => console.error("open_taskbar_settings failed:", e))}
+              >
+                {t("settings.tray.openTaskbarSettings")}
+              </button>
+            </p>
+          )}
+        </SettingsSection>
+
+        <TaskbarStripSection onMenubarIconStyleChange={onMenubarIconStyleChange} />
+
+        <SettingsSection title={t("settings.theme.title")} description={t("settings.theme.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.theme.title")}
+            options={THEME_OPTIONS}
+            value={themeMode}
+            onChange={onThemeModeChange}
+          />
+        </SettingsSection>
+
+        <LanguageSection />
+
+        <GlobalShortcutSection globalShortcut={globalShortcut} onGlobalShortcutChange={onGlobalShortcutChange} />
+      </div>
+      <div className="min-w-0 space-y-1">
+        <SettingsSection title={t("settings.plugins.title")} description={t("settings.plugins.desc")}>
+          <div className="-mx-1">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sortedPlugins.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                {sortedPlugins.map((plugin) => (
+                  <SortablePluginItem
+                    key={plugin.id}
+                    plugin={plugin}
+                    onToggle={onToggle}
+                    inTray={!trayHiddenPlugins.includes(plugin.id)}
+                    onToggleTray={handleToggleTray}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+        </SettingsSection>
+
+        <AccountsSection onAccountsChanged={onAccountsChanged} />
+
+        <ClaudeCodeSection />
+
+        <PanelSection />
+
+        <NotificationsSection plugins={plugins} />
+
+        <SettingsSection title={t("settings.startOnLogin.title")} description={t("settings.startOnLogin.desc")}>
+          <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
+            <Checkbox
+              key={`start-on-login-${startOnLogin}`}
+              checked={startOnLogin}
+              onCheckedChange={(checked) => onStartOnLoginChange(checked === true)}
+            />
+            {t("settings.startOnLogin.label")}
+          </label>
+        </SettingsSection>
+
+        <SettingsBackupSection />
+      </div>
     </div>
   );
 }

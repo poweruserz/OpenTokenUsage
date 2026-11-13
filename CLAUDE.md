@@ -170,7 +170,10 @@ This file holds the project facts that are easy to get wrong.
   it (grey strip, dropped frames). So the window is `"resizable": false`: a resizable undecorated window gets
   tauri-runtime-wry's `TAURI_DRAG_RESIZE_BORDERS` child, which takes a real mouse press on the edges into that loop
   before the webview sees it (mouse messages posted to the webview skip it; test edges with a real mouse or
-  SendInput). `setSize` and SetWindowPos still work. `use-panel.ts` sizes the window to that width and the content's height. The
+  SendInput). `setSize` and SetWindowPos still work. The settings view is `SETTINGS_PANEL_WIDTH` (760) wide, its
+  sections in two columns, with no edge strips; going in or out calls `resize_panel` without `keepRight`, so the host
+  keeps the edge the re-anchor keeps (left at a remembered spot, right near the tray) and leaves the remembered spot
+  alone. `use-panel.ts` sizes the window to that width and the content's height. The
   content's scroller reaches the card's right edge (`-mr-3`, `pr-3`) so the scrollbar sits there and the content
   keeps the same 12 px on both sides.
 - Panel: the title bar pin (`panelPinned`) keeps it always on top. "Remember position": `tray.rs`

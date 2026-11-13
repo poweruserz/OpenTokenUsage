@@ -409,11 +409,43 @@ describe("usePanel", () => {
       })
       expect(invokeMock).not.toHaveBeenCalledWith("resize_panel", expect.anything())
       setSize.mockClear()
-      rerender({ view: "settings" })
+      rerender({ view: "codex" })
       await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 560 })))
 
       act(() => result.current.keepPanelWidth())
       expect(savePanelWidthMock).toHaveBeenCalledWith(560)
+    } finally {
+      document.body.removeChild(container)
+    }
+  })
+
+  it("gives settings its own wider width and goes back to the kept width, the host picking the edge", async () => {
+    const setSize = vi.fn().mockResolvedValue(undefined)
+    getCurrentWindowMock.mockReturnValue({ setSize })
+    loadPanelWidthMock.mockResolvedValue(480)
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    try {
+      const { rerender } = renderHook(
+        ({ view }: { view: string }) => {
+          const panel = usePanel({ activeView: view, setActiveView: vi.fn(), showAbout: false, setShowAbout: vi.fn(), displayPlugins: [] })
+          panel.containerRef.current = container
+          return panel
+        },
+        { initialProps: { view: "home" } }
+      )
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 480 })))
+      expect(invokeMock).not.toHaveBeenCalledWith("resize_panel", expect.anything())
+
+      rerender({ view: "settings" })
+      await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("resize_panel", { fromWidth: 480, width: 760 }))
+      await waitFor(() => expect(setSize).toHaveBeenLastCalledWith(expect.objectContaining({ width: 760 })))
+
+      invokeMock.mockClear()
+      rerender({ view: "home" })
+      await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("resize_panel", { fromWidth: 760, width: 480 }))
+      await waitFor(() => expect(setSize).toHaveBeenLastCalledWith(expect.objectContaining({ width: 480 })))
+      expect(invokeMock.mock.calls.filter(([name]) => name === "resize_panel")).toHaveLength(1)
     } finally {
       document.body.removeChild(container)
     }

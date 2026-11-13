@@ -531,6 +531,8 @@ export const savePanelPinned = (value: boolean) => saveBoolean(PANEL_PINNED_KEY,
 /** The panel's width in logical px: dragging its left or right edge makes it up to 40% wider. */
 export const PANEL_MIN_WIDTH = 400;
 export const PANEL_MAX_WIDTH = 560;
+/** The settings view's width: its sections sit in two columns. `resize_panel` (lib.rs) allows up to this. */
+export const SETTINGS_PANEL_WIDTH = 760;
 
 export function normalizePanelWidth(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return PANEL_MIN_WIDTH;
