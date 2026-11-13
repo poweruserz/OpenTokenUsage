@@ -8,6 +8,8 @@ import { getLocale, t } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export const WEEK_DAYS_REFRESH_MS = 5 * 60_000
+/** Longest window shown: its local days stay within what `usage_by_day` takes (10 bounds, 9 days). */
+const MAX_PERIOD_MS = 8 * 86_400_000
 
 /** A weekly limit from `startMs` up to `nowMs` by local day: its start, each midnight in between, and now. */
 export function dayBounds(startMs: number, nowMs: number): number[] {
@@ -36,7 +38,9 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
   const endMs = resetMinute(weekly?.resetsAt)
   const periodMs = weekly?.periodDurationMs ?? 0
   const startMs = endMs - periodMs
-  const has = hasUsageLogs(pluginId) && Number.isFinite(endMs) && periodMs > 0 && (weekly?.limit ?? 0) > 0
+  // A weekly limit only: Codex can label a longer window "Weekly", and its days wouldn't fit `usage_by_day`.
+  const has =
+    hasUsageLogs(pluginId) && Number.isFinite(endMs) && periodMs > 0 && periodMs <= MAX_PERIOD_MS && (weekly?.limit ?? 0) > 0
   // Kept with the card and the limit it was read for: the detail page reuses this component.
   const key = `${pluginId}|${endMs}`
   const [read, setRead] = useState<{ key: string; bounds: number[]; days: number[] } | null>(null)
@@ -80,13 +84,11 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
         {data.days.map((weight, index) => {
           const share = used * (weight / total)
           const day = dayName.format(new Date(data.bounds[index]))
-          const label = share > 0 && share < 0.005 ? "<1%" : percent.format(share)
+          const label = share > 0 && share < 0.005 ? `<${percent.format(0.01)}` : percent.format(share)
           return (
-            <li
-              key={data.bounds[index]}
-              aria-label={t("weekDays.day", { day, percent: label })}
-              className="grid grid-cols-[3rem_minmax(0,1fr)_2.5rem] items-center gap-1 text-[10px]"
-            >
+            <li key={data.bounds[index]} className="grid grid-cols-[3rem_minmax(0,1fr)_2.5rem] items-center gap-1 text-[10px]">
+              {/* Read as one sentence: screen readers in browse mode skip an aria-label on a list item. */}
+              <span className="sr-only">{t("weekDays.day", { day, percent: label })}</span>
               <span aria-hidden className="truncate text-muted-foreground">{day}</span>
               <span aria-hidden className="h-1.5 rounded-full bg-foreground/5">
                 <span

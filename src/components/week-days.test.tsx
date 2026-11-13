@@ -32,7 +32,7 @@ it("shares the weekly limit used so far out over the days by their weighted toke
   const resetsAt = new Date(Date.now() + 6 * DAY).toISOString() // a day and a bit into the week
   render(<WeekDays pluginId="claude" weekly={{ used: 40, limit: 100, resetsAt, periodDurationMs: 7 * DAY }} />)
   const days = await screen.findAllByRole("listitem")
-  expect(days.map((day) => day.getAttribute("aria-label"))).toEqual([
+  expect(days.map((day) => day.querySelector(".sr-only")?.textContent)).toEqual([
     expect.stringMatching(/: about 10% of the weekly limit$/),
     expect.stringMatching(/: about 30% of the weekly limit$/),
   ])
@@ -40,6 +40,20 @@ it("shares the weekly limit used so far out over the days by their weighted toke
   const asked = vi.mocked(invoke).mock.calls[0][1] as { pluginId: string; bounds: number[] }
   expect(asked.pluginId).toBe("claude")
   expect(asked.bounds[0]).toBe(Math.round(Date.parse(resetsAt) / 60_000) * 60_000 - 7 * DAY)
+})
+
+it("writes a tiny day in the language's own percent style", async () => {
+  vi.mocked(invoke).mockResolvedValue([1, 999])
+  const resetsAt = new Date(Date.now() + 6 * DAY).toISOString()
+  render(<WeekDays pluginId="claude" weekly={{ used: 40, limit: 100, resetsAt, periodDurationMs: 7 * DAY }} />)
+  expect(await screen.findByText(`<${new Intl.NumberFormat("en-US", { style: "percent" }).format(0.01)}`)).toBeInTheDocument()
+})
+
+it("leaves out a window longer than a week, which Codex can also call weekly", () => {
+  const weekly = { used: 40, limit: 100, resetsAt: new Date(Date.now() + DAY).toISOString(), periodDurationMs: 30 * DAY }
+  const { container } = render(<WeekDays pluginId="codex" weekly={weekly} />)
+  expect(container).toBeEmptyDOMElement()
+  expect(invoke).not.toHaveBeenCalled()
 })
 
 it("is not shown without a weekly line, for cards without local logs, and reads nothing while closed", () => {
