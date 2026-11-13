@@ -212,8 +212,12 @@ fn ticket_of(branch: &str) -> Option<String> {
 }
 
 /// Shares each model's dollars out over the projects and branches whose tokens it served.
+/// `priced` is the usage of the whole days `costs` cover, `usage` the part to share out: the same for
+/// a month, less for a weekly limit, which starts mid-day (its first day's earlier tokens set the rate
+/// but get no share, so the window isn't charged for them).
 fn share_out(
     log: Log,
+    priced: &Usage,
     usage: &Usage,
     costs: Option<&HashMap<String, f64>>,
     repository: impl Fn(&str) -> PathBuf,
@@ -221,7 +225,7 @@ fn share_out(
     // Dollars per weighted token, per model ("" = every model, for Codex).
     let mut weights: HashMap<&str, f64> = HashMap::new();
     let pooled = costs.is_some_and(|costs| costs.contains_key(""));
-    for ((model, ..), parts) in usage {
+    for ((model, ..), parts) in priced {
         let key = if pooled { "" } else { model.as_str() };
         *weights.entry(key).or_default() += weight(log, model, parts);
     }
@@ -293,14 +297,21 @@ fn share_out(
             .then(a.name.cmp(&b.name))
     });
 
-    let total_cost: f64 = costs.map_or(0.0, |costs| costs.values().sum());
     let shared: f64 = projects.iter().map(|p| p.cost).sum();
+    // Dollars of a model the logs don't show can't be placed in a project (nor in part of a day).
+    let unattributed: f64 = costs.map_or(0.0, |costs| {
+        costs
+            .iter()
+            .filter(|(model, _)| weights.get(model.as_str()).copied().unwrap_or(0.0) <= 0.0)
+            .map(|(_, cost)| cost)
+            .sum()
+    });
     Projects {
         priced: costs.is_some(),
         no_runner: false,
-        total_cost,
+        total_cost: shared + unattributed,
         total_tokens: projects.iter().map(|p| p.tokens).sum(),
-        unattributed_cost: (total_cost - shared).max(0.0),
+        unattributed_cost: unattributed,
         projects,
         unreadable: 0,
     }
@@ -332,8 +343,9 @@ fn is_date(value: &str) -> bool {
 }
 
 /// The projects of a Claude or Codex card's login (the usual one or an extra account) from
-/// `start_ms` up to `end_ms`; `since`/`until` are the same month's first and last local day
-/// (`YYYYMMDD`) for ccusage. Empty for other cards and for a WSL copy.
+/// `start_ms` up to `end_ms`; `since`/`until` are the first and last local day (`YYYYMMDD`) for
+/// ccusage. A range that starts mid-day (a weekly limit) passes that day's local midnight as
+/// `price_start_ms`. Empty for other cards and for a WSL copy.
 #[tauri::command]
 pub async fn usage_projects(
     state: tauri::State<'_, Mutex<AppState>>,
@@ -342,8 +354,12 @@ pub async fn usage_projects(
     end_ms: i64,
     since: String,
     until: String,
+    price_start_ms: Option<i64>,
 ) -> Result<Projects, String> {
-    if !is_date(&since) || !is_date(&until) || end_ms <= start_ms {
+    // A day is at most 25 hours (a DST change).
+    let day_start_ok =
+        price_start_ms.map_or(true, |p| p <= start_ms && start_ms - p <= 25 * 3_600_000);
+    if !is_date(&since) || !is_date(&until) || end_ms <= start_ms || !day_start_ok {
         return Err("invalid month".into());
     }
     let source = {
@@ -367,6 +383,12 @@ pub async fn usage_projects(
             None => dirs.iter().map(|dir| dir.join(folder)).collect(),
         };
         let (usage, unreadable) = month_usage(log, &logs, start_ms, end_ms);
+        let whole_days = match price_start_ms {
+            Some(day_start) if day_start < start_ms => {
+                Some(month_usage(log, &logs, day_start, end_ms).0)
+            }
+            _ => None,
+        };
         let report = crate::plugin_engine::host_api::ccusage_daily(
             // One cached report per month, so switching months doesn't run ccusage again.
             &format!("{plugin_id}:projects:{since}"),
@@ -378,7 +400,8 @@ pub async fn usage_projects(
         );
         let report: serde_json::Value = serde_json::from_str(&report).unwrap_or_default();
         let costs = month_costs(&report);
-        let mut projects = share_out(log, &usage, costs.as_ref(), repository_cached);
+        let priced = whole_days.as_ref().unwrap_or(&usage);
+        let mut projects = share_out(log, priced, &usage, costs.as_ref(), repository_cached);
         projects.no_runner = report["status"] == "no_runner";
         projects.unreadable = unreadable;
         projects
@@ -537,7 +560,7 @@ mod tests {
                 (model, "C:/work/blog", "main", parts(0, 0, 0, reads)),
             ]);
             let costs = HashMap::from([(model.to_string(), 8.0)]);
-            let out = share_out(Log::Claude, &usage, Some(&costs), by_parent);
+            let out = share_out(Log::Claude, &usage, &usage, Some(&costs), by_parent);
             let shares: Vec<_> = out.projects.iter().map(|p| cents(p.cost)).collect();
             assert_eq!(shares, [400, 400], "{model}");
         }
@@ -562,7 +585,7 @@ mod tests {
             ("sonnet".to_string(), 1.5),
             ("haiku".to_string(), 0.5),
         ]);
-        let out = share_out(Log::Claude, &usage, Some(&costs), by_parent);
+        let out = share_out(Log::Claude, &usage, &usage, Some(&costs), by_parent);
 
         assert!(out.priced);
         assert_eq!(cents(out.total_cost), 1000);
@@ -583,6 +606,23 @@ mod tests {
     }
 
     #[test]
+    fn charges_a_window_that_starts_mid_day_only_for_its_own_tokens() {
+        // The whole day ccusage priced: 300 Opus tokens for $9, the blog's 100 before the weekly limit began.
+        let day = usage(&[
+            ("opus", "C:/work/shop", "main", parts(200, 0, 0, 0)),
+            ("opus", "C:/work/blog", "main", parts(100, 0, 0, 0)),
+        ]);
+        let window = usage(&[("opus", "C:/work/shop", "main", parts(200, 0, 0, 0))]);
+        let costs = HashMap::from([("opus".to_string(), 9.0), ("haiku".to_string(), 0.5)]);
+        let out = share_out(Log::Claude, &day, &window, Some(&costs), by_parent);
+
+        assert_eq!(out.projects.len(), 1);
+        assert_eq!(cents(out.projects[0].cost), 600);
+        assert_eq!(cents(out.unattributed_cost), 50); // haiku isn't in the logs at all
+        assert_eq!(cents(out.total_cost), 650);
+    }
+
+    #[test]
     fn pools_codex_dollars_and_lists_tokens_alone_when_unpriced() {
         let usage = usage(&[
             ("gpt-a", "C:/one", "dev", parts(100, 0, 0, 0)),
@@ -590,7 +630,9 @@ mod tests {
         ]);
         // 100 vs 800 weighted.
         let costs = HashMap::from([(String::new(), 9.0)]);
-        let out = share_out(Log::Codex, &usage, Some(&costs), |cwd| PathBuf::from(cwd));
+        let out = share_out(Log::Codex, &usage, &usage, Some(&costs), |cwd| {
+            PathBuf::from(cwd)
+        });
         assert_eq!(
             out.projects
                 .iter()
@@ -600,7 +642,7 @@ mod tests {
         );
         assert_eq!(cents(out.unattributed_cost), 0);
 
-        let unpriced = share_out(Log::Codex, &usage, None, |cwd| PathBuf::from(cwd));
+        let unpriced = share_out(Log::Codex, &usage, &usage, None, |cwd| PathBuf::from(cwd));
         assert!(!unpriced.priced);
         assert!(unpriced
             .projects

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { invoke } from "@tauri-apps/api/core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { monthRange, UsageProjects, type Project, type Projects } from "@/components/usage-projects"
+import { monthRange, UsageProjects, weekRange, type Project, type Projects } from "@/components/usage-projects"
 import { loadProjectBudgets, saveProjectBudgets } from "@/lib/settings"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
@@ -41,6 +41,43 @@ describe("usage by project", () => {
       startMs: new Date(2026, 2, 1).getTime(), endMs: new Date(2026, 3, 1).getTime(), since: "20260301", until: "20260331",
     })
     expect(monthRange(new Date(2026, 0, 3), 1)).toMatchObject({ since: "20251201", until: "20251231" })
+  })
+
+  it("asks for a weekly limit up to today, with its first day's midnight for ccusage's whole-day prices", () => {
+    const endMs = new Date(2026, 2, 19, 10).getTime() // resets 19 March, 10:00
+    expect(weekRange(endMs, 7 * 86_400_000, new Date(2026, 2, 15, 12))).toEqual({
+      startMs: new Date(2026, 2, 12, 10).getTime(),
+      endMs,
+      since: "20260312",
+      until: "20260315",
+      priceStartMs: new Date(2026, 2, 12).getTime(),
+    })
+  })
+
+  it("splits the current weekly limit by project, without the monthly budgets, forecast and CSV", async () => {
+    vi.mocked(invoke).mockResolvedValue(projects([project("shop", 30, 300)]))
+    const { rerender } = render(<UsageProjects pluginId="claude" />)
+    await screen.findByRole("button", { name: /shop/ })
+    expect(screen.queryByRole("button", { name: "Weekly limit" })).toBeNull() // no weekly line, no tab
+
+    const resetsAt = new Date(Date.now() + 2 * 86_400_000).toISOString()
+    rerender(<UsageProjects pluginId="claude" weekly={{ resetsAt, periodDurationMs: 7 * 86_400_000 }} />)
+    fireEvent.click(screen.getByRole("button", { name: "Weekly limit" }))
+    await waitFor(() => expect(invoke).toHaveBeenLastCalledWith("usage_projects", expect.objectContaining({ priceStartMs: expect.any(Number) })))
+    const asked = vi.mocked(invoke).mock.calls.at(-1)?.[1] as { startMs: number; endMs: number }
+    expect(asked.endMs).toBe(Math.round(Date.parse(resetsAt) / 60_000) * 60_000)
+    expect(asked.startMs).toBe(asked.endMs - 7 * 86_400_000)
+
+    fireEvent.click(await screen.findByRole("button", { name: /shop/ }))
+    expect(screen.queryByLabelText("Monthly budget")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull()
+    expect(screen.queryByText(/by month end/)).toBeNull()
+
+    // Claude's reset time moves by milliseconds on every probe: that is the same window, not a new read.
+    const calls = vi.mocked(invoke).mock.calls.length
+    rerender(<UsageProjects pluginId="claude" weekly={{ resetsAt: new Date(Date.parse(resetsAt) + 7).toISOString(), periodDurationMs: 7 * 86_400_000 }} />)
+    expect(vi.mocked(invoke).mock.calls.length).toBe(calls)
+    expect(screen.getByRole("button", { name: /shop/ })).toHaveAttribute("aria-expanded", "true")
   })
 
   it("lists projects with their cost and share, and a project's branches with their ticket", async () => {
