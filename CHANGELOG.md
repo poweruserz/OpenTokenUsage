@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.8.6
+
+Muse Code joins the providers, for those who turn it on.
+
+### New Features
+- Muse Code (Meta): the 5-hour session and weekly limits with their resets and your plan, read from the Muse CLI's login (`muse login`). It stays off until you turn it on in Settings, and the first-start check never turns it on: its usage comes from the endpoint Meta also uses to hand out the account's API key, so the app asks it at most once every 5 minutes and keeps nothing of that answer but the plan and the limits. While Meta leaves a limit out (an idle 5-hour window), the card keeps the last reading until it resets. Thanks to @yuuta0331 for testing the endpoint on Windows (#88, #92)
+
+### Bug Fixes
+- The response log no longer keeps part of a name or other private value that contains a quotation mark (#92)
+
 ## v0.8.5
 
 A new install turns on only the providers you use, and Cursor finds its encrypted login again.
