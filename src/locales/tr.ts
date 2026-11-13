@@ -305,7 +305,7 @@ export const tr: Messages = {
   "alert.pace.title": "{provider}: {label} tükenmek üzere",
   "alert.pace.body": "Bu tempoyla limit, sıfırlanmadan önce {time} içinde dolacak.",
   "alert.spike.title": "{provider}: {folder} hızla token harcıyor",
-  "alert.spike.body": "Son 15 dakikada {tokens} token, olağanın {times} katı. Bir ajan döngüye mi takıldı?",
+  "alert.spike.body": "Bir çeyrek saatte {tokens} token, olağanın {times} katı. Bir ajan döngüye mi takıldı?",
   "alert.update.title": "OpenTokenUsage {version} hazır",
   "alert.update.body": "Paneli açıp Güncelleştirmek için yeniden başlat butonuna basın.",
   "alert.signIn.title": "{provider}: yeniden giriş yapın",

@@ -305,7 +305,7 @@ export const en = {
   "alert.pace.title": "{provider}: {label} is running out",
   "alert.pace.body": "At this pace you'll hit the limit in {time}, before it resets.",
   "alert.spike.title": "{provider}: {folder} is using tokens fast",
-  "alert.spike.body": "{tokens} tokens in the last 15 minutes, {times}× your usual. An agent stuck in a loop?",
+  "alert.spike.body": "{tokens} tokens in a quarter hour, {times}× your usual. An agent stuck in a loop?",
   "alert.update.title": "OpenTokenUsage {version} is ready",
   "alert.update.body": "Open the panel and choose Restart to update.",
   "alert.signIn.title": "{provider}: sign in again",

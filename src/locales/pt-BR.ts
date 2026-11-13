@@ -305,7 +305,7 @@ export const ptBR: Messages = {
   "alert.pace.title": "{provider}: {label} está acabando",
   "alert.pace.body": "Nesse ritmo, você atingirá o limite em {time}, antes da redefinição.",
   "alert.spike.title": "{provider}: {folder} está gastando tokens muito rápido",
-  "alert.spike.body": "{tokens} tokens nos últimos 15 minutos, {times}× o normal. Um agente preso em um loop?",
+  "alert.spike.body": "{tokens} tokens em um quarto de hora, {times}× o normal. Um agente preso em um loop?",
   "alert.update.title": "OpenTokenUsage {version} está pronto",
   "alert.update.body": "Abra o painel e escolha Reiniciar para atualizar.",
   "alert.signIn.title": "{provider}: entre novamente",

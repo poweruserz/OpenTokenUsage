@@ -305,7 +305,7 @@ export const de: Messages = {
   "alert.pace.title": "{provider}: {label} wird knapp",
   "alert.pace.body": "Bei diesem Tempo ist das Limit in {time} erreicht – vor dem Zurücksetzen.",
   "alert.spike.title": "{provider}: {folder} verbraucht Tokens sehr schnell",
-  "alert.spike.body": "{tokens} Tokens in den letzten 15 Minuten, {times}× so viel wie üblich. Hängt ein Agent in einer Schleife?",
+  "alert.spike.body": "{tokens} Tokens in einer Viertelstunde, {times}× so viel wie üblich. Hängt ein Agent in einer Schleife?",
   "alert.update.title": "OpenTokenUsage {version} ist bereit",
   "alert.update.body": "Öffnen Sie den Bereich und wählen Sie „Zum Aktualisieren neu starten“.",
   "alert.signIn.title": "{provider}: erneut anmelden",

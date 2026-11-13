@@ -207,10 +207,11 @@ This file holds the project facts that are easy to get wrong.
   window theme: Mica takes its tint from the window, so a light page on dark Windows needs it.
 - Usage spikes (`usage_spikes.rs`, `use-usage-spike-alerts.ts`, setting `alertSettings.spikes`, on unless false): with
   notifications on, every 5 min, panel open or not, the same log scan names Claude/Codex sessions (one log file each)
-  whose last 15 min reach 3x the usual busy quarter hour (p90 of the past week's busy session quarter hours, up to an
-  hour ago, price-weighted via `usage_projects::weight`) and 300k weighted tokens, after 20 such quarters of history.
-  Calibrated on 4 weeks of real logs (busiest ordinary quarter: 2.9x). One notification per card and folder an hour,
-  in memory.
+  whose current or last clock quarter hour reaches 3x the usual busy quarter hour (p90 of the past week's busy session
+  quarter hours, up to an hour ago, price-weighted via `usage_projects::weight`) and 300k weighted tokens, after 20
+  such quarters of history. Both sides are aligned quarters on purpose: a sliding window would read a burst the
+  history saw split over two quarters up to twice as high. Calibrated on 4 weeks of real logs (busiest ordinary
+  quarter: 2.9x). One notification per card and folder an hour (a session's sub-agents share its folder), in memory.
 - Notifications (`src/lib/usage-alerts.ts`, pure + tested): the usage levels the user picks
   (`alertSettings.levels`, default 80/95, or a provider's own in `providerLevels` via `alertLevelsFor`; the
   card notches its bars at them, flipped when showing what's left), pace, reset; each once per provider+line+window, keys

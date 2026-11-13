@@ -305,7 +305,7 @@ export const zhCN: Messages = {
   "alert.pace.title": "{provider}：{label} 即将用完",
   "alert.pace.body": "按当前速度，将在 {time} 后达到上限，早于重置时间。",
   "alert.spike.title": "{provider}：{folder} 的 Token 消耗很快",
-  "alert.spike.body": "最近 15 分钟用了 {tokens} 个 Token，是平时的 {times} 倍。是不是有代理陷入了循环？",
+  "alert.spike.body": "一刻钟内用了 {tokens} 个 Token，是平时的 {times} 倍。是不是有代理陷入了循环？",
   "alert.update.title": "OpenTokenUsage {version} 已就绪",
   "alert.update.body": "打开面板，选择“重启以更新”。",
   "alert.signIn.title": "{provider}：请重新登录",

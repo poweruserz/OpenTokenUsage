@@ -305,7 +305,7 @@ export const fr: Messages = {
   "alert.pace.title": "{provider} : {label} bientôt épuisé",
   "alert.pace.body": "À ce rythme, vous atteindrez la limite dans {time}, avant la réinitialisation.",
   "alert.spike.title": "{provider} : {folder} consomme des tokens très vite",
-  "alert.spike.body": "{tokens} tokens ces 15 dernières minutes, {times}× l'habitude. Un agent bloqué dans une boucle ?",
+  "alert.spike.body": "{tokens} tokens en un quart d'heure, {times}× l'habitude. Un agent bloqué dans une boucle ?",
   "alert.update.title": "OpenTokenUsage {version} est prêt",
   "alert.update.body": "Ouvrez le panneau et choisissez Redémarrer pour mettre à jour.",
   "alert.signIn.title": "{provider} : reconnectez-vous",

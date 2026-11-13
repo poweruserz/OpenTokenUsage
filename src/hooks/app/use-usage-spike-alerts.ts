@@ -57,7 +57,8 @@ export function useUsageSpikeAlerts({
           for (const spike of await invoke<Spike[]>("usage_spikes", { pluginId: id })) {
             const key = `${id}|${spike.folder}`
             const last = lastRef.current.get(key)
-            if (last !== undefined && Date.now() - last < SPIKE_REPEAT_MS) continue
+            // One per folder: a session and its sub-agents (each its own log) can all run hot at once.
+            if (keys.includes(key) || (last !== undefined && Date.now() - last < SPIKE_REPEAT_MS)) continue
             alerts.push(spikeAlert(names.get(id) ?? id, spike, getLocale()))
             keys.push(key)
           }
@@ -66,7 +67,13 @@ export function useUsageSpikeAlerts({
         // Marked before showing, so a check of a restarted effect doesn't notify the same spike twice.
         const at = Date.now()
         keys.forEach((key) => lastRef.current.set(key, at))
-        if (!(await showNotifications(alerts, settings))) keys.forEach((key) => lastRef.current.delete(key))
+        let shown = false
+        try {
+          shown = await showNotifications(alerts, settings)
+        } finally {
+          // Not allowed, or it failed: the next check tries again.
+          if (!shown) keys.forEach((key) => lastRef.current.delete(key))
+        }
       } catch (error) {
         console.error("Failed to check usage spikes:", error)
       } finally {

@@ -305,7 +305,7 @@ export const it: Messages = {
   "alert.pace.title": "{provider}: {label} in esaurimento",
   "alert.pace.body": "A questo ritmo raggiungerai il limite tra {time}, prima dell'azzeramento.",
   "alert.spike.title": "{provider}: {folder} sta consumando token molto in fretta",
-  "alert.spike.body": "{tokens} token negli ultimi 15 minuti, {times}× il solito. Un agente bloccato in un ciclo?",
+  "alert.spike.body": "{tokens} token in un quarto d'ora, {times}× il solito. Un agente bloccato in un ciclo?",
   "alert.update.title": "OpenTokenUsage {version} è pronto",
   "alert.update.body": "Apri il pannello e scegli Riavvia per aggiornare.",
   "alert.signIn.title": "{provider}: accedi di nuovo",

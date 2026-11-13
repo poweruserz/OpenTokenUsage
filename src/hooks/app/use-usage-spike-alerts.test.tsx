@@ -27,12 +27,15 @@ const spikeCalls = () => vi.mocked(invoke).mock.calls.filter(([command]) => comm
 it("says which folder of which card burns tokens, and how much faster than usual", () => {
   expect(spikeAlert("Claude", SHOP, "en-US")).toEqual({
     title: "Claude: shop is using tokens fast",
-    body: "12.4M tokens in the last 15 minutes, 6× your usual. An agent stuck in a loop?",
+    body: "12.4M tokens in a quarter hour, 6× your usual. An agent stuck in a loop?",
   })
 })
 
-it("checks the cards with local logs and notifies a spike once an hour, not on every check", async () => {
-  vi.mocked(invoke).mockImplementation(async (command) => (command === "usage_spikes" ? [SHOP] : undefined))
+it("checks the cards with local logs and notifies a folder once an hour, not on every check", async () => {
+  // A session and its sub-agent in the same folder, both running hot: one notification.
+  vi.mocked(invoke).mockImplementation(async (command) =>
+    command === "usage_spikes" ? [SHOP, { ...SHOP, tokens: 5_000_000, times: 3.2 }] : undefined
+  )
   const { rerender } = renderHook((props: { settings: typeof DEFAULT_ALERT_SETTINGS }) =>
     useUsageSpikeAlerts({ pluginsMeta: META, enabledIds: ["claude", "cursor"], enabled: true, settings: props.settings }),
     { initialProps: { settings: DEFAULT_ALERT_SETTINGS } }
@@ -58,8 +61,12 @@ it("reads nothing with notifications or spike alerts off", () => {
   expect(spikeCalls()).toHaveLength(0)
 })
 
-it("notifies again later when notifications weren't allowed the first time", async () => {
-  vi.mocked(isPermissionGranted).mockResolvedValue(false)
+it.each([
+  ["weren't allowed", () => vi.mocked(isPermissionGranted).mockResolvedValue(false)],
+  ["failed", () => vi.mocked(isPermissionGranted).mockRejectedValue(new Error("no notification service"))],
+])("notifies again later when notifications %s the first time", async (_, firstTime) => {
+  vi.spyOn(console, "error").mockImplementation(() => {})
+  firstTime()
   vi.mocked(invoke).mockImplementation(async (command) => (command === "usage_spikes" ? [SHOP] : undefined))
   const { rerender } = renderHook((props: { sound: "windows" | "chime" }) =>
     useUsageSpikeAlerts({

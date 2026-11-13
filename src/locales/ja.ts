@@ -305,7 +305,7 @@ export const ja: Messages = {
   "alert.pace.title": "{provider}: {label} が不足しそうです",
   "alert.pace.body": "このペースでは、リセット前の {time} 後に上限に達します。",
   "alert.spike.title": "{provider}: {folder} のトークン消費が急増しています",
-  "alert.spike.body": "直近 15 分で {tokens} トークン、普段の {times} 倍です。エージェントがループしていませんか？",
+  "alert.spike.body": "15 分間で {tokens} トークン、普段の {times} 倍です。エージェントがループしていませんか？",
   "alert.update.title": "OpenTokenUsage {version} の準備ができました",
   "alert.update.body": "パネルを開いて「再起動して更新」を選んでください。",
   "alert.signIn.title": "{provider}: 再度サインインしてください",

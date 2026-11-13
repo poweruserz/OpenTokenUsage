@@ -305,7 +305,7 @@ export const es419: Messages = {
   "alert.pace.title": "{provider}: {label} se está agotando",
   "alert.pace.body": "A este ritmo alcanzarás el límite en {time}, antes de que se restablezca.",
   "alert.spike.title": "{provider}: {folder} está gastando tokens muy rápido",
-  "alert.spike.body": "{tokens} tokens en los últimos 15 minutos, {times}× lo habitual. ¿Un agente atorado en un bucle?",
+  "alert.spike.body": "{tokens} tokens en un cuarto de hora, {times}× lo habitual. ¿Un agente atorado en un bucle?",
   "alert.update.title": "OpenTokenUsage {version} está listo",
   "alert.update.body": "Abre el panel y elige Reiniciar para actualizar.",
   "alert.signIn.title": "{provider}: vuelve a iniciar sesión",

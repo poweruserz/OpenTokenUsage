@@ -12,12 +12,13 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// What counts as now.
-const RECENT_MINUTES: i64 = 15;
-/// What sets the usual: the past week up to an hour ago, so a spike in the making stays out of it.
+/// Both sides are clock-aligned UTC quarter hours, the shape the factor was measured on: now is the
+/// current quarter so far or the last whole one, whichever is bigger (a sliding window would see a
+/// burst whole that the history saw split over two quarters, and read up to twice as high).
+/// What sets the usual: the past week's quarters up to an hour ago, so a spike in the making stays out.
 const HISTORY_DAYS: i64 = 7;
-const HISTORY_GAP_MINUTES: i64 = 60;
-/// A session's last 15 minutes must reach this many times the usual busy quarter hour (its 90th
+const HISTORY_GAP_QUARTERS: i64 = 4;
+/// A session's quarter hour must reach this many times the usual busy quarter hour (its 90th
 /// percentile)... Measured on 4 weeks of real Claude Code logs (1,842 busy session quarter hours),
 /// the busiest ordinary one was 2.9 times the usual: 3 flags none of them and still catches a loop
 /// well below the 4 times a more cautious bar would wait for.
@@ -34,7 +35,7 @@ const QUARTER_SPOTS: i64 = 900 / SPOT_SECS;
 pub struct Spike {
     /// The folder the session worked in (its last path part).
     folder: String,
-    /// Tokens the session used in the last 15 minutes.
+    /// Tokens the session used in that quarter hour.
     tokens: u64,
     /// How many times the usual busy quarter hour that is, by price-weighted tokens.
     times: f64,
@@ -43,46 +44,47 @@ pub struct Spike {
 /// Adds sessions up one at a time (the scan hands them over under its lock), then names the spikes.
 struct Spikes {
     log: Log,
-    /// The current minute (Unix seconds / `SPOT_SECS`).
+    /// The current quarter hour (Unix seconds / 900).
     now: i64,
     /// Price-weighted tokens of every busy quarter hour of every session in the history.
     history: Vec<f64>,
-    /// Each session active in the last 15 minutes: its folder, tokens and weighted tokens.
+    /// Each session active in the current or last quarter hour: its folder, tokens and weighted tokens.
     recent: Vec<(String, u64, f64)>,
 }
 
 impl Spikes {
-    fn new(log: Log, now: i64) -> Self {
+    /// `minute`: the current minute (Unix seconds / `SPOT_SECS`).
+    fn new(log: Log, minute: i64) -> Self {
         Spikes {
             log,
-            now,
+            now: minute.div_euclid(QUARTER_SPOTS),
             history: Vec::new(),
             recent: Vec::new(),
         }
     }
 
     fn add(&mut self, spots: &HashMap<Spot, Parts>) {
-        let recent_from = self.now - RECENT_MINUTES;
-        let history_from = self.now - HISTORY_DAYS * 24 * 60;
-        let history_to = self.now - HISTORY_GAP_MINUTES;
+        let history_from = self.now - HISTORY_DAYS * 24 * 4;
+        let history_to = self.now - HISTORY_GAP_QUARTERS;
         let mut quarters: HashMap<i64, f64> = HashMap::new();
-        let mut folders: HashMap<&str, f64> = HashMap::new();
-        let (mut tokens, mut weighted) = (0u64, 0.0);
+        // The current and the last quarter: tokens, weighted tokens, and weighted tokens per folder.
+        let mut live: HashMap<i64, (u64, f64, HashMap<&str, f64>)> = HashMap::new();
         for (spot, parts) in spots {
             let w = weight(self.log, &spot.model, parts);
-            if spot.slot > recent_from && spot.slot <= self.now {
-                tokens += parts.total();
-                weighted += w;
+            let quarter = spot.slot.div_euclid(QUARTER_SPOTS);
+            if quarter == self.now || quarter == self.now - 1 {
+                let (tokens, weighted, folders) = live.entry(quarter).or_default();
+                *tokens += parts.total();
+                *weighted += w;
                 *folders.entry(spot.cwd.as_str()).or_default() += w;
-            } else if spot.slot >= history_from && spot.slot < history_to {
-                *quarters
-                    .entry(spot.slot.div_euclid(QUARTER_SPOTS))
-                    .or_default() += w;
+            } else if quarter >= history_from && quarter < history_to {
+                *quarters.entry(quarter).or_default() += w;
             }
         }
         self.history
             .extend(quarters.into_values().filter(|w| *w > 0.0));
-        if weighted > 0.0 {
+        let busiest = live.into_values().max_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((tokens, weighted, folders)) = busiest.filter(|(_, w, _)| *w > 0.0) {
             let cwd = folders
                 .into_iter()
                 .max_by(|a, b| a.1.total_cmp(&b.1))
@@ -206,7 +208,7 @@ mod tests {
     #[test]
     fn names_a_session_burning_far_faster_than_the_usual_quarter_hour() {
         let mut sessions = ordinary_week();
-        // A loop: 1.2M in the last 15 minutes, 12 times the usual 100k.
+        // A loop: 1.2M in the last quarter hour, 12 times the usual 100k.
         sessions.push(session(
             "C:\\work\\shop",
             &[(NOW - 10, 600_000), (NOW - 2, 600_000)],
@@ -240,6 +242,23 @@ mod tests {
         let mut sessions = ordinary_week();
         sessions.push(session("C:/work/shop", &[(NOW - 20, 5_000_000)]));
         assert!(find(&sessions).is_empty());
+    }
+
+    #[test]
+    fn judges_whole_clock_quarter_hours_like_the_usual_ones() {
+        // NOW starts a quarter hour. 280k at its last minute and 280k now: 560k within a few
+        // minutes, but each quarter is under 3 times the usual 100k, as the history would count it.
+        let mut sessions = ordinary_week();
+        sessions.push(session(
+            "C:/work/shop",
+            &[(NOW - 1, 280_000), (NOW, 280_000)],
+        ));
+        assert!(find(&sessions).is_empty());
+
+        // The current quarter counts as soon as it is over the bar.
+        let mut sessions = ordinary_week();
+        sessions.push(session("C:/work/shop", &[(NOW, 1_200_000)]));
+        assert_eq!(find(&sessions).len(), 1);
     }
 
     #[test]
