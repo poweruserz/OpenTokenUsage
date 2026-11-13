@@ -1,6 +1,7 @@
 import { ProviderCard } from "@/components/provider-card"
 import { UsageHeatmap } from "@/components/usage-heatmap"
 import { UsageProjects } from "@/components/usage-projects"
+import { WeekDays } from "@/components/week-days"
 import type { PluginDisplayState } from "@/lib/plugin-types"
 import type { DisplayMode, ResetTimerDisplayMode, TimeFormatMode } from "@/lib/settings"
 
@@ -55,6 +56,7 @@ export function ProviderDetailPage({
         timeFormatMode={timeFormatMode}
         onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
       />
+      <WeekDays pluginId={plugin.meta.id} weekly={weekly?.type === "progress" ? weekly : undefined} />
       <UsageHeatmap pluginId={plugin.meta.id} timeFormatMode={timeFormatMode} />
       <UsageProjects pluginId={plugin.meta.id} weekly={weekly?.type === "progress" ? weekly : undefined} />
       <div className="pb-3" />

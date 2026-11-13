@@ -192,7 +192,8 @@ This file holds the project facts that are easy to get wrong.
 - Detail page sections (`detail-section.tsx`, `detail-sections.ts`): a provider's detail page shows its bars, then
   parts under a rule and a title that closes them: banked resets, cost (the text rows before a usage chart, and the
   chart), models (the rows after the chart: both ccusage plugins list each model's share there), live sessions, the
-  hour grid, projects. A provider without a chart keeps its text rows with the bars. The closed parts are the setting
+  weekly limit by day (`week-days.tsx`, `usage_by_day`: the used percent shared out over the window's local days by
+  price-weighted tokens; the frontend sends the day bounds), the hour grid, projects. A provider without a chart keeps its text rows with the bars. The closed parts are the setting
   `collapsedSections`: one list for every provider, in `BACKUP_KEYS`, read once at start (`useStoredDetailSections`);
   models and the hour grid start closed. A closed hour grid or projects list reads no logs (the spike check below does). The overview card keeps
   one run of lines.

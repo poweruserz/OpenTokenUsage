@@ -86,6 +86,7 @@ Open Claude or Codex for its detail page. It adds what only their own logs on yo
 - **Usage by project.** Each repository's share of the month, or of the current weekly limit, and its cost at API prices, with its git branches and any ticket key in the branch name.
 - **Monthly budgets.** A project's bar turns yellow at 80% and red at 100%, with a notification at each, even with the panel closed.
 - **Export CSV** of the month, one row per branch, and costs in **one of 13 currencies** at a rate you enter.
+- **Weekly limit by day.** What each day of the current weekly limit used of it, so far.
 - **Usage by hour.** Tokens per weekday and hour over the last 4 weeks, with your busiest hour and each weekday's total.
 - **Live sessions.** The Claude Code sessions running on this PC and what each is doing; with the Claude Code status line on, how full each context is.
 - **Cache hit rate** and a 30-day usage trend.

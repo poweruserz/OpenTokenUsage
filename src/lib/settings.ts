@@ -494,7 +494,7 @@ export async function saveProjectBudgets(value: ProjectBudgets): Promise<void> {
 }
 
 /** The parts of a provider's detail page that a click on their title closes, for every provider. */
-export const DETAIL_SECTIONS = ["resets", "cost", "models", "sessions", "heatmap", "projects"] as const;
+export const DETAIL_SECTIONS = ["resets", "cost", "models", "sessions", "week", "heatmap", "projects"] as const;
 export type DetailSection = (typeof DETAIL_SECTIONS)[number];
 /** Closed until opened: the two longest parts, and the hour grid reads the logs only once it's open. */
 export const DEFAULT_COLLAPSED_SECTIONS: DetailSection[] = ["models", "heatmap"];
