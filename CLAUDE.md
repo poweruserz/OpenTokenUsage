@@ -194,7 +194,7 @@ This file holds the project facts that are easy to get wrong.
   chart), models (the rows after the chart: both ccusage plugins list each model's share there), live sessions, the
   hour grid, projects. A provider without a chart keeps its text rows with the bars. The closed parts are the setting
   `collapsedSections`: one list for every provider, in `BACKUP_KEYS`, read once at start (`useStoredDetailSections`);
-  models and the hour grid start closed. A closed hour grid or projects list reads no logs. The overview card keeps
+  models and the hour grid start closed. A closed hour grid or projects list reads no logs (the spike check below does). The overview card keeps
   one run of lines.
 - Pace (`pace-status.ts`): one elapsed share for everything that shows it (card dot, marker, deficit, tray,
   pace alert) via `paceElapsedFraction`; with `paceWorkdays` a ~7-day window counts Mon–Fri (local time) only.
@@ -205,6 +205,12 @@ This file holds the project facts that are easy to get wrong.
   inside the ring and round ones grow.
 - Themes: `dark` (default, pure black: classes `.dark.oled`) | `light`. `useSettingsTheme` also sets the
   window theme: Mica takes its tint from the window, so a light page on dark Windows needs it.
+- Usage spikes (`usage_spikes.rs`, `use-usage-spike-alerts.ts`, setting `alertSettings.spikes`, on unless false): with
+  notifications on, every 5 min, panel open or not, the same log scan names Claude/Codex sessions (one log file each)
+  whose last 15 min reach 3x the usual busy quarter hour (p90 of the past week's busy session quarter hours, up to an
+  hour ago, price-weighted via `usage_projects::weight`) and 300k weighted tokens, after 20 such quarters of history.
+  Calibrated on 4 weeks of real logs (busiest ordinary quarter: 2.9x). One notification per card and folder an hour,
+  in memory.
 - Notifications (`src/lib/usage-alerts.ts`, pure + tested): the usage levels the user picks
   (`alertSettings.levels`, default 80/95, or a provider's own in `providerLevels` via `alertLevelsFor`; the
   card notches its bars at them, flipped when showing what's left), pace, reset; each once per provider+line+window, keys

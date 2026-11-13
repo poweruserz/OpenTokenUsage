@@ -483,6 +483,12 @@ describe("alert settings", () => {
     expect(alertLevelsFor(settings, "codex")).toEqual([80, 95])
     expect(normalizeAlertSettings(undefined).providerLevels).toEqual({})
   })
+
+  it("keeps usage spike notifications on unless they were turned off", () => {
+    expect(normalizeAlertSettings(undefined).spikes).toBe(true)
+    expect(normalizeAlertSettings({ levels: [80] }).spikes).toBe(true) // settings saved before spikes existed
+    expect(normalizeAlertSettings({ spikes: false }).spikes).toBe(false)
+  })
 })
 
 describe("star prompt", () => {
