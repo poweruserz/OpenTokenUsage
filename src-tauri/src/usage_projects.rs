@@ -3,7 +3,7 @@
 //! git branch it was spent in; dollars from ccusage's daily report, the same source as the card's
 //! totals, shared out by what each project's tokens cost. Nothing leaves the PC.
 
-use crate::usage_heatmap::{scan_logs, Log, Parts, SLOT_SECS};
+use crate::usage_heatmap::{scan_logs, Log, Parts, SPOT_SECS};
 use crate::AppState;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -320,8 +320,8 @@ fn share_out(
 /// Tokens by model, folder and branch spent from `start_ms` up to `end_ms`.
 fn month_usage(log: Log, dirs: &[PathBuf], start_ms: i64, end_ms: i64) -> (Usage, usize) {
     let (first, end) = (
-        start_ms.div_euclid(1000 * SLOT_SECS),
-        end_ms.div_euclid(1000 * SLOT_SECS),
+        start_ms.div_euclid(1000 * SPOT_SECS),
+        end_ms.div_euclid(1000 * SPOT_SECS),
     );
     let since = UNIX_EPOCH + Duration::from_millis(start_ms.max(0) as u64);
     let mut usage = Usage::new();
@@ -835,5 +835,41 @@ mod tests {
         assert_eq!(unreadable, 0);
         let total: u64 = usage.values().map(Parts::total).sum();
         assert_eq!(total, 2);
+    }
+
+    #[test]
+    fn cuts_a_weekly_limit_at_its_minute_not_its_quarter_hour() {
+        let root = std::env::temp_dir().join(format!("openusage-week-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let line = |id: &str, at: &str, tokens: u64| {
+            serde_json::json!({ "type": "assistant", "timestamp": at, "cwd": "C:/work/shop", "gitBranch": "main",
+                "message": { "id": id, "model": "opus", "usage": { "input_tokens": tokens, "output_tokens": 0 } } })
+            .to_string()
+                + "\n"
+        };
+        // A limit from 10:07 to 09:52 a week later (Codex resets at any minute).
+        let text = [
+            line("before", "2026-11-05T10:03:00Z", 1),
+            line("first", "2026-11-05T10:08:00Z", 10),
+            line("last", "2026-11-12T09:51:00Z", 100),
+            line("after", "2026-11-12T09:53:00Z", 1000),
+        ]
+        .concat();
+        std::fs::write(root.join("session.jsonl"), text).unwrap();
+        let ms = |at: &str| {
+            time::OffsetDateTime::parse(at, &time::format_description::well_known::Rfc3339)
+                .unwrap()
+                .unix_timestamp()
+                * 1000
+        };
+        let (usage, _) = month_usage(
+            Log::Claude,
+            &[root],
+            ms("2026-11-05T10:07:00Z"),
+            ms("2026-11-12T09:52:00Z"),
+        );
+        let total: u64 = usage.values().map(Parts::total).sum();
+        assert_eq!(total, 110);
     }
 }
