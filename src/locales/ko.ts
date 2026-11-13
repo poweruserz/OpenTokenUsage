@@ -251,6 +251,7 @@ export const ko: Messages = {
   "weekDays.title": "요일별 주간 한도",
   "weekDays.day": "{day}: 주간 한도의 약 {percent}",
   "weekDays.note": "지금까지 쓴 주간 한도 {percent}를 날마다 쓴 토큰의 금액에 따라 나눈 값입니다(로컬 로그 기준).",
+  "weekDays.loadFailed": "날짜별 사용량을 읽지 못했습니다. 몇 분 뒤 다시 시도합니다.",
   "heatmap.peak": "가장 많이 쓴 시간: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} 토큰",
   "heatmap.dayTotal": "{day}, 4주 합계: {tokens} 토큰",

@@ -339,14 +339,22 @@ fn month_usage(log: Log, dirs: &[PathBuf], start_ms: i64, end_ms: i64) -> (Usage
 }
 
 /// Price-weighted tokens between each two of `bounds` (ms), by the minute the scan keeps.
-fn days_usage(log: Log, dirs: &[PathBuf], bounds: &[i64]) -> Vec<f64> {
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Days {
+    days: Vec<f64>,
+    /// Logs that couldn't be read: the days leave them out, so the shares may be off.
+    unreadable: usize,
+}
+
+fn days_usage(log: Log, dirs: &[PathBuf], bounds: &[i64]) -> Days {
     let minutes: Vec<i64> = bounds
         .iter()
         .map(|ms| ms.div_euclid(1000 * SPOT_SECS))
         .collect();
     let mut days = vec![0.0; bounds.len().saturating_sub(1)];
     let since = UNIX_EPOCH + Duration::from_millis(bounds.first().copied().unwrap_or(0).max(0) as u64);
-    scan_logs(log, dirs, since, |scan| {
+    let unreadable = scan_logs(log, dirs, since, |scan| {
         for (spot, parts) in &scan.spots {
             // How many bounds the minute is at or after: 1 is the first day, len is past the last.
             let at = minutes.partition_point(|m| *m <= spot.slot);
@@ -355,7 +363,7 @@ fn days_usage(log: Log, dirs: &[PathBuf], bounds: &[i64]) -> Vec<f64> {
             }
         }
     });
-    days
+    Days { days, unreadable }
 }
 
 /// 2 to 10 ascending bounds over at most 9 days (a weekly limit's days and a DST change or two).
@@ -375,7 +383,7 @@ pub async fn usage_by_day(
     state: tauri::State<'_, Mutex<AppState>>,
     plugin_id: String,
     bounds: Vec<i64>,
-) -> Result<Vec<f64>, String> {
+) -> Result<Days, String> {
     if !valid_days(&bounds) {
         return Err("invalid days".into());
     }
@@ -389,7 +397,10 @@ pub async fn usage_by_day(
         }
     };
     let Some((log, dirs, folder)) = source else {
-        return Ok(Vec::new());
+        return Ok(Days {
+            days: Vec::new(),
+            unreadable: 0,
+        });
     };
     let dirs: Vec<PathBuf> = dirs.iter().map(|dir| dir.join(folder)).collect();
     tauri::async_runtime::spawn_blocking(move || days_usage(log, &dirs, &bounds))
@@ -926,7 +937,13 @@ mod tests {
             ms("2026-11-06T00:00:00Z"),
             ms("2026-11-07T00:00:00Z"),
         ];
-        assert_eq!(days_usage(Log::Claude, &[root], &bounds), [10.0, 110.0]);
+        assert_eq!(
+            days_usage(Log::Claude, &[root], &bounds),
+            Days {
+                days: vec![10.0, 110.0],
+                unreadable: 0
+            }
+        );
 
         assert!(valid_days(&bounds));
         let day = 24 * 3_600_000;

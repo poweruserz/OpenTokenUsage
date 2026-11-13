@@ -251,6 +251,7 @@ export const zhCN: Messages = {
   "weekDays.title": "每周限额（按天）",
   "weekDays.day": "{day}：约占每周限额的 {percent}",
   "weekDays.note": "目前已用的每周限额 {percent}，按每天 Token 的费用分摊（来自本地日志）。",
+  "weekDays.loadFailed": "无法读取每天的用量。几分钟后会再试。",
   "heatmap.peak": "最忙时段：{day} {hour}",
   "heatmap.cell": "{day} {hour}：{tokens} 个 Token",
   "heatmap.dayTotal": "{day}（4 周合计）：{tokens} 个 Token",

@@ -28,7 +28,7 @@ it("cuts a weekly limit at each local midnight up to now", () => {
 })
 
 it("shares the weekly limit used so far out over the days by their weighted tokens", async () => {
-  vi.mocked(invoke).mockResolvedValue([1, 3])
+  vi.mocked(invoke).mockResolvedValue({ days: [1, 3], unreadable: 0 })
   const resetsAt = new Date(Date.now() + 6 * DAY).toISOString() // a day and a bit into the week
   render(<WeekDays pluginId="claude" weekly={{ used: 40, limit: 100, resetsAt, periodDurationMs: 7 * DAY }} />)
   const days = await screen.findAllByRole("listitem")
@@ -43,10 +43,23 @@ it("shares the weekly limit used so far out over the days by their weighted toke
 })
 
 it("writes a tiny day in the language's own percent style", async () => {
-  vi.mocked(invoke).mockResolvedValue([1, 999])
+  vi.mocked(invoke).mockResolvedValue({ days: [1, 999], unreadable: 0 })
   const resetsAt = new Date(Date.now() + 6 * DAY).toISOString()
   render(<WeekDays pluginId="claude" weekly={{ used: 40, limit: 100, resetsAt, periodDurationMs: 7 * DAY }} />)
   expect(await screen.findByText(`<${new Intl.NumberFormat("en-US", { style: "percent" }).format(0.01)}`)).toBeInTheDocument()
+})
+
+it("says when logs couldn't be read, and when the read failed", async () => {
+  const weekly = { used: 40, limit: 100, resetsAt: new Date(Date.now() + 6 * DAY).toISOString(), periodDurationMs: 7 * DAY }
+  vi.mocked(invoke).mockResolvedValue({ days: [1, 3], unreadable: 2 })
+  const { unmount } = render(<WeekDays pluginId="claude" weekly={weekly} />)
+  expect(await screen.findByText("Log files that couldn't be read: 2")).toBeInTheDocument()
+  unmount()
+
+  vi.spyOn(console, "error").mockImplementation(() => {})
+  vi.mocked(invoke).mockRejectedValue("scan failed")
+  render(<WeekDays pluginId="claude" weekly={weekly} />)
+  expect(await screen.findByText(/Couldn't read the days/)).toBeInTheDocument()
 })
 
 it("leaves out a window longer than a week, which Codex can also call weekly", () => {

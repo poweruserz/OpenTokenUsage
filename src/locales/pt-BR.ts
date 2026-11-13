@@ -251,6 +251,7 @@ export const ptBR: Messages = {
   "weekDays.title": "Limite semanal por dia",
   "weekDays.day": "{day}: cerca de {percent} do limite semanal",
   "weekDays.note": "Os {percent} do limite semanal usados até agora, divididos pelo custo dos tokens de cada dia (dos logs locais).",
+  "weekDays.loadFailed": "Não foi possível ler os dias. Nova tentativa em alguns minutos.",
   "heatmap.peak": "Horário de maior uso: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} tokens",
   "heatmap.dayTotal": "{day}, nas 4 semanas: {tokens} tokens",

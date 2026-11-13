@@ -251,6 +251,7 @@ export const it: Messages = {
   "weekDays.title": "Limite settimanale per giorno",
   "weekDays.day": "{day}: circa il {percent} del limite settimanale",
   "weekDays.note": "Il {percent} del limite settimanale usato finora, ripartito in base al costo dei token di ogni giorno (dai log locali).",
+  "weekDays.loadFailed": "Impossibile leggere i giorni. Nuovo tentativo tra qualche minuto.",
   "heatmap.peak": "Ora di maggior uso: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} token",
   "heatmap.dayTotal": "{day}, nelle 4 settimane: {tokens} token",

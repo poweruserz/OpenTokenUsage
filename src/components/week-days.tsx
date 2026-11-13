@@ -26,6 +26,8 @@ export function dayBounds(startMs: number, nowMs: number): number[] {
 }
 
 type Weekly = { used: number; limit: number; resetsAt?: string; periodDurationMs?: number }
+/** `usage_by_day`: price-weighted tokens per day, and the logs it couldn't read. */
+type Days = { days: number[]; unreadable: number }
 
 /**
  * What each local day of the current weekly limit used of it, on a Claude or Codex detail page: the limit used so
@@ -43,7 +45,9 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
     hasUsageLogs(pluginId) && Number.isFinite(endMs) && periodMs > 0 && periodMs <= MAX_PERIOD_MS && (weekly?.limit ?? 0) > 0
   // Kept with the card and the limit it was read for: the detail page reuses this component.
   const key = `${pluginId}|${endMs}`
-  const [read, setRead] = useState<{ key: string; bounds: number[]; days: number[] } | null>(null)
+  const [read, setRead] = useState<{ key: string; bounds: number[]; days: number[]; unreadable: number } | null>(null)
+  // The card and limit whose last read failed: said in the section, over any rows read before.
+  const [failed, setFailed] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open || !shown || !isTauri() || !has) return
@@ -52,11 +56,16 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
       const now = Math.min(Date.now(), endMs)
       if (now <= startMs) return
       const bounds = dayBounds(startMs, now)
-      invoke<number[]>("usage_by_day", { pluginId, bounds })
-        .then((days) => {
-          if (live) setRead({ key, bounds, days })
+      invoke<Days>("usage_by_day", { pluginId, bounds })
+        .then(({ days, unreadable }) => {
+          if (!live) return
+          setRead({ key, bounds, days, unreadable })
+          setFailed(null)
         })
-        .catch((error) => console.error("Failed to read the weekly limit by day:", error))
+        .catch((error) => {
+          console.error("Failed to read the weekly limit by day:", error)
+          if (live) setFailed(key)
+        })
     }
     load()
     const timer = setInterval(load, WEEK_DAYS_REFRESH_MS)
@@ -69,9 +78,13 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
   if (!has || !weekly) return null
   const title = t("weekDays.title")
   const data = read?.key === key ? read : null
-  if (!shown || !data) return <DetailSection id="week" title={title} />
+  const failure = failed === key && (
+    <p role="status" className="mb-1 text-[10px] text-destructive">{t("weekDays.loadFailed")}</p>
+  )
+  if (!shown || (!data && !failure)) return <DetailSection id="week" title={title} />
+  if (!data) return <DetailSection id="week" title={title}>{failure}</DetailSection>
   const total = data.days.reduce((sum, weight) => sum + weight, 0)
-  if (total <= 0) return null
+  if (total <= 0 && !failure && data.unreadable === 0) return null
 
   const used = Math.max(0, Math.min(1, weekly.used / weekly.limit))
   const locale = getLocale()
@@ -80,7 +93,8 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
   const max = Math.max(...data.days)
   return (
     <DetailSection id="week" title={title}>
-      <ul className="flex flex-col gap-0.5">
+      {failure}
+      {total > 0 && <ul className="flex flex-col gap-0.5">
         {data.days.map((weight, index) => {
           const share = used * (weight / total)
           const day = dayName.format(new Date(data.bounds[index]))
@@ -100,8 +114,13 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
             </li>
           )
         })}
-      </ul>
-      <p className="mt-1 text-[10px] text-muted-foreground">{t("weekDays.note", { percent: percent.format(used) })}</p>
+      </ul>}
+      {total > 0 && (
+        <p className="mt-1 text-[10px] text-muted-foreground">{t("weekDays.note", { percent: percent.format(used) })}</p>
+      )}
+      {data.unreadable > 0 && (
+        <p className="mt-1 text-[10px] text-destructive">{t("heatmap.unreadable", { count: data.unreadable })}</p>
+      )}
     </DetailSection>
   )
 }

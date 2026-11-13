@@ -251,6 +251,7 @@ export const tr: Messages = {
   "weekDays.title": "Günlere göre haftalık limit",
   "weekDays.day": "{day}: haftalık limitin yaklaşık {percent} kadarı",
   "weekDays.note": "Haftalık limitin şimdiye kadar kullanılan {percent} kısmı, her günün token maliyetine göre paylaştırıldı (yerel kayıtlardan).",
+  "weekDays.loadFailed": "Günler okunamadı. Birkaç dakika içinde yeniden denenecek.",
   "heatmap.peak": "En yoğun: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} token",
   "heatmap.dayTotal": "{day}, 4 haftanın toplamı: {tokens} token",

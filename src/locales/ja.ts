@@ -251,6 +251,7 @@ export const ja: Messages = {
   "weekDays.title": "週間上限の日別内訳",
   "weekDays.day": "{day}: 週間上限の約 {percent}",
   "weekDays.note": "これまでに使った週間上限の {percent} を、各日のトークンの金額で配分した値です（ローカルのログから）。",
+  "weekDays.loadFailed": "日別の使用量を読み取れませんでした。数分後にもう一度試します。",
   "heatmap.peak": "最も多い時間帯: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} トークン",
   "heatmap.dayTotal": "{day}（4 週間の合計）: {tokens} トークン",

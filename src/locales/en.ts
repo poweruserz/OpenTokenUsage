@@ -251,6 +251,7 @@ export const en = {
   "weekDays.title": "Weekly limit by day",
   "weekDays.day": "{day}: about {percent} of the weekly limit",
   "weekDays.note": "The {percent} of the weekly limit used so far, shared out by what each day's tokens cost (from local logs).",
+  "weekDays.loadFailed": "Couldn't read the days. Trying again in a few minutes.",
   "heatmap.peak": "Busiest: {day} {hour}",
   "heatmap.cell": "{day} {hour}: {tokens} tokens",
   "heatmap.dayTotal": "{day}, all 4 weeks: {tokens} tokens",
