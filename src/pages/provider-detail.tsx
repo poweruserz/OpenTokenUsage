@@ -29,6 +29,10 @@ export function ProviderDetailPage({
     )
   }
 
+  const weekly = plugin.data?.lines.find(
+    (line) => line.type === "progress" && line.label === plugin.meta.weeklyCandidate
+  )
+
   return (
     <>
       <ProviderCard
@@ -52,7 +56,7 @@ export function ProviderDetailPage({
         onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
       />
       <UsageHeatmap pluginId={plugin.meta.id} timeFormatMode={timeFormatMode} />
-      <UsageProjects pluginId={plugin.meta.id} />
+      <UsageProjects pluginId={plugin.meta.id} weekly={weekly?.type === "progress" ? weekly : undefined} />
       <div className="pb-3" />
     </>
   )

@@ -67,6 +67,20 @@ describe("usage heatmap", () => {
     expect(screen.getByRole("gridcell", { name: /Tue 2:00.*2\.5M tokens/ })).toBeInTheDocument()
   })
 
+  it("adds each weekday up, as a bar beside its row and in its row header", async () => {
+    vi.mocked(invoke).mockResolvedValue(heatmap([[slotOf(1, 9), 1_000_000], [slotOf(1, 14), 2_000_000], [slotOf(3, 8), 1_500_000]]))
+    render(<UsageHeatmap pluginId="claude" />)
+    const tuesday = await screen.findByRole("rowheader", { name: /^Tue, all 4 weeks: 3M tokens$/ })
+    expect(screen.getByRole("rowheader", { name: /^Thu, all 4 weeks: 1\.5M tokens$/ })).toBeInTheDocument()
+    // The busiest weekday's bar is full and solid; the others are as long as their share of it.
+    const bar = (row: HTMLElement) => row.parentElement!.lastElementChild!.firstElementChild as HTMLElement
+    expect(bar(tuesday).style.width).toBe("100%")
+    expect(bar(tuesday).className).not.toMatch(/opacity-50/)
+    const thursday = screen.getByRole("rowheader", { name: /^Thu/ })
+    expect(bar(thursday).style.width).toBe("50%")
+    expect(bar(thursday).className).toMatch(/opacity-50/)
+  })
+
   it("follows the clock setting", async () => {
     vi.mocked(invoke).mockResolvedValue(heatmap([[slotOf(1, 14), 10]]))
     render(<UsageHeatmap pluginId="claude" timeFormatMode="24h" />)

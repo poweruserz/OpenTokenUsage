@@ -3,7 +3,7 @@
 //! git branch it was spent in; dollars from ccusage's daily report, the same source as the card's
 //! totals, shared out by what each project's tokens cost. Nothing leaves the PC.
 
-use crate::usage_heatmap::{scan_logs, Log, Parts, SLOT_SECS};
+use crate::usage_heatmap::{scan_logs, Log, Parts, SPOT_SECS};
 use crate::AppState;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -212,8 +212,12 @@ fn ticket_of(branch: &str) -> Option<String> {
 }
 
 /// Shares each model's dollars out over the projects and branches whose tokens it served.
+/// `priced` is the usage of the whole days `costs` cover, `usage` the part to share out: the same for
+/// a month, less for a weekly limit, which starts mid-day (its first day's earlier tokens set the rate
+/// but get no share, so the window isn't charged for them).
 fn share_out(
     log: Log,
+    priced: &Usage,
     usage: &Usage,
     costs: Option<&HashMap<String, f64>>,
     repository: impl Fn(&str) -> PathBuf,
@@ -221,7 +225,7 @@ fn share_out(
     // Dollars per weighted token, per model ("" = every model, for Codex).
     let mut weights: HashMap<&str, f64> = HashMap::new();
     let pooled = costs.is_some_and(|costs| costs.contains_key(""));
-    for ((model, ..), parts) in usage {
+    for ((model, ..), parts) in priced {
         let key = if pooled { "" } else { model.as_str() };
         *weights.entry(key).or_default() += weight(log, model, parts);
     }
@@ -293,14 +297,21 @@ fn share_out(
             .then(a.name.cmp(&b.name))
     });
 
-    let total_cost: f64 = costs.map_or(0.0, |costs| costs.values().sum());
     let shared: f64 = projects.iter().map(|p| p.cost).sum();
+    // Dollars of a model the logs don't show can't be placed in a project (nor in part of a day).
+    let unattributed: f64 = costs.map_or(0.0, |costs| {
+        costs
+            .iter()
+            .filter(|(model, _)| weights.get(model.as_str()).copied().unwrap_or(0.0) <= 0.0)
+            .map(|(_, cost)| cost)
+            .sum()
+    });
     Projects {
         priced: costs.is_some(),
         no_runner: false,
-        total_cost,
+        total_cost: shared + unattributed,
         total_tokens: projects.iter().map(|p| p.tokens).sum(),
-        unattributed_cost: (total_cost - shared).max(0.0),
+        unattributed_cost: unattributed,
         projects,
         unreadable: 0,
     }
@@ -309,8 +320,8 @@ fn share_out(
 /// Tokens by model, folder and branch spent from `start_ms` up to `end_ms`.
 fn month_usage(log: Log, dirs: &[PathBuf], start_ms: i64, end_ms: i64) -> (Usage, usize) {
     let (first, end) = (
-        start_ms.div_euclid(1000 * SLOT_SECS),
-        end_ms.div_euclid(1000 * SLOT_SECS),
+        start_ms.div_euclid(1000 * SPOT_SECS),
+        end_ms.div_euclid(1000 * SPOT_SECS),
     );
     let since = UNIX_EPOCH + Duration::from_millis(start_ms.max(0) as u64);
     let mut usage = Usage::new();
@@ -331,9 +342,39 @@ fn is_date(value: &str) -> bool {
     value.len() == 8 && value.bytes().all(|b| b.is_ascii_digit())
 }
 
+/// The whole local days ccusage priced for a range that starts mid-day (`from`, `to`: from the first
+/// day's midnight to the midnight after the last). `None` when the range is whole days itself; an error
+/// for bounds that don't hold its start, begin more than a day before it, or span over 32 days.
+fn priced_days(
+    start_ms: i64,
+    from: Option<i64>,
+    to: Option<i64>,
+) -> Result<Option<(i64, i64)>, ()> {
+    const HOUR: i64 = 3_600_000;
+    match (from, to) {
+        (None, None) => Ok(None),
+        (Some(from), Some(to)) => {
+            // checked: the webview sends these, and a wrapped difference would pass the bounds.
+            let before = start_ms.checked_sub(from).ok_or(())?;
+            let span = to.checked_sub(from).ok_or(())?;
+            // A day is at most 25 hours (a DST change).
+            if (0..=25 * HOUR).contains(&before)
+                && (1..=32 * 24 * HOUR).contains(&span)
+                && to > start_ms
+            {
+                Ok(Some((from, to)))
+            } else {
+                Err(())
+            }
+        }
+        _ => Err(()),
+    }
+}
+
 /// The projects of a Claude or Codex card's login (the usual one or an extra account) from
-/// `start_ms` up to `end_ms`; `since`/`until` are the same month's first and last local day
-/// (`YYYYMMDD`) for ccusage. Empty for other cards and for a WSL copy.
+/// `start_ms` up to `end_ms`; `since`/`until` are the first and last local day (`YYYYMMDD`) for
+/// ccusage. A range that starts mid-day (a weekly limit) passes the whole days ccusage prices as
+/// `price_start_ms`/`price_end_ms`. Empty for other cards and for a WSL copy.
 #[tauri::command]
 pub async fn usage_projects(
     state: tauri::State<'_, Mutex<AppState>>,
@@ -342,10 +383,14 @@ pub async fn usage_projects(
     end_ms: i64,
     since: String,
     until: String,
+    price_start_ms: Option<i64>,
+    price_end_ms: Option<i64>,
 ) -> Result<Projects, String> {
-    if !is_date(&since) || !is_date(&until) || end_ms <= start_ms {
+    let priced_range = priced_days(start_ms, price_start_ms, price_end_ms);
+    if !is_date(&since) || !is_date(&until) || end_ms <= start_ms || priced_range.is_err() {
         return Err("invalid month".into());
     }
+    let priced_range = priced_range.unwrap_or(None);
     let source = {
         let state = state.lock().map_err(|e| e.to_string())?;
         let plugin = state.plugins.iter().find(|p| p.manifest.id == plugin_id);
@@ -367,6 +412,7 @@ pub async fn usage_projects(
             None => dirs.iter().map(|dir| dir.join(folder)).collect(),
         };
         let (usage, unreadable) = month_usage(log, &logs, start_ms, end_ms);
+        let whole_days = priced_range.map(|(from, to)| month_usage(log, &logs, from, to).0);
         let report = crate::plugin_engine::host_api::ccusage_daily(
             // One cached report per month, so switching months doesn't run ccusage again.
             &format!("{plugin_id}:projects:{since}"),
@@ -378,7 +424,8 @@ pub async fn usage_projects(
         );
         let report: serde_json::Value = serde_json::from_str(&report).unwrap_or_default();
         let costs = month_costs(&report);
-        let mut projects = share_out(log, &usage, costs.as_ref(), repository_cached);
+        let priced = whole_days.as_ref().unwrap_or(&usage);
+        let mut projects = share_out(log, priced, &usage, costs.as_ref(), repository_cached);
         projects.no_runner = report["status"] == "no_runner";
         projects.unreadable = unreadable;
         projects
@@ -537,7 +584,7 @@ mod tests {
                 (model, "C:/work/blog", "main", parts(0, 0, 0, reads)),
             ]);
             let costs = HashMap::from([(model.to_string(), 8.0)]);
-            let out = share_out(Log::Claude, &usage, Some(&costs), by_parent);
+            let out = share_out(Log::Claude, &usage, &usage, Some(&costs), by_parent);
             let shares: Vec<_> = out.projects.iter().map(|p| cents(p.cost)).collect();
             assert_eq!(shares, [400, 400], "{model}");
         }
@@ -562,7 +609,7 @@ mod tests {
             ("sonnet".to_string(), 1.5),
             ("haiku".to_string(), 0.5),
         ]);
-        let out = share_out(Log::Claude, &usage, Some(&costs), by_parent);
+        let out = share_out(Log::Claude, &usage, &usage, Some(&costs), by_parent);
 
         assert!(out.priced);
         assert_eq!(cents(out.total_cost), 1000);
@@ -583,6 +630,49 @@ mod tests {
     }
 
     #[test]
+    fn charges_a_window_that_starts_mid_day_only_for_its_own_tokens() {
+        // The whole day ccusage priced: 300 Opus tokens for $9, the blog's 100 before the weekly limit began.
+        let day = usage(&[
+            ("opus", "C:/work/shop", "main", parts(200, 0, 0, 0)),
+            ("opus", "C:/work/blog", "main", parts(100, 0, 0, 0)),
+        ]);
+        let window = usage(&[("opus", "C:/work/shop", "main", parts(200, 0, 0, 0))]);
+        let costs = HashMap::from([("opus".to_string(), 9.0), ("haiku".to_string(), 0.5)]);
+        let out = share_out(Log::Claude, &day, &window, Some(&costs), by_parent);
+
+        assert_eq!(out.projects.len(), 1);
+        assert_eq!(cents(out.projects[0].cost), 600);
+        assert_eq!(cents(out.unattributed_cost), 50); // haiku isn't in the logs at all
+        assert_eq!(cents(out.total_cost), 650);
+    }
+
+    #[test]
+    fn takes_whole_priced_days_only_around_the_ranges_start() {
+        const HOUR: i64 = 3_600_000;
+        let start = 1_000 * 24 * HOUR + 10 * HOUR; // 10:00 on some day
+        let midnight = start - 10 * HOUR;
+        assert_eq!(priced_days(start, None, None), Ok(None));
+        // The week's first day up to the midnight after today (or after the day it reset).
+        assert_eq!(
+            priced_days(start, Some(midnight), Some(midnight + 8 * 24 * HOUR)),
+            Ok(Some((midnight, midnight + 8 * 24 * HOUR)))
+        );
+        // A day after a DST change has 25 hours.
+        assert!(priced_days(start, Some(start - 25 * HOUR), Some(start + HOUR)).is_ok());
+        for (from, to) in [
+            (Some(start - 26 * HOUR), Some(start + HOUR)), // more than a day before the start
+            (Some(start + 1), Some(start + HOUR)),         // after the start
+            (Some(midnight), Some(start)),                 // ends before the range begins
+            (Some(midnight), Some(midnight + 33 * 24 * HOUR)), // longer than a month
+            (Some(midnight), None),                        // half a pair
+            (Some(i64::MIN), Some(start + HOUR)),          // would wrap
+            (Some(midnight), Some(i64::MIN)),
+        ] {
+            assert_eq!(priced_days(start, from, to), Err(()), "{from:?} {to:?}");
+        }
+    }
+
+    #[test]
     fn pools_codex_dollars_and_lists_tokens_alone_when_unpriced() {
         let usage = usage(&[
             ("gpt-a", "C:/one", "dev", parts(100, 0, 0, 0)),
@@ -590,7 +680,9 @@ mod tests {
         ]);
         // 100 vs 800 weighted.
         let costs = HashMap::from([(String::new(), 9.0)]);
-        let out = share_out(Log::Codex, &usage, Some(&costs), |cwd| PathBuf::from(cwd));
+        let out = share_out(Log::Codex, &usage, &usage, Some(&costs), |cwd| {
+            PathBuf::from(cwd)
+        });
         assert_eq!(
             out.projects
                 .iter()
@@ -600,7 +692,7 @@ mod tests {
         );
         assert_eq!(cents(out.unattributed_cost), 0);
 
-        let unpriced = share_out(Log::Codex, &usage, None, |cwd| PathBuf::from(cwd));
+        let unpriced = share_out(Log::Codex, &usage, &usage, None, |cwd| PathBuf::from(cwd));
         assert!(!unpriced.priced);
         assert!(unpriced
             .projects
@@ -743,5 +835,41 @@ mod tests {
         assert_eq!(unreadable, 0);
         let total: u64 = usage.values().map(Parts::total).sum();
         assert_eq!(total, 2);
+    }
+
+    #[test]
+    fn cuts_a_weekly_limit_at_its_minute_not_its_quarter_hour() {
+        let root = std::env::temp_dir().join(format!("openusage-week-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let line = |id: &str, at: &str, tokens: u64| {
+            serde_json::json!({ "type": "assistant", "timestamp": at, "cwd": "C:/work/shop", "gitBranch": "main",
+                "message": { "id": id, "model": "opus", "usage": { "input_tokens": tokens, "output_tokens": 0 } } })
+            .to_string()
+                + "\n"
+        };
+        // A limit from 10:07 to 09:52 a week later (Codex resets at any minute).
+        let text = [
+            line("before", "2026-11-05T10:03:00Z", 1),
+            line("first", "2026-11-05T10:08:00Z", 10),
+            line("last", "2026-11-12T09:51:00Z", 100),
+            line("after", "2026-11-12T09:53:00Z", 1000),
+        ]
+        .concat();
+        std::fs::write(root.join("session.jsonl"), text).unwrap();
+        let ms = |at: &str| {
+            time::OffsetDateTime::parse(at, &time::format_description::well_known::Rfc3339)
+                .unwrap()
+                .unix_timestamp()
+                * 1000
+        };
+        let (usage, _) = month_usage(
+            Log::Claude,
+            &[root],
+            ms("2026-11-05T10:07:00Z"),
+            ms("2026-11-12T09:52:00Z"),
+        );
+        let total: u64 = usage.values().map(Parts::total).sum();
+        assert_eq!(total, 110);
     }
 }

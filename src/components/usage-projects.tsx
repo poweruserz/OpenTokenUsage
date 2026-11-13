@@ -44,6 +44,27 @@ export function monthRange(now: Date, back: number) {
   }
 }
 
+/**
+ * The weekly limit that ends at `endMs`: its bounds, its first and last day (up to today) for ccusage, and those
+ * whole local days, which ccusage prices although the limit starts (and may have ended) mid-day.
+ */
+export function weekRange(endMs: number, periodMs: number, now: Date) {
+  const startMs = endMs - periodMs
+  const first = new Date(startMs)
+  const last = new Date(Math.min(now.getTime(), endMs - 1))
+  return {
+    startMs,
+    endMs,
+    since: yyyymmdd(first),
+    until: yyyymmdd(last),
+    priceStartMs: new Date(first.getFullYear(), first.getMonth(), first.getDate()).getTime(),
+    priceEndMs: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1).getTime(),
+  }
+}
+
+/** A weekly line's reset time to the minute: Claude's `resets_at` moves by milliseconds on every probe. */
+const minute = (resetsAt: string | undefined) => (resetsAt ? Math.round(Date.parse(resetsAt) / 60_000) * 60_000 : NaN)
+
 /** Claude Code writes `HEAD` when it can't name the branch (detached, or not a repository). */
 const branchLabel = (name: string) => (name && name !== "HEAD" ? name : t("projects.noBranch"))
 
@@ -74,18 +95,29 @@ function saveBudget(pluginId: string, path: string, usd: number | null, saved: (
   return budgetSaves
 }
 
-/** What each project and branch cost a Claude or Codex login this month or last, read every few minutes while shown. */
-export function UsageProjects({ pluginId }: { pluginId: string }) {
+type Range = ReturnType<typeof monthRange> | ReturnType<typeof weekRange>
+
+/**
+ * What each project and branch cost a Claude or Codex login this month, last month or in the current weekly
+ * limit (`weekly`: the card's weekly line), read every few minutes while shown.
+ */
+export function UsageProjects({ pluginId, weekly }: { pluginId: string; weekly?: { resetsAt?: string; periodDurationMs?: number } }) {
   const open = usePanelOpen()
   // Closed, it reads nothing (budget alerts check on their own: use-project-budget-alerts.ts).
   const shown = useDetailSectionOpen("projects")
   const currency = useAppPreferencesStore((state) => state.currency)
   const budgets = useAppPreferencesStore((state) => state.projectBudgets)
   const setProjectBudgets = useAppPreferencesStore((state) => state.setProjectBudgets)
-  const [back, setBack] = useState(0)
+  const [picked, setPicked] = useState<number | "week">(0)
+  const weekEnd = minute(weekly?.resetsAt)
+  const weekPeriod = weekly?.periodDurationMs ?? 0
+  const hasWeek = Number.isFinite(weekEnd) && weekPeriod > 0
+  // A card without a weekly limit (or the next card picked) falls back to this month.
+  const back = picked === "week" && !hasWeek ? 0 : picked
+  const week = back === "week"
   // Kept with the card, the toggle and the month it was read for: the detail page reuses this
   // component, and a month that ends while it's open keeps its own rows until the next read.
-  const [read, setRead] = useState<{ key: string; range: ReturnType<typeof monthRange>; projects: Projects } | null>(null)
+  const [read, setRead] = useState<{ key: string; range: Range; projects: Projects } | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [all, setAll] = useState(false)
   // The card and month whose last read failed: said beside the month toggle.
@@ -94,7 +126,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   const [draft, setDraft] = useState("")
   const [invalid, setInvalid] = useState(false)
   const [exported, setExported] = useState<{ key: string; message: string; failed: boolean } | null>(null)
-  const key = `${pluginId}|${back}`
+  const key = week ? `${pluginId}|week|${weekEnd}` : `${pluginId}|${back}`
+  const rangeNow = (): Range => (week ? weekRange(weekEnd, weekPeriod, new Date()) : monthRange(new Date(), back as number))
   const cardBudgets = budgets[pluginId] ?? {}
 
   const toggle = (path: string) => {
@@ -108,9 +141,9 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   useEffect(() => {
     if (!open || !shown || !isTauri() || !hasUsageLogs(pluginId)) return
     let live = true
-    const loading = `${pluginId}|${back}`
+    const loading = key
     const load = () => {
-      const range = monthRange(new Date(), back)
+      const range = rangeNow()
       return invoke<Projects>("usage_projects", { pluginId, ...range })
         .then((projects) => {
           if (!live) return
@@ -128,7 +161,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
       live = false
       clearInterval(timer)
     }
-  }, [open, shown, pluginId, back])
+    // `key` names the range rangeNow() reads.
+  }, [open, shown, pluginId, key])
 
   useEffect(() => {
     setExpanded(null)
@@ -141,7 +175,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   // No project rows can still be a priced month: logs it couldn't read, or dollars it couldn't place.
   const empty = !data || (data.projects.length === 0 && !(data.priced && data.totalCost >= 0.005))
   // The month the rows were read for (not today's: a month can end while the list is open).
-  const range = read?.key === key ? read.range : monthRange(new Date(), back)
+  const range = read?.key === key ? read.range : rangeNow()
 
   const locale = getLocale()
   const tokens = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
@@ -151,7 +185,8 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
   const share = (project: Project) =>
     data?.priced && data.totalCost > 0 ? project.cost / data.totalCost : data && data.totalTokens > 0 ? project.tokens / data.totalTokens : 0
   const rows = data ? (all ? data.projects : data.projects.slice(0, FIRST_ROWS)) : []
-  const forecast = (spent: number) => (data?.priced ? monthEndForecast(spent, range.startMs, range.endMs, Date.now()) : null)
+  // Forecasts, budgets and the CSV are per month.
+  const forecast = (spent: number) => (data?.priced && !week ? monthEndForecast(spent, range.startMs, range.endMs, Date.now()) : null)
   const money = (usd: number) => formatMoney(usd, currency, locale)
   const exportCsv = () => {
     if (!data) return
@@ -170,15 +205,15 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
       title={t("projects.title")}
       controls={
         <div role="group" aria-label={t("projects.title")} className="flex rounded-md bg-foreground/5 p-0.5 text-[10px]">
-          {[t("projects.thisMonth"), t("projects.lastMonth")].map((label, index) => (
+          {([[t("projects.thisMonth"), 0], [t("projects.lastMonth"), 1], ...(hasWeek ? [[t("projects.weeklyLimit"), "week"]] : [])] as [string, number | "week"][]).map(([label, value]) => (
             <button
               key={label}
               type="button"
-              aria-pressed={back === index}
-              onClick={() => setBack(index)}
+              aria-pressed={back === value}
+              onClick={() => setPicked(value)}
               className={cn(
                 "rounded px-1.5 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                back === index ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                back === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               )}
             >
               {label}
@@ -192,7 +227,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
         <p role="status" className="mb-1 text-[11px] text-destructive">{t("projects.loadFailed")}</p>
       )}
       {!data ? null : empty ? (
-        <p className="text-[11px] text-muted-foreground">{t("projects.empty")}</p>
+        <p className="text-[11px] text-muted-foreground">{t(week ? "projects.emptyWeek" : "projects.empty")}</p>
       ) : (
         <>
           <div className="mb-1 flex items-baseline justify-between text-[11px]">
@@ -208,7 +243,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
             {rows.map((project) => {
               const isOpen = expanded === project.path
               const name = project.name || t("projects.unknown")
-              const budget = data.priced ? cardBudgets[project.path] : undefined
+              const budget = data.priced && !week ? cardBudgets[project.path] : undefined
               const level = budget ? budgetLevel(project.cost, budget) : 0
               const fill = budget ? Math.min(1, project.cost / budget) : share(project)
               return (
@@ -249,7 +284,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                       ))}
                     </ul>
                   )}
-                  {isOpen && data.priced && project.path && (
+                  {isOpen && data.priced && !week && project.path && (
                     <div className="mb-1.5 ml-5 flex flex-col gap-0.5 text-[10px] text-muted-foreground">
                       {budget && (
                         <p className={cn("tabular-nums", level === 100 && "text-destructive")}>
@@ -328,9 +363,9 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
             </p>
           )}
           <p className="mt-1 text-[10px] text-muted-foreground">
-            {data.priced ? t("projects.apiPrices") : data.noRunner ? t("projects.unpriced") : t("projects.unpricedFailed")}
+            {data.priced ? t("projects.apiPrices") : data.noRunner ? t("projects.unpriced") : t(week ? "projects.unpricedFailedWeek" : "projects.unpricedFailed")}
           </p>
-          <div className="mt-1 flex items-center gap-2 text-[10px]">
+          {!week && <div className="mt-1 flex items-center gap-2 text-[10px]">
             <button
               type="button"
               onClick={exportCsv}
@@ -347,7 +382,7 @@ export function UsageProjects({ pluginId }: { pluginId: string }) {
                 {exported.message}
               </span>
             )}
-          </div>
+          </div>}
         </>
       )}
       {data && data.unreadable > 0 && (

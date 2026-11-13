@@ -50,8 +50,9 @@ This file holds the project facts that are easy to get wrong.
   takes seconds on GBs of logs). A file's size comes from `fs::metadata`, not the folder listing: Windows' listing keeps
   the size a file had when last closed, and a CLI can hold its log open. Claude writes a line per content block, each
   with the message's usage so far: a message counts once, at its largest. Codex counts `token_usage_record` lines (one
-  per response); older logs only have `token_count`, a repeat with an unchanged total skipped. Usage is kept per UTC
-  quarter hour so half-hour time zones land in the right local hour; logs it can't read are counted under the grid.
+  per response); older logs only have `token_count`, a repeat with an unchanged total skipped. The scan keeps usage per
+  minute (`SPOT_SECS`, so a weekly limit is cut at its reset minute) and the grid gets UTC quarter hours (`SLOT_SECS`),
+  so half-hour time zones land in the right local hour; logs it can't read are counted under the grid.
   The detail page reuses the component across cards, so its data is kept with the card id it was read for. The grid
   is an ARIA grid: one tab stop, arrow keys move, the focused cell's tokens show in the header.
 - Usage by project (`usage_projects.rs`, `usage-projects.tsx`): the same scan (`scan_logs`, shared cache) keeps each
@@ -63,7 +64,10 @@ This file holds the project facts that are easy to get wrong.
   out per model (Codex's report has only day totals: pooled) by tokens weighted at the providers' price ratios, so
   projects add up to ccusage's total. A folder maps to its repository (walk up to `.git`; a `.git` file's `gitdir`,
   normalized, to the checkout holding it), looked up once per folder; network paths (`\\…`) are never looked into.
-  Month bounds come from the frontend (local time); `HEAD` means no branch.
+  Month bounds come from the frontend (local time); `HEAD` means no branch. The Weekly limit view passes the card's
+  weekly window (reset time to the minute: Claude's moves by milliseconds) and the whole local days ccusage prices
+  around it as `price_start_ms`/`price_end_ms` (`priced_days` checks them): `share_out` sets each model's rate from
+  the whole days' tokens and shares only the window's.
   Budgets (`project-budgets.ts`, setting `projectBudgets`: USD per card id and project path, in `BACKUP_KEYS` via
   `mergeCardMap`): the bar turns yellow at 80% and red at 100%; `use-project-budget-alerts.ts` checks enabled cards
   with a budget every 15 min, panel open or not, and notifies at 80% and 100% once per project and month (keys in

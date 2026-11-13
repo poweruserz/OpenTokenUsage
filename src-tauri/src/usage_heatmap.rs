@@ -14,9 +14,12 @@ use time::format_description::well_known::Rfc3339;
 
 /// Four whole weeks, so every weekday and hour of the grid adds up the same number of days.
 const DAYS: i64 = 28;
-/// Usage is kept per quarter hour: every time zone is a whole number of them off UTC, so the
-/// frontend can put each one in the right local hour (half-hour zones included).
+/// The heatmap reports usage per quarter hour: every time zone is a whole number of them off UTC, so
+/// the frontend can put each one in the right local hour (half-hour zones included).
 pub(crate) const SLOT_SECS: i64 = 900;
+/// The scan keeps each minute (`Spot::slot`), so a range that starts at any minute (a weekly limit's
+/// reset) is cut there rather than at its quarter hour.
+pub(crate) const SPOT_SECS: i64 = 60;
 /// `projects/<project>/<session>/subagents/<agent>.jsonl`, `sessions/<year>/<month>/<day>/<rollout>.jsonl`.
 const MAX_DEPTH: usize = 5;
 
@@ -70,6 +73,7 @@ impl Parts {
 /// Where tokens went: their quarter hour, the model, and the folder and git branch it worked in.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub(crate) struct Spot {
+    /// Unix seconds / `SPOT_SECS`.
     pub slot: i64,
     pub model: String,
     pub cwd: String,
@@ -200,7 +204,7 @@ impl CodexTokens {
 
 fn slot_of(timestamp: &str) -> Option<i64> {
     let at = time::OffsetDateTime::parse(timestamp, &Rfc3339).ok()?;
-    Some(at.unix_timestamp().div_euclid(SLOT_SECS))
+    Some(at.unix_timestamp().div_euclid(SPOT_SECS))
 }
 
 fn bump(spots: &mut HashMap<Spot, Parts>, spot: Spot, parts: Parts) {
@@ -452,8 +456,9 @@ fn heatmap(log: Log, dirs: &[PathBuf], now: SystemTime) -> Heatmap {
     let mut totals: HashMap<i64, u64> = HashMap::new();
     let unreadable = scan_logs(log, dirs, since, |scan| {
         for (spot, parts) in &scan.spots {
-            if spot.slot > first_slot {
-                *totals.entry(spot.slot).or_default() += parts.total();
+            let quarter = (spot.slot * SPOT_SECS).div_euclid(SLOT_SECS);
+            if quarter > first_slot {
+                *totals.entry(quarter).or_default() += parts.total();
             }
         }
     });
@@ -521,8 +526,9 @@ mod tests {
             )
     }
 
+    /// The heatmap's quarter hour of a timestamp.
     fn slot(timestamp: &str) -> i64 {
-        slot_of(timestamp).unwrap()
+        (slot_of(timestamp).unwrap() * SPOT_SECS).div_euclid(SLOT_SECS)
     }
 
     fn slots(log: Log, root: &Path, now: SystemTime) -> Vec<(i64, u64)> {

@@ -36,7 +36,8 @@ const MOVES: Record<string, (cell: Cell) => Cell> = {
   End: ({ day }) => ({ day, hour: 23 }),
 }
 
-const ROW = "grid grid-cols-[2rem_repeat(24,minmax(0,1fr))] items-center gap-px"
+// Weekday, 24 hours, and the weekday's total as a bar.
+const ROW = "grid grid-cols-[2rem_repeat(24,minmax(0,1fr))_2rem] items-center gap-px"
 
 /** When in the week a login's CLI was used over the last four weeks, read every few minutes while shown. */
 export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: string; timeFormatMode?: TimeFormatMode }) {
@@ -80,6 +81,8 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
 
   const grid = heatmapGrid(heatmap.slots)
   const max = Math.max(1, ...grid.flat())
+  const dayTotals = grid.map((row) => row.reduce((sum, value) => sum + value, 0))
+  const maxDay = Math.max(1, ...dayTotals)
   const locale = getLocale()
   const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" })
   // 2024-01-01 was a Monday.
@@ -89,6 +92,7 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
   const tokens = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
   const cellLabel = ({ day, hour }: Cell) =>
     t("heatmap.cell", { day: days[day], hour: hourLabel(hour), tokens: tokens.format(grid[day][hour]) })
+  const dayTotal = (day: number) => t("heatmap.dayTotal", { day: days[day], tokens: tokens.format(dayTotals[day]) })
   let peak = { day: 0, hour: 0, value: -1 }
   grid.forEach((row, day) =>
     row.forEach((value, hour) => {
@@ -122,7 +126,7 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
         <div role="grid" aria-label={title} className="flex flex-col gap-px">
           {grid.map((row, day) => (
             <div key={day} role="row" className={ROW}>
-              <span role="rowheader" className="truncate pr-1 text-[10px] leading-none text-muted-foreground">
+              <span role="rowheader" aria-label={dayTotal(day)} className="truncate pr-1 text-[10px] leading-none text-muted-foreground">
                 {days[day]}
               </span>
               {row.map((value, hour) => (
@@ -148,6 +152,12 @@ export function UsageHeatmap({ pluginId, timeFormatMode = "auto" }: { pluginId: 
                   />
                 </span>
               ))}
+              <span aria-hidden title={dayTotal(day)} className="ml-1 flex h-1.5 rounded-full bg-foreground/5">
+                <span
+                  className={cn("h-full rounded-full bg-primary", dayTotals[day] < maxDay && "opacity-50")}
+                  style={{ width: `${(dayTotals[day] / maxDay) * 100}%` }}
+                />
+              </span>
             </div>
           ))}
           <div aria-hidden className={ROW}>
