@@ -59,8 +59,10 @@
   function saveKept(ctx, kept) {
     try {
       ctx.host.fs.writeText(keptPath(ctx), JSON.stringify(kept))
+      return true
     } catch (e) {
       ctx.host.log.warn("muse last read not saved: " + String(e))
+      return false
     }
   }
 
@@ -76,13 +78,22 @@
   }
 
   // Meta leaves `subs_usage` (or one window) out while the 5-hour window is idle, and once left it
-  // out for everyone: a skipped window keeps the last reading until that reading's reset. A session
-  // past its reset (or already shown idle) is a new window nobody has used yet.
+  // out for everyone: a skipped window keeps the last reading until that reading's reset (an idle
+  // session has none). A session past its reset is a new window nobody has used yet.
   function carryOver(fresh, last, nowMs, idleIsEmpty) {
     if (fresh) return fresh
     if (!last) return null
-    if (last.resetsAtMs !== null && last.resetsAtMs > nowMs) return last
+    if (last.resetsAtMs === null || last.resetsAtMs > nowMs) return last
     return idleIsEmpty ? { usedPercent: 0, resetsAtMs: null, durationMins: last.durationMins } : null
+  }
+
+  // The windows as of now: a fresh answer's, or the last ones, each checked against its reset.
+  function current(fresh, last, nowMs) {
+    return {
+      plan: fresh ? fresh.plan : last.plan,
+      session: carryOver(fresh && fresh.session, last && last.session, nowMs, true),
+      weekly: carryOver(fresh && fresh.weekly, last && last.weekly, nowMs, false),
+    }
   }
 
   function planName(value) {
@@ -167,14 +178,14 @@
     var age = kept ? nowMs - kept.checkedAt : -1
     if (kept && age >= 0 && age < MIN_READ_GAP_MS) {
       if (typeof kept.error === "string") throw kept.error
-      if (kept.usage) return toOutput(ctx, kept.usage, kept.usageAt)
+      if (kept.usage) return toOutput(ctx, current(null, kept.usage, nowMs), kept.usageAt)
       throw UNAVAILABLE
     }
 
     var last = kept && kept.usage ? kept.usage : null
     var lastAt = last ? kept.usageAt : null
-    // Saved before asking, so a request that never answers still counts.
-    saveKept(ctx, { account: account, checkedAt: nowMs, usage: last, usageAt: lastAt })
+    // Saved before asking, so a request that never answers still counts; unsaved, the limit can't hold.
+    if (!saveKept(ctx, { account: account, checkedAt: nowMs, usage: last, usageAt: lastAt })) throw UNAVAILABLE
     var fresh
     try {
       fresh = readUsage(ctx, login.token)
@@ -184,11 +195,7 @@
       }
       throw e
     }
-    var usage = {
-      plan: fresh.plan,
-      session: carryOver(fresh.session, last && last.session, nowMs, true),
-      weekly: carryOver(fresh.weekly, last && last.weekly, nowMs, false),
-    }
+    var usage = current(fresh, last, nowMs)
     saveKept(ctx, { account: account, checkedAt: nowMs, usage: usage, usageAt: nowMs })
     return toOutput(ctx, usage, null)
   }

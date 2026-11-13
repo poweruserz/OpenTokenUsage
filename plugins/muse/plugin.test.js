@@ -174,6 +174,41 @@ describe("muse plugin", () => {
     expect(ctx.host.http.request).toHaveBeenCalledTimes(1)
   })
 
+  it("doesn't ask when it can't note the request: the 5-minute limit would be lost", async () => {
+    const plugin = await loadPlugin()
+    const ctx = makeCtx()
+    writeLogin(ctx)
+    const write = ctx.host.fs.writeText.getMockImplementation()
+    ctx.host.fs.writeText.mockImplementation((path, text) => {
+      if (String(path).endsWith("/last-read.json")) throw new Error("disk full")
+      return write(path, text)
+    })
+    ctx.host.http.request.mockReturnValue(answer())
+    expect(probeError(plugin, ctx)).toBe("Muse Code quota data unavailable. Try again later.")
+    expect(probeError(plugin, ctx)).toBe("Muse Code quota data unavailable. Try again later.")
+    expect(ctx.host.http.request).not.toHaveBeenCalled()
+  })
+
+  it("shows a window that reset since the kept read as reset, without asking", async () => {
+    const plugin = await loadPlugin()
+    const ctx = makeCtx()
+    writeLogin(ctx)
+    ctx.host.http.request.mockReturnValue(
+      answer({
+        subs_usage: {
+          window: { used_percent: 100, window_duration_mins: 300, resets_at: (NOW + 2 * MIN) / 1000 },
+          weekly: { used_percent: 60, resets_at: (NOW + 2 * MIN) / 1000 },
+        },
+      })
+    )
+    plugin.probe(ctx)
+    vi.setSystemTime(NOW + 3 * MIN)
+    const out = plugin.probe(ctx)
+    expect(ctx.host.http.request).toHaveBeenCalledTimes(1)
+    expect(out.staleSince).toBe(NOW)
+    expect(out.lines).toEqual([expect.objectContaining({ label: "Session", used: 0 })])
+  })
+
   it("a new login asks at once instead of showing the previous login's read", async () => {
     const plugin = await loadPlugin()
     const ctx = makeCtx()
