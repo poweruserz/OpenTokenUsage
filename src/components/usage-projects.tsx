@@ -45,18 +45,20 @@ export function monthRange(now: Date, back: number) {
 }
 
 /**
- * The weekly limit that ends at `endMs`: its bounds, its first and last day (up to today) for ccusage, and its
- * first day's local midnight, since it starts mid-day and ccusage prices whole days.
+ * The weekly limit that ends at `endMs`: its bounds, its first and last day (up to today) for ccusage, and those
+ * whole local days, which ccusage prices although the limit starts (and may have ended) mid-day.
  */
 export function weekRange(endMs: number, periodMs: number, now: Date) {
   const startMs = endMs - periodMs
   const first = new Date(startMs)
+  const last = new Date(Math.min(now.getTime(), endMs - 1))
   return {
     startMs,
     endMs,
     since: yyyymmdd(first),
-    until: yyyymmdd(new Date(Math.min(now.getTime(), endMs - 1))),
+    until: yyyymmdd(last),
     priceStartMs: new Date(first.getFullYear(), first.getMonth(), first.getDate()).getTime(),
+    priceEndMs: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1).getTime(),
   }
 }
 
@@ -225,7 +227,7 @@ export function UsageProjects({ pluginId, weekly }: { pluginId: string; weekly?:
         <p role="status" className="mb-1 text-[11px] text-destructive">{t("projects.loadFailed")}</p>
       )}
       {!data ? null : empty ? (
-        <p className="text-[11px] text-muted-foreground">{t("projects.empty")}</p>
+        <p className="text-[11px] text-muted-foreground">{t(week ? "projects.emptyWeek" : "projects.empty")}</p>
       ) : (
         <>
           <div className="mb-1 flex items-baseline justify-between text-[11px]">
@@ -361,7 +363,7 @@ export function UsageProjects({ pluginId, weekly }: { pluginId: string; weekly?:
             </p>
           )}
           <p className="mt-1 text-[10px] text-muted-foreground">
-            {data.priced ? t("projects.apiPrices") : data.noRunner ? t("projects.unpriced") : t("projects.unpricedFailed")}
+            {data.priced ? t("projects.apiPrices") : data.noRunner ? t("projects.unpriced") : t(week ? "projects.unpricedFailedWeek" : "projects.unpricedFailed")}
           </p>
           {!week && <div className="mt-1 flex items-center gap-2 text-[10px]">
             <button

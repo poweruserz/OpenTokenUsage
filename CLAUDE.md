@@ -64,9 +64,9 @@ This file holds the project facts that are easy to get wrong.
   projects add up to ccusage's total. A folder maps to its repository (walk up to `.git`; a `.git` file's `gitdir`,
   normalized, to the checkout holding it), looked up once per folder; network paths (`\\…`) are never looked into.
   Month bounds come from the frontend (local time); `HEAD` means no branch. The Weekly limit view passes the card's
-  weekly window (reset time to the minute: Claude's moves by milliseconds) and its first day's local midnight as
-  `price_start_ms`: ccusage prices whole days, so `share_out` sets each model's rate from the whole days' tokens
-  and shares only the window's.
+  weekly window (reset time to the minute: Claude's moves by milliseconds) and the whole local days ccusage prices
+  around it as `price_start_ms`/`price_end_ms` (`priced_days` checks them): `share_out` sets each model's rate from
+  the whole days' tokens and shares only the window's.
   Budgets (`project-budgets.ts`, setting `projectBudgets`: USD per card id and project path, in `BACKUP_KEYS` via
   `mergeCardMap`): the bar turns yellow at 80% and red at 100%; `use-project-budget-alerts.ts` checks enabled cards
   with a budget every 15 min, panel open or not, and notifies at 80% and 100% once per project and month (keys in

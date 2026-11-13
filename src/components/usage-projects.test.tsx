@@ -51,6 +51,12 @@ describe("usage by project", () => {
       since: "20260312",
       until: "20260315",
       priceStartMs: new Date(2026, 2, 12).getTime(),
+      priceEndMs: new Date(2026, 2, 16).getTime(),
+    })
+    // A limit that already reset (the card not probed since): its priced days end with the reset day.
+    expect(weekRange(endMs, 7 * 86_400_000, new Date(2026, 2, 19, 15))).toMatchObject({
+      until: "20260319",
+      priceEndMs: new Date(2026, 2, 20).getTime(),
     })
   })
 
@@ -72,6 +78,16 @@ describe("usage by project", () => {
     expect(screen.queryByLabelText("Monthly budget")).toBeNull()
     expect(screen.queryByRole("button", { name: "Export CSV" })).toBeNull()
     expect(screen.queryByText(/by month end/)).toBeNull()
+
+    // An empty weekly limit says so, not "this month".
+    vi.mocked(invoke).mockResolvedValue(projects([]))
+    fireEvent.click(screen.getByRole("button", { name: "Last month" }))
+    fireEvent.click(screen.getByRole("button", { name: "Weekly limit" }))
+    expect(await screen.findByText("No usage in this weekly limit.")).toBeInTheDocument()
+    vi.mocked(invoke).mockResolvedValue(projects([project("shop", 30, 300)]))
+    fireEvent.click(screen.getByRole("button", { name: "This month" }))
+    fireEvent.click(screen.getByRole("button", { name: "Weekly limit" }))
+    fireEvent.click(await screen.findByRole("button", { name: /shop/ }))
 
     // Claude's reset time moves by milliseconds on every probe: that is the same window, not a new read.
     const calls = vi.mocked(invoke).mock.calls.length

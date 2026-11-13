@@ -342,10 +342,39 @@ fn is_date(value: &str) -> bool {
     value.len() == 8 && value.bytes().all(|b| b.is_ascii_digit())
 }
 
+/// The whole local days ccusage priced for a range that starts mid-day (`from`, `to`: from the first
+/// day's midnight to the midnight after the last). `None` when the range is whole days itself; an error
+/// for bounds that don't hold its start, begin more than a day before it, or span over 32 days.
+fn priced_days(
+    start_ms: i64,
+    from: Option<i64>,
+    to: Option<i64>,
+) -> Result<Option<(i64, i64)>, ()> {
+    const HOUR: i64 = 3_600_000;
+    match (from, to) {
+        (None, None) => Ok(None),
+        (Some(from), Some(to)) => {
+            // checked: the webview sends these, and a wrapped difference would pass the bounds.
+            let before = start_ms.checked_sub(from).ok_or(())?;
+            let span = to.checked_sub(from).ok_or(())?;
+            // A day is at most 25 hours (a DST change).
+            if (0..=25 * HOUR).contains(&before)
+                && (1..=32 * 24 * HOUR).contains(&span)
+                && to > start_ms
+            {
+                Ok(Some((from, to)))
+            } else {
+                Err(())
+            }
+        }
+        _ => Err(()),
+    }
+}
+
 /// The projects of a Claude or Codex card's login (the usual one or an extra account) from
 /// `start_ms` up to `end_ms`; `since`/`until` are the first and last local day (`YYYYMMDD`) for
-/// ccusage. A range that starts mid-day (a weekly limit) passes that day's local midnight as
-/// `price_start_ms`. Empty for other cards and for a WSL copy.
+/// ccusage. A range that starts mid-day (a weekly limit) passes the whole days ccusage prices as
+/// `price_start_ms`/`price_end_ms`. Empty for other cards and for a WSL copy.
 #[tauri::command]
 pub async fn usage_projects(
     state: tauri::State<'_, Mutex<AppState>>,
@@ -355,13 +384,13 @@ pub async fn usage_projects(
     since: String,
     until: String,
     price_start_ms: Option<i64>,
+    price_end_ms: Option<i64>,
 ) -> Result<Projects, String> {
-    // A day is at most 25 hours (a DST change).
-    let day_start_ok =
-        price_start_ms.map_or(true, |p| p <= start_ms && start_ms - p <= 25 * 3_600_000);
-    if !is_date(&since) || !is_date(&until) || end_ms <= start_ms || !day_start_ok {
+    let priced_range = priced_days(start_ms, price_start_ms, price_end_ms);
+    if !is_date(&since) || !is_date(&until) || end_ms <= start_ms || priced_range.is_err() {
         return Err("invalid month".into());
     }
+    let priced_range = priced_range.unwrap_or(None);
     let source = {
         let state = state.lock().map_err(|e| e.to_string())?;
         let plugin = state.plugins.iter().find(|p| p.manifest.id == plugin_id);
@@ -383,12 +412,7 @@ pub async fn usage_projects(
             None => dirs.iter().map(|dir| dir.join(folder)).collect(),
         };
         let (usage, unreadable) = month_usage(log, &logs, start_ms, end_ms);
-        let whole_days = match price_start_ms {
-            Some(day_start) if day_start < start_ms => {
-                Some(month_usage(log, &logs, day_start, end_ms).0)
-            }
-            _ => None,
-        };
+        let whole_days = priced_range.map(|(from, to)| month_usage(log, &logs, from, to).0);
         let report = crate::plugin_engine::host_api::ccusage_daily(
             // One cached report per month, so switching months doesn't run ccusage again.
             &format!("{plugin_id}:projects:{since}"),
@@ -620,6 +644,32 @@ mod tests {
         assert_eq!(cents(out.projects[0].cost), 600);
         assert_eq!(cents(out.unattributed_cost), 50); // haiku isn't in the logs at all
         assert_eq!(cents(out.total_cost), 650);
+    }
+
+    #[test]
+    fn takes_whole_priced_days_only_around_the_ranges_start() {
+        const HOUR: i64 = 3_600_000;
+        let start = 1_000 * 24 * HOUR + 10 * HOUR; // 10:00 on some day
+        let midnight = start - 10 * HOUR;
+        assert_eq!(priced_days(start, None, None), Ok(None));
+        // The week's first day up to the midnight after today (or after the day it reset).
+        assert_eq!(
+            priced_days(start, Some(midnight), Some(midnight + 8 * 24 * HOUR)),
+            Ok(Some((midnight, midnight + 8 * 24 * HOUR)))
+        );
+        // A day after a DST change has 25 hours.
+        assert!(priced_days(start, Some(start - 25 * HOUR), Some(start + HOUR)).is_ok());
+        for (from, to) in [
+            (Some(start - 26 * HOUR), Some(start + HOUR)), // more than a day before the start
+            (Some(start + 1), Some(start + HOUR)),         // after the start
+            (Some(midnight), Some(start)),                 // ends before the range begins
+            (Some(midnight), Some(midnight + 33 * 24 * HOUR)), // longer than a month
+            (Some(midnight), None),                        // half a pair
+            (Some(i64::MIN), Some(start + HOUR)),          // would wrap
+            (Some(midnight), Some(i64::MIN)),
+        ] {
+            assert_eq!(priced_days(start, from, to), Err(()), "{from:?} {to:?}");
+        }
     }
 
     #[test]
