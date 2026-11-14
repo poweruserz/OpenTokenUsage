@@ -208,12 +208,16 @@ export function usePanel({
 
       let maxHeightPhysical: number | null = null
       let maxHeightLogical: number | null = null
+      // The settings view's width, narrower on a work area that can't hold it (a portrait screen at a high scale).
+      let settingsWidth = SETTINGS_PANEL_WIDTH
 
       try {
         const monitor = await currentMonitor()
         if (monitor) {
           maxHeightPhysical = Math.floor(monitor.size.height * MAX_HEIGHT_FRACTION_OF_MONITOR)
           maxHeightLogical = Math.floor(maxHeightPhysical / factor)
+          const workAreaWidth = Math.floor(monitor.workArea.size.width / factor)
+          settingsWidth = Math.max(PANEL_MIN_WIDTH, Math.min(SETTINGS_PANEL_WIDTH, workAreaWidth))
         }
       } catch {
         // fall through to fallback
@@ -237,7 +241,7 @@ export function usePanel({
       try {
         const win = getCurrentWindow()
         // Read after the await above: an edge drag may have changed the width meanwhile.
-        const logicalWidth = activeView === "settings" ? SETTINGS_PANEL_WIDTH : widthRef.current
+        const logicalWidth = activeView === "settings" ? settingsWidth : widthRef.current
         const shown = shownWidthRef.current
         shownWidthRef.current = logicalWidth
         if (shown !== null && shown !== logicalWidth) {

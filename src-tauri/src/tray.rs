@@ -570,8 +570,7 @@ fn remembered_position(window: &tauri::WebviewWindow) -> Option<(i32, i32)> {
             .then_some(value as i32)
     };
     let (x, y) = (coordinate("x")?, coordinate("y")?);
-    let width = window.outer_size().ok()?.width as i32;
-    let title_bar = (x + width / 2, y + 8);
+    let title_bar = spot_probe(window, (x, y));
     window
         .available_monitors()
         .ok()?
@@ -579,6 +578,13 @@ fn remembered_position(window: &tauri::WebviewWindow) -> Option<(i32, i32)> {
         .map(work_area_of)
         .any(|area| contains(area, title_bar))
         .then_some((x, y))
+}
+
+/// The point of a spot that must be on a screen: on the title bar, at the narrowest panel's middle (400 logical
+/// px), so the answer doesn't change with the wider settings view.
+fn spot_probe(window: &tauri::WebviewWindow, (x, y): (i32, i32)) -> (i32, i32) {
+    let half = (200.0 * window.scale_factor().unwrap_or(1.0)).round() as i32;
+    (x + half, y + 8)
 }
 
 fn contains(area: (i32, i32, i32, i32), (x, y): (i32, i32)) -> bool {
@@ -595,7 +601,7 @@ fn place_at_remembered(window: &tauri::WebviewWindow, (x, y): (i32, i32)) {
         monitors
             .iter()
             .map(work_area_of)
-            .find(|area| contains(*area, (x + width / 2, y + 8)))
+            .find(|area| contains(*area, spot_probe(window, (x, y))))
     });
     let Some(area) = area else {
         return;
@@ -625,6 +631,35 @@ fn edge_resize_x(
 ) -> i32 {
     let x = if keep_right { x + width - new_width } else { x };
     x.min(area.2 - new_width).max(area.0)
+}
+
+/// Where the panel's left edge comes from at any width away from a remembered spot (physical px): the middle of
+/// the tray icon or strip it opened above, its right edge in the corner, or its middle once the user moved or
+/// resized it. Going in and out of the wider settings view places the panel from this.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Anchor {
+    Middle(i32),
+    Right(i32),
+}
+
+fn anchor_slot() -> &'static Mutex<Option<Anchor>> {
+    static SLOT: OnceLock<Mutex<Option<Anchor>>> = OnceLock::new();
+    SLOT.get_or_init(|| Mutex::new(None))
+}
+
+fn set_anchor(anchor: Anchor) {
+    if let Ok(mut slot) = anchor_slot().lock() {
+        *slot = Some(anchor);
+    }
+}
+
+/// Pure: the panel's left edge at `width` from `anchor`, inside the work area.
+fn anchored_x(anchor: Anchor, width: i32, area: (i32, i32, i32, i32)) -> i32 {
+    let x = match anchor {
+        Anchor::Middle(middle) => middle - width / 2,
+        Anchor::Right(right) => right - width,
+    };
+    x.min(area.2 - width).max(area.0)
 }
 
 /// An edge drag (`resize_panel`): the panel `width` logical px wide, in one SetWindowPos (a size and then a
@@ -658,20 +693,31 @@ pub fn resize_panel(
     // The width the frontend last set, not the window's: its setSize is async and can land after this sync
     // command, leaving the window at an older width for a moment (the left edge stays right, though).
     let old_width = (from_width * scale).ceil() as i32;
-    // Checked at the old width, before the move.
     let remembered = remembered_position(window);
-    // An edge drag names the edge that stays. A view change (settings is wider) keeps the one the re-anchor after it
-    // keeps, the left at a remembered spot and the right near the tray, and never moves the remembered spot, so
-    // leaving settings puts the panel back.
-    let dragged = keep_right.is_some();
-    let keep_right = keep_right.unwrap_or(remembered.is_none());
-    let x = edge_resize_x(
-        pos.x,
-        old_width,
-        new_width,
-        keep_right,
-        work_area_of(&monitor),
-    );
+    let area = work_area_of(&monitor);
+    let x = match (keep_right, remembered) {
+        // An edge drag: the other edge stays, and the panel's new middle is where it is anchored.
+        (Some(keep_right), _) => {
+            let x = edge_resize_x(pos.x, old_width, new_width, keep_right, area);
+            set_anchor(Anchor::Middle(x + new_width / 2));
+            x
+        }
+        // Into or out of settings at a remembered spot: where the re-anchor after this puts the panel.
+        (None, Some((saved_x, saved_y))) => {
+            fit_into(saved_x, saved_y, new_width, size.height as i32, area).0
+        }
+        // Elsewhere: from the anchor (or the panel's middle, if nothing anchored it), so the way back lands where the
+        // panel started even when the work area clamped the wide one.
+        (None, None) => {
+            let anchor = anchor_slot()
+                .lock()
+                .ok()
+                .and_then(|slot| *slot)
+                .unwrap_or(Anchor::Middle(pos.x + old_width / 2));
+            set_anchor(anchor);
+            anchored_x(anchor, new_width, area)
+        }
+    };
     if let Ok(mut slot) = placed_slot().lock() {
         *slot = Some((x, pos.y));
     }
@@ -686,8 +732,9 @@ pub fn resize_panel(
             SWP_NOZORDER | SWP_NOACTIVATE,
         );
     }
-    // The remembered spot moves with the left edge; its y, and a spot that is gone or off screen, stay as they are.
-    if let (Some((saved_x, saved_y)), true) = (remembered, dragged && x != pos.x) {
+    // An edge drag moves the remembered spot with the left edge; its y, a view change, and a spot that is gone or
+    // off screen leave it as it is.
+    if let (Some((saved_x, saved_y)), true) = (remembered, keep_right.is_some() && x != pos.x) {
         if let Some(store) = remember_position_store(window.app_handle()) {
             store.set(
                 PANEL_POSITION_KEY,
@@ -702,6 +749,9 @@ pub fn panel_moved(window: &tauri::WebviewWindow, position: tauri::PhysicalPosit
     let ours = placed_slot().lock().ok().and_then(|slot| *slot) == Some((position.x, position.y));
     if ours || !window.is_visible().unwrap_or(false) {
         return;
+    }
+    if let Ok(size) = window.outer_size() {
+        set_anchor(Anchor::Middle(position.x + size.width as i32 / 2));
     }
     if let Some(store) = remember_position_store(window.app_handle()) {
         store.set(
@@ -810,6 +860,7 @@ pub fn anchor_panel(window: &tauri::WebviewWindow) {
         None => {
             let bottom = area.3 - margin;
             set_last_anchor_bottom_physical_y(bottom);
+            set_anchor(Anchor::Right(area.2 - margin));
             (area.2 - size.width as i32 - margin, bottom)
         }
     };
@@ -864,6 +915,7 @@ fn position_window_at_tray_icon(
     // Bottom taskbar: the icon sits below the work area, so anchor on the work area's bottom.
     let anchor_bottom = (icon_y.round() as i32).min(area.3) - margin;
     set_last_anchor_bottom_physical_y(anchor_bottom);
+    set_anchor(Anchor::Middle(icon_center_x.round() as i32));
     let x = (icon_center_x - size.width as f64 / 2.0).round() as i32;
     let (x, y) = flyout_origin(
         x,
@@ -928,6 +980,20 @@ mod flyout_tests {
         // At the screen's edges the panel grows the other way instead of sticking out.
         assert_eq!(super::edge_resize_x(2148, 400, 500, false, AREA), 2060);
         assert_eq!(super::edge_resize_x(20, 400, 500, true, AREA), 0);
+    }
+
+    #[test]
+    fn a_trip_into_settings_and_back_lands_where_it_started() {
+        use super::{anchored_x, Anchor};
+        // Each width is placed from the anchor, not from the clamped wide panel: (400 px, 760 px, back to 400 px).
+        let trip = |anchor| (anchored_x(anchor, 400, AREA), anchored_x(anchor, 760, AREA));
+        assert_eq!(trip(Anchor::Right(2548)), (2148, 1788)); // the corner
+        assert_eq!(trip(Anchor::Middle(220)), (20, 0)); // dragged near the left edge: 0 is clamped, 20 is back
+        assert_eq!(trip(Anchor::Middle(2500)), (2160, 1800)); // an icon at the far right
+        assert_eq!(trip(Anchor::Middle(1280)), (1080, 900)); // centered on what was clicked, at both widths
+                                                             // At a remembered spot both ways go where the re-anchor (`fit_into`) puts them, so nothing jumps after.
+        assert_eq!(fit_into(2148, 800, 760, 541, AREA).0, 1800);
+        assert_eq!(fit_into(2148, 800, 400, 541, AREA).0, 2148);
     }
 
     #[test]

@@ -171,9 +171,11 @@ This file holds the project facts that are easy to get wrong.
   tauri-runtime-wry's `TAURI_DRAG_RESIZE_BORDERS` child, which takes a real mouse press on the edges into that loop
   before the webview sees it (mouse messages posted to the webview skip it; test edges with a real mouse or
   SendInput). `setSize` and SetWindowPos still work. The settings view is `SETTINGS_PANEL_WIDTH` (760) wide, its
-  sections in two columns, with no edge strips; going in or out calls `resize_panel` without `keepRight`, so the host
-  keeps the edge the re-anchor keeps (left at a remembered spot, right near the tray) and leaves the remembered spot
-  alone. `use-panel.ts` sizes the window to that width and the content's height. The
+  sections in two columns (narrower on a work area that can't hold it), with no edge strips. Going in or out calls
+  `resize_panel` without `keepRight`: at a remembered spot the panel goes where `fit_into` will, elsewhere it is placed
+  from `tray.rs`'s `Anchor` (the tray icon's middle, the corner's right edge, or its middle after a user move or edge
+  drag), so the round trip lands where it started even when the work area clamped the wide panel; the remembered spot
+  never moves. `use-panel.ts` sizes the window to that width and the content's height. The
   content's scroller reaches the card's right edge (`-mr-3`, `pr-3`) so the scrollbar sits there and the content
   keeps the same 12 px on both sides.
 - Panel: the title bar pin (`panelPinned`) keeps it always on top. "Remember position": `tray.rs`

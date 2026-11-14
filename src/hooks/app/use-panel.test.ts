@@ -450,4 +450,25 @@ describe("usePanel", () => {
       document.body.removeChild(container)
     }
   })
+
+  it("keeps settings inside a work area narrower than its width", async () => {
+    const setSize = vi.fn().mockResolvedValue(undefined)
+    getCurrentWindowMock.mockReturnValue({ setSize })
+    currentMonitorMock.mockResolvedValue({
+      size: { width: 700, height: 1200 },
+      workArea: { size: { width: 700, height: 1152 } },
+    })
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    try {
+      renderHook(() => {
+        const panel = usePanel({ activeView: "settings", setActiveView: vi.fn(), showAbout: false, setShowAbout: vi.fn(), displayPlugins: [] })
+        panel.containerRef.current = container
+        return panel
+      })
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 700 })))
+    } finally {
+      document.body.removeChild(container)
+    }
+  })
 })
