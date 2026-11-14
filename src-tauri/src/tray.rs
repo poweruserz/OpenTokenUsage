@@ -706,14 +706,16 @@ pub fn resize_panel(
         (None, Some((saved_x, saved_y))) => {
             fit_into(saved_x, saved_y, new_width, size.height as i32, area).0
         }
-        // Elsewhere: from the anchor (or the panel's middle, if nothing anchored it), so the way back lands where the
-        // panel started even when the work area clamped the wide one.
+        // Elsewhere: from the anchor, so the way back lands where the panel started even when the work area clamped
+        // the wide one. Nothing anchored it yet only when it opened at a remembered spot and that was turned off since:
+        // the corner then, where `anchor_panel` puts it right after.
         (None, None) => {
+            let margin = (FLYOUT_MARGIN * scale).round() as i32;
             let anchor = anchor_slot()
                 .lock()
                 .ok()
                 .and_then(|slot| *slot)
-                .unwrap_or(Anchor::Middle(pos.x + old_width / 2));
+                .unwrap_or(Anchor::Right(area.2 - margin));
             set_anchor(anchor);
             anchored_x(anchor, new_width, area)
         }
