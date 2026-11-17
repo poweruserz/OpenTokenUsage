@@ -101,6 +101,9 @@ export const esES: Messages = {
   "settings.categories": "Categorías de ajustes",
 
 
+  "settings.configBroken": "No se ha guardado: ~/.openusage/config.json no es un JSON válido. Corrige o borra ese archivo y vuelve a guardar.",
+
+
   "settings.strip.desktopEdgeSide": "Borde",
 
 

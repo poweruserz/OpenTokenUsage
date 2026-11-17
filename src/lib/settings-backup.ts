@@ -14,6 +14,8 @@ export const BACKUP_KEYS = [
   "collapsedSections",
   "currency",
   "desktopWidgets",
+  // Saved with collapsedSections: without it, a restored list looks older than "year" and closes it.
+  "detailSectionsSeen",
   "displayMode",
   "glass",
   "globalShortcut",
@@ -168,7 +170,7 @@ export async function resetAllSettings(): Promise<void> {
     const value = await backupStore.get(key)
     if (value !== undefined) kept[key] = value
   }
-  await restoreSettingsBackup(JSON.stringify({ app: BACKUP_APP, version: 1, settings: kept }))
+  await restore(kept, true)
 }
 
 /**
@@ -179,10 +181,20 @@ export async function resetAllSettings(): Promise<void> {
 export async function restoreSettingsBackup(text: string): Promise<RestoreResult> {
   const settings = backupSettings(text)
   if (!settings) return { ok: false, reason: "notBackup" }
+  await restore(settings, false)
+  return { ok: true }
+}
+
+/** `reset`: this PC's extra-account preferences go back to their defaults too, not kept as an import keeps them. */
+async function restore(settings: Record<string, unknown>, reset: boolean): Promise<void> {
   const writes: [string, unknown][] = []
   for (const key of BACKUP_KEYS) {
     const has = Object.prototype.hasOwnProperty.call(settings, key)
-    const value = restoredValue(key, has, settings[key], await backupStore.get(key))
+    let local = await backupStore.get(key)
+    // The providers and budgets a reset keeps are this PC's own already; the sound file stays choosable.
+    if (reset && key === "alertSettings") local = { ...asObject(local), providerLevels: {} }
+    else if (reset && key !== "plugins" && key !== "projectBudgets") local = undefined
+    const value = restoredValue(key, has, settings[key], local)
     if (value !== KEEP) writes.push([key, value])
   }
   for (const [key, value] of writes) {
@@ -192,5 +204,4 @@ export async function restoreSettingsBackup(text: string): Promise<RestoreResult
     if (key === "plugins") await backupStore.delete(PROVIDER_DETECTION_KEY)
   }
   await backupStore.save()
-  return { ok: true }
 }

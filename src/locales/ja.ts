@@ -101,6 +101,9 @@ export const ja: Messages = {
   "settings.categories": "設定のカテゴリ",
 
 
+  "settings.configBroken": "保存されませんでした: ~/.openusage/config.json が正しい JSON ではありません。ファイルを修正するか削除してから、もう一度保存してください。",
+
+
   "settings.strip.desktopEdgeSide": "端",
 
 

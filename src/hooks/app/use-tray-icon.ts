@@ -36,6 +36,8 @@ type UseTrayIconArgs = {
   trayPercentColor: string
   themeMode: string
   activeView: string
+  /** The screen is shared ("Hide from screen sharing"): no usage in the hover text either. */
+  sharing?: boolean
 }
 
 export type TraySettingsPreview = {
@@ -78,6 +80,7 @@ export function useTrayIcon({
   trayPercentColor,
   themeMode,
   activeView,
+  sharing = false,
 }: UseTrayIconArgs) {
   const trayRef = useRef<TrayIcon | null>(null)
   const trayGaugeIconPathRef = useRef<string | null>(null)
@@ -144,6 +147,11 @@ export function useTrayIcon({
   useEffect(() => {
     activeViewRef.current = activeView
   }, [activeView])
+
+  const sharingRef = useRef(sharing)
+  useEffect(() => {
+    sharingRef.current = sharing
+  }, [sharing])
 
   const scheduleTrayIconUpdate = useCallback((
     _reason: TrayUpdateReason,
@@ -339,8 +347,8 @@ export function useTrayIcon({
 
       if (style === "icon") {
         // The app logo is full color, so one icon works on light and dark taskbars. The strip sets
-        // this style, so its live rates go in the hover text here too.
-        restoreGaugeIcon(["OpenTokenUsage", ...rateLines].join("\n"))
+        // this style, so its live rates go in the hover text here too (not while the screen is shared).
+        restoreGaugeIcon(["OpenTokenUsage", ...(sharingRef.current ? [] : rateLines)].join("\n"))
         return
       }
 
@@ -435,7 +443,7 @@ export function useTrayIcon({
   useEffect(() => {
     if (!trayReady) return
     scheduleTrayIconUpdate("settings", 0)
-  }, [activeView, menubarIconStyle, paceWorkdays, scheduleTrayIconUpdate, trayReady])
+  }, [activeView, menubarIconStyle, paceWorkdays, sharing, scheduleTrayIconUpdate, trayReady])
 
   // Pace moves with time, not only with usage: redraw a pace-colored number between probes.
   useEffect(() => {

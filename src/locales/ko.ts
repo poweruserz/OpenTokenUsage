@@ -101,6 +101,9 @@ export const ko: Messages = {
   "settings.categories": "설정 범주",
 
 
+  "settings.configBroken": "저장되지 않음: ~/.openusage/config.json이 올바른 JSON이 아닙니다. 파일을 고치거나 삭제한 뒤 다시 저장하세요.",
+
+
   "settings.strip.desktopEdgeSide": "가장자리",
 
 

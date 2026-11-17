@@ -25,7 +25,7 @@ pub(crate) fn silent_command(program: &str) -> Command {
     cmd
 }
 
-const WHITELISTED_ENV_VARS: [&str; 19] = [
+const WHITELISTED_ENV_VARS: [&str; 22] = [
     "GH_HOST",
     "CODEX_HOME",
     "CLAUDE_CONFIG_DIR",
@@ -45,6 +45,9 @@ const WHITELISTED_ENV_VARS: [&str; 19] = [
     "PI_CODING_AGENT_DIR",
     "OPENROUTER_API_KEY",
     "DEEPSEEK_API_KEY",
+    "MOONSHOT_API_KEY",
+    "KILO_API_KEY",
+    "CODEBUFF_API_KEY",
 ];
 const MIN_BLOCKING_TIMEOUT: Duration = Duration::from_millis(1);
 
@@ -3687,6 +3690,14 @@ mod tests {
     #[test]
     fn gh_host_is_env_allowlisted() {
         assert!(WHITELISTED_ENV_VARS.contains(&"GH_HOST"));
+    }
+
+    #[test]
+    fn the_api_key_providers_keys_are_env_allowlisted() {
+        // Kimi API, Kilo and Codebuff read these (`ctx.host.env.get`); the plugin tests mock the host.
+        for name in ["MOONSHOT_API_KEY", "KILO_API_KEY", "CODEBUFF_API_KEY"] {
+            assert!(WHITELISTED_ENV_VARS.contains(&name), "{name}");
+        }
     }
 
     #[test]

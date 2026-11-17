@@ -11,6 +11,7 @@ const STATUS_TEXT = {
   saved: "settings.proxy.saved",
   invalid: "settings.proxy.invalid",
   error: "settings.proxy.error",
+  broken: "settings.configBroken",
 } as const satisfies Record<string, MessageKey>
 
 /**
@@ -35,7 +36,7 @@ export function ProxySection() {
       setStatus("saved")
     } catch (error) {
       if (error !== "invalidUrl") console.error("Failed to save the proxy setting:", error)
-      setStatus(error === "invalidUrl" ? "invalid" : "error")
+      setStatus(error === "invalidUrl" ? "invalid" : error === "configBroken" ? "broken" : "error")
     }
   }
 

@@ -101,6 +101,9 @@ export const tr: Messages = {
   "settings.categories": "Ayar kategorileri",
 
 
+  "settings.configBroken": "Kaydedilmedi: ~/.openusage/config.json geçerli bir JSON değil. Dosyayı düzeltin ya da silin, sonra yeniden kaydedin.",
+
+
   "settings.strip.desktopEdgeSide": "Kenar",
 
 

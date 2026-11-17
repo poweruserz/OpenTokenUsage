@@ -101,6 +101,9 @@ export const de: Messages = {
   "settings.categories": "Einstellungsbereiche",
 
 
+  "settings.configBroken": "Nicht gespeichert: ~/.openusage/config.json ist kein gültiges JSON. Datei korrigieren oder löschen, dann erneut speichern.",
+
+
   "settings.strip.desktopEdgeSide": "Rand",
 
 

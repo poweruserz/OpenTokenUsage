@@ -101,6 +101,9 @@ export const en = {
   "settings.categories": "Settings categories",
 
 
+  "settings.configBroken": "Not saved: ~/.openusage/config.json isn't valid JSON. Fix or delete that file, then save again.",
+
+
   "settings.strip.desktopEdgeSide": "Edge",
 
 

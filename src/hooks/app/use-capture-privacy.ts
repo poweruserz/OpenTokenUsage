@@ -21,18 +21,23 @@ export function useCapturePrivacy(): boolean {
   }, [setEnabled])
 
   useEffect(() => {
-    invoke("set_capture_privacy", { enabled }).catch((error) =>
-      console.error("Failed to apply the screen sharing setting:", error)
-    )
-    if (!enabled) {
-      setSharing(false)
-      return
-    }
     let cancelled = false
     let unlisten: (() => void) | undefined
-    listen<boolean>("privacy:sharing", (event) => setSharing(event.payload === true))
-      .then((stop) => (cancelled ? stop() : (unlisten = stop)))
-      .catch((error) => console.error("Failed to listen for screen sharing:", error))
+    if (!enabled) setSharing(false)
+    // Listen first, then turn it on: the host only sends changes, and answers with the state now.
+    const listening = enabled
+      ? listen<boolean>("privacy:sharing", (event) => setSharing(event.payload === true)).then(
+          (stop) => (cancelled ? stop() : (unlisten = stop)),
+          (error) => console.error("Failed to listen for screen sharing:", error)
+        )
+      : Promise.resolve()
+    listening
+      // Turned off meanwhile: that run applies "off", this one must not land after it.
+      .then(() => (cancelled && enabled ? null : invoke<boolean>("set_capture_privacy", { enabled })))
+      .then((now) => {
+        if (enabled && !cancelled && now !== null) setSharing(now === true)
+      })
+      .catch((error) => console.error("Failed to apply the screen sharing setting:", error))
     return () => {
       cancelled = true
       unlisten?.()

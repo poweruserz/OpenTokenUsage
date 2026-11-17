@@ -151,15 +151,27 @@ pub fn set_proxy_setting(enabled: bool, url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Rewrites ~/.openusage/config.json through `change`, which gets what's there (Null when nothing).
+/// Rewrites ~/.openusage/config.json through `change`, which gets what's there (Null when there is no
+/// file). A file it can't read or parse stops the save: rewriting it would drop the other settings.
 fn update_config(
     change: impl FnOnce(serde_json::Value) -> serde_json::Value,
 ) -> Result<(), String> {
-    let path = config_path().ok_or("no home directory")?;
-    let current = std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or(serde_json::Value::Null);
+    update_config_at(&config_path().ok_or("no home directory")?, change)
+}
+
+fn update_config_at(
+    path: &std::path::Path,
+    change: impl FnOnce(serde_json::Value) -> serde_json::Value,
+) -> Result<(), String> {
+    // The literal `~` path in messages: they reach the log, which mustn't name the Windows user.
+    let current = match std::fs::read_to_string(path) {
+        Ok(text) => serde_json::from_str(&text).map_err(|e| {
+            log::warn!("[config] ~/.openusage/config.json is not valid JSON ({e}): not saved");
+            "configBroken".to_string()
+        })?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::Value::Null,
+        Err(e) => return Err(format!("can't read ~/.openusage/config.json: {e}")),
+    };
     let text = serde_json::to_string_pretty(&change(current)).map_err(|e| e.to_string())?;
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
@@ -167,7 +179,7 @@ fn update_config(
     // Write aside, then swap: a crash mid-write never leaves half a config.
     let temp = path.with_extension("json.tmp");
     std::fs::write(&temp, text).map_err(|e| e.to_string())?;
-    std::fs::rename(&temp, &path).map_err(|e| e.to_string())
+    std::fs::rename(&temp, path).map_err(|e| e.to_string())
 }
 
 /// A balance endpoint (Settings → Providers → Custom balances) the `custom-balance` plugin reads. The
@@ -462,5 +474,32 @@ mod tests {
             with_proxy(serde_json::Value::Null, &setting)["proxy"]["enabled"],
             true
         );
+    }
+
+    #[test]
+    fn a_config_that_isnt_json_is_never_overwritten() {
+        let dir = std::env::temp_dir().join(format!("otu-config-{}", std::process::id()));
+        let path = dir.join("config.json");
+        let _ = std::fs::remove_dir_all(&dir);
+        let add = |value: serde_json::Value| {
+            let mut object = value.as_object().cloned().unwrap_or_default();
+            object.insert("added".into(), true.into());
+            serde_json::Value::Object(object)
+        };
+        // No file yet: written.
+        update_config_at(&path, add).unwrap();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("added"));
+        // A typo in it: the save stops and the file stays as it is.
+        std::fs::write(&path, "{ \"balances\": [ oops").unwrap();
+        // Settings tells the user the file is the problem, not their entries.
+        assert_eq!(
+            update_config_at(&path, add),
+            Err("configBroken".to_string())
+        );
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "{ \"balances\": [ oops"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

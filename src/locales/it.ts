@@ -101,6 +101,9 @@ export const it: Messages = {
   "settings.categories": "Categorie delle impostazioni",
 
 
+  "settings.configBroken": "Non salvato: ~/.openusage/config.json non è un JSON valido. Correggi o elimina il file, poi salva di nuovo.",
+
+
   "settings.strip.desktopEdgeSide": "Bordo",
 
 

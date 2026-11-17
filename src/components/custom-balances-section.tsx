@@ -80,7 +80,7 @@ function Field({
  */
 export function CustomBalancesSection() {
   const [balances, setBalances] = useState<Draft[] | null>(null)
-  const [status, setStatus] = useState<"saved" | "invalid" | null>(null)
+  const [status, setStatus] = useState<"saved" | "invalid" | "broken" | null>(null)
 
   useEffect(() => {
     if (!isTauri()) return
@@ -108,7 +108,8 @@ export function CustomBalancesSection() {
       setStatus("saved")
     } catch (error) {
       console.error("Custom balances not saved:", error)
-      setStatus("invalid")
+      // `configBroken`: the file has a typo, not the entries (`config.rs`).
+      setStatus(error === "configBroken" ? "broken" : "invalid")
     }
   }
 
@@ -208,7 +209,7 @@ export function CustomBalancesSection() {
           </button>
           {status && (
             <span className={cn("text-xs", status === "saved" ? "text-muted-foreground" : "text-destructive")}>
-              {t(status === "saved" ? "settings.balances.saved" : "settings.balances.invalid")}
+              {t(status === "saved" ? "settings.balances.saved" : status === "broken" ? "settings.configBroken" : "settings.balances.invalid")}
             </span>
           )}
         </div>

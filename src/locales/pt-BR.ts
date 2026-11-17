@@ -101,6 +101,9 @@ export const ptBR: Messages = {
   "settings.categories": "Categorias de configurações",
 
 
+  "settings.configBroken": "Não salvo: ~/.openusage/config.json não é um JSON válido. Corrija ou apague esse arquivo e salve de novo.",
+
+
   "settings.strip.desktopEdgeSide": "Borda",
 
 

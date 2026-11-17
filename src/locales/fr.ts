@@ -101,6 +101,9 @@ export const fr: Messages = {
   "settings.categories": "Catégories de paramètres",
 
 
+  "settings.configBroken": "Non enregistré : ~/.openusage/config.json n'est pas un JSON valide. Corrigez ou supprimez ce fichier, puis enregistrez à nouveau.",
+
+
   "settings.strip.desktopEdgeSide": "Bord",
 
 

@@ -15,7 +15,7 @@
 //! it never hides what is behind it. While a full-screen app is in front (a game, a video, a slide
 //! show), the widgets on its monitor hide.
 
-use super::{to_pixels, Pixels, StripImage, APP};
+use super::{to_pixels_within, Pixels, StripImage, APP};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
@@ -148,11 +148,18 @@ fn valid_id(id: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
+/// A column of six providers, or the edge rail with today and the rate, at up to 500 % (the strip's
+/// own limit is one taskbar tall).
+const MAX_WIDGET_SIZE: (u32, u32) = (4096, 4096);
+
 fn to_images(images: Vec<StripImage>) -> Result<Vec<Pixels>, String> {
     if images.is_empty() || images.len() > super::MAX_IMAGES {
         return Err("a desktop widget takes 1 to 8 images".into());
     }
-    images.into_iter().map(to_pixels).collect()
+    images
+        .into_iter()
+        .map(|image| to_pixels_within(image, MAX_WIDGET_SIZE))
+        .collect()
 }
 
 /// Hover text as the tooltip shows it: line breaks kept, other control characters dropped.
@@ -1447,6 +1454,21 @@ mod tests {
             (-1260, -36)
         );
         assert_eq!(edge_spot(below, size, false, 6, left), (-2034, 464));
+    }
+
+    #[test]
+    fn a_widget_may_be_far_taller_than_the_strip() {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        // The edge rail with six providers at 250 %.
+        let (width, height) = (160u32, 1700u32);
+        let image = |dpi| StripImage {
+            rgba: STANDARD.encode(vec![0u8; (width * height * 4) as usize]),
+            width,
+            height,
+            dpi,
+        };
+        assert!(to_images(vec![image(240)]).is_ok());
+        assert!(super::super::to_pixels(image(240)).is_err());
     }
 
     #[test]

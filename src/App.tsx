@@ -226,6 +226,7 @@ function App() {
     trayPercentColor,
     themeMode,
     activeView,
+    sharing,
   })
 
   const redrawAppTrayIcon = useCallback(() => scheduleTrayIconUpdate("settings", 0), [scheduleTrayIconUpdate])
@@ -250,7 +251,8 @@ function App() {
   const stripIdle =
     runningTools !== null &&
     pluginSettings !== null &&
-    !stripToolRunning(runningTools, stripPluginSettings(taskbarStripStyle.providers, pluginSettings).order)
+    // The same cards the strip draws, the followed tool's included.
+    !stripToolRunning(runningTools, stripPluginSettings(taskbarStripStyle.providers, pluginSettings, followed).order)
 
   useTaskbarStrip({
     enabled: stripShown,

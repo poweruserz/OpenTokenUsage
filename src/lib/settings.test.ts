@@ -88,6 +88,15 @@ describe("settings", () => {
     await expect(loadCollapsedSections()).resolves.toEqual(["heatmap"])
   })
 
+  it("keeps an opened year section open through a backup", async () => {
+    const { buildSettingsBackup, restoreSettingsBackup } = await import("@/lib/settings-backup")
+    await saveCollapsedSections(["heatmap"])
+    const backup = await buildSettingsBackup()
+    storeState.clear()
+    await restoreSettingsBackup(backup)
+    await expect(loadCollapsedSections()).resolves.toEqual(["heatmap"])
+  })
+
   it("saves strip placement and restores it after reloading settings", async () => {
     const original = await loadTaskbarStripStyle()
     await saveTaskbarStripStyle({ ...original, position: "left", offset: 120 })

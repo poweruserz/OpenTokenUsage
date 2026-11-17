@@ -22,8 +22,10 @@ pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 
+/// Returns whether the user presents or the PC is remote controlled now (false while off): the
+/// watcher only emits changes, and one already running emits nothing when turned off and on again.
 #[tauri::command]
-pub fn set_capture_privacy(app_handle: AppHandle, enabled: bool) {
+pub fn set_capture_privacy(app_handle: AppHandle, enabled: bool) -> bool {
     ENABLED.store(enabled, Ordering::Relaxed);
     #[cfg(windows)]
     {
@@ -42,23 +44,30 @@ pub fn set_capture_privacy(app_handle: AppHandle, enabled: bool) {
             WATCHING.store(false, Ordering::SeqCst);
         }
     }
+    enabled && sharing()
 }
 
 /// Emits `privacy:sharing` whenever presenting or remote control starts or stops, until turned off.
 fn watch(app: AppHandle) {
-    let mut last = false;
-    while enabled() {
-        let now = sharing();
-        if now != last {
-            let _ = app.emit("privacy:sharing", now);
-            last = now;
+    loop {
+        let mut last = false;
+        while enabled() {
+            let now = sharing();
+            if now != last {
+                let _ = app.emit("privacy:sharing", now);
+                last = now;
+            }
+            std::thread::sleep(CHECK_EVERY);
         }
-        std::thread::sleep(CHECK_EVERY);
+        if last {
+            let _ = app.emit("privacy:sharing", false);
+        }
+        WATCHING.store(false, Ordering::SeqCst);
+        // Turned on again before that: `set_capture_privacy` saw this watcher and started none.
+        if !enabled() || WATCHING.swap(true, Ordering::SeqCst) {
+            break;
+        }
     }
-    if last {
-        let _ = app.emit("privacy:sharing", false);
-    }
-    WATCHING.store(false, Ordering::SeqCst);
 }
 
 #[cfg(windows)]

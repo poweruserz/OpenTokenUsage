@@ -129,10 +129,15 @@ static APP: OnceLock<AppHandle> = OnceLock::new();
 const MAX_STRIP_SIZE: (u32, u32) = (4096, 512);
 
 fn to_pixels(image: StripImage) -> Result<Pixels, String> {
+    to_pixels_within(image, MAX_STRIP_SIZE)
+}
+
+/// An image at most `max` px wide and tall (desktop widgets take taller ones than the strip).
+fn to_pixels_within(image: StripImage, max: (u32, u32)) -> Result<Pixels, String> {
     if !DPI_RANGE.contains(&image.dpi) {
         return Err("strip dpi out of range".into());
     }
-    let mut data = crate::tray::decode_rgba(&image.rgba, image.width, image.height, MAX_STRIP_SIZE)
+    let mut data = crate::tray::decode_rgba(&image.rgba, image.width, image.height, max)
         .map_err(|e| format!("strip {e}"))?;
     for px in data.chunks_exact_mut(4) {
         let alpha = px[3] as u32;

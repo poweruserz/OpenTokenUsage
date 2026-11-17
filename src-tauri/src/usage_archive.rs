@@ -59,6 +59,22 @@ fn merge(kept: &mut BTreeMap<i64, u64>, scanned: &BTreeMap<i64, u64>) {
     }
 }
 
+/// What the logs no longer hold of each kept UTC day (all of it, or the sessions deleted from it)
+/// goes on the local day of the same date: off by the UTC offset's hours, never counted twice (the
+/// scanned rest is already on its own hours' days).
+fn fill_deleted(
+    days: &mut BTreeMap<i64, u64>,
+    kept: &BTreeMap<i64, u64>,
+    scanned: &BTreeMap<i64, u64>,
+) {
+    for (&day, &tokens) in kept {
+        let missing = tokens.saturating_sub(scanned.get(&day).copied().unwrap_or(0));
+        if missing > 0 {
+            *days.entry(day).or_default() += missing;
+        }
+    }
+}
+
 fn read_archive(path: &Path) -> Archive {
     std::fs::read(path)
         .ok()
@@ -105,12 +121,7 @@ pub(crate) fn year_usage(
         let mut archive = read_archive(path);
         let kept = archive.entry(card.to_owned()).or_default();
         merge(kept, &utc);
-        // A UTC day the logs no longer hold shows on the local day of the same date: off by the UTC
-        // offset's hours, never counted twice.
-        for (&day, &tokens) in kept.iter().filter(|(day, _)| !utc.contains_key(day)) {
-            let shown = days.entry(day).or_default();
-            *shown = (*shown).max(tokens);
-        }
+        fill_deleted(&mut days, kept, &utc);
         if let Err(e) = write_archive(path, &archive) {
             log::warn!("usage archive not written: {e}");
         }
@@ -314,6 +325,20 @@ mod tests {
         // Day 10's logs were deleted (now 0 or less), day 11 grew, day 12 is new.
         merge(&mut kept, &BTreeMap::from([(10, 0), (11, 90), (12, 7)]));
         assert_eq!(kept, BTreeMap::from([(10, 500), (11, 90), (12, 7)]));
+    }
+
+    #[test]
+    fn a_day_with_some_sessions_deleted_gets_the_deleted_share_back() {
+        // Day 10 kept 2 000; one of its two sessions is gone (1 000 left, shown on days 9 and 10 at
+        // this UTC offset). Day 11's logs are all gone. Day 12 is whole.
+        let kept = BTreeMap::from([(10, 2_000), (11, 500), (12, 70)]);
+        let scanned = BTreeMap::from([(10, 1_000), (12, 70)]);
+        let mut days = BTreeMap::from([(9, 300), (10, 700), (12, 70)]);
+        fill_deleted(&mut days, &kept, &scanned);
+        assert_eq!(
+            days,
+            BTreeMap::from([(9, 300), (10, 1_700), (11, 500), (12, 70)])
+        );
     }
 
     #[test]
