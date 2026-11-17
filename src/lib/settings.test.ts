@@ -116,6 +116,9 @@ describe("settings", () => {
     // A style the user saved is taken as it is.
     storeState.set("taskbarStripStyle", { colorMode: "traffic" })
     await expect(loadTaskbarStripStyle()).resolves.toMatchObject({ colorMode: "traffic" })
+    // One saved before color modes existed kept its colors on.
+    storeState.set("taskbarStripStyle", { usageColors: true, fontSize: 13 })
+    await expect(loadTaskbarStripStyle()).resolves.toMatchObject({ colorMode: "heat" })
   })
 
   it("sanitizes stored settings", async () => {

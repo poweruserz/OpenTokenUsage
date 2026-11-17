@@ -962,7 +962,10 @@ export function normalizeTaskbarStripStyle(value: unknown): TaskbarStripStyle {
       ? (raw.colorMode as TaskbarStripColorMode)
       : (raw as { usageColors?: unknown }).usageColors === false // before color modes existed
         ? "off"
-        : d.colorMode,
+        : // A saved style without one is from before color modes, whose default colored by usage.
+          value && typeof value === "object"
+          ? "heat"
+          : d.colorMode,
     warnAt: isPercent(raw.warnAt) ? raw.warnAt : d.warnAt,
     criticalAt: isPercent(raw.criticalAt) ? raw.criticalAt : d.criticalAt,
     warnColor: isHexColor(raw.warnColor) ? raw.warnColor : d.warnColor,

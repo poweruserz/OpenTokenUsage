@@ -447,8 +447,15 @@ describe("normalizeTaskbarStripStyle", () => {
       bold: false,
       providers: ["a", "b"],
       lineModes: { claude: "weekly" },
+      // Saved without a color mode: from before they existed (below).
+      colorMode: "heat",
     })
     expect(normalizeTaskbarStripStyle({ usageColors: false }).colorMode).toBe("off")
+    // Saved before color modes with colors on (their default then): they stay on.
+    expect(normalizeTaskbarStripStyle({ usageColors: true }).colorMode).toBe("heat")
+    expect(normalizeTaskbarStripStyle({ fontSize: 13 }).colorMode).toBe("heat")
+    // Nothing saved: today's default.
+    expect(normalizeTaskbarStripStyle(undefined).colorMode).toBe("off")
     expect(normalizeTaskbarStripStyle(undefined)).toEqual(DEFAULT_TASKBAR_STRIP_STYLE)
   })
 })
