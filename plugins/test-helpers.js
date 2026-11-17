@@ -6,6 +6,7 @@ export const makeCtx = () => {
 
   const ctx = {
     nowIso: "2026-02-02T00:00:00.000Z",
+    localDate: "2026-02-02",
     app: {
       version: "0.0.0",
       platform: "darwin",

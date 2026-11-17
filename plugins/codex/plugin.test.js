@@ -1757,6 +1757,50 @@ describe("codex plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Usage request failed after refresh")
   })
 
+  it("reads a Business plan's monthly cap from spend_control when rate_limit is null", async () => {
+    const ctx = makeCtx()
+    ctx.host.fs.writeText("~/.codex/auth.json", JSON.stringify({
+      tokens: { access_token: "token" },
+      last_refresh: new Date().toISOString(),
+    }))
+    const now = 1_700_000_000_000
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now)
+    const nowSec = Math.floor(now / 1000)
+    const answer = (limit) => ({
+      status: 200,
+      headers: {},
+      bodyText: JSON.stringify({ plan_type: "business", rate_limit: null, spend_control: { individual_limit: limit } }),
+    })
+    const plugin = await loadPlugin()
+
+    ctx.host.http.request.mockReturnValue(
+      answer({ limit: "2400", used: "1434.58", used_percent: 60, reset_after_seconds: 11831, reset_at: nowSec + 3600 })
+    )
+    let monthly = plugin.probe(ctx).lines.find((l) => l.label === "Monthly")
+    expect(monthly.used).toBe(60)
+    expect(monthly.resetsAt).toBe(new Date((nowSec + 3600) * 1000).toISOString())
+
+    // No percent: from the amounts; a null reset_at falls back to reset_after_seconds.
+    ctx.host.http.request.mockReturnValue(answer({ limit: "2400", used: "600", reset_at: null, reset_after_seconds: 3600 }))
+    monthly = plugin.probe(ctx).lines.find((l) => l.label === "Monthly")
+    expect(monthly.used).toBe(25)
+    expect(monthly.resetsAt).toBe(new Date((nowSec + 3600) * 1000).toISOString())
+
+    // A plan with rate_limit ignores spend_control.
+    ctx.host.http.request.mockReturnValue({
+      status: 200,
+      headers: {},
+      bodyText: JSON.stringify({
+        rate_limit: { primary_window: { used_percent: 10, limit_window_seconds: 18000 } },
+        spend_control: { individual_limit: { used_percent: 90 } },
+      }),
+    })
+    const lines = plugin.probe(ctx).lines
+    expect(lines.find((l) => l.label === "Monthly")).toBeUndefined()
+    expect(lines.find((l) => l.label === "Session").used).toBe(10)
+    nowSpy.mockRestore()
+  })
+
   it("surfaces additional_rate_limits as Spark lines", async () => {
     const ctx = makeCtx()
     ctx.host.fs.writeText("~/.codex/auth.json", JSON.stringify({

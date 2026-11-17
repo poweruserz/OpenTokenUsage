@@ -354,6 +354,20 @@ pub fn toggle_panel_at(
     position: tauri::Position,
     size: tauri::Size,
 ) -> bool {
+    toggle_panel(app_handle, |window| {
+        position_window_at_tray_icon(window, position, size)
+    })
+}
+
+/// A desktop widget click (`rect`: it and the widgets it touches, physical px): like `toggle_panel_at`,
+/// but the panel opens beside them, bottoms level, so widgets kept on top never cover it.
+pub fn toggle_panel_beside(app_handle: &AppHandle, rect: (i32, i32, i32, i32)) -> bool {
+    toggle_panel(app_handle, |window| position_window_beside(window, rect))
+}
+
+/// Hides a visible panel; otherwise shows it where the user left it (with "Remember position"),
+/// or where `place_fresh` puts it.
+fn toggle_panel(app_handle: &AppHandle, place_fresh: impl FnOnce(&tauri::WebviewWindow)) -> bool {
     let Some(window) = app_handle.get_webview_window("main") else {
         return false;
     };
@@ -367,9 +381,69 @@ pub fn toggle_panel_at(
     let _ = window.set_focus();
     match remembered_position(&window) {
         Some(spot) => place_at_remembered(&window, spot),
-        None => position_window_at_tray_icon(&window, position, size),
+        None => place_fresh(&window),
     }
     true
+}
+
+/// The panel's x beside a rect: left of it when the panel fits there, else right of it, else as far
+/// left as the work area lets it.
+fn beside_x(
+    rect: (i32, i32, i32, i32),
+    width: i32,
+    margin: i32,
+    area: (i32, i32, i32, i32),
+) -> i32 {
+    let left = rect.0 - margin - width;
+    let right = rect.2 + margin;
+    if left >= area.0 || right + width > area.2 {
+        left.max(area.0)
+    } else {
+        right
+    }
+}
+
+/// Places the panel beside `rect` on its monitor, its bottom level with the rect's.
+fn position_window_beside(window: &tauri::WebviewWindow, rect: (i32, i32, i32, i32)) {
+    let Ok(size) = window.outer_size() else {
+        return;
+    };
+    let (width, height) = (size.width as i32, size.height as i32);
+    let (center_x, center_y) = ((rect.0 + rect.2) / 2, (rect.1 + rect.3) / 2);
+    let monitor = window
+        .available_monitors()
+        .ok()
+        .and_then(|monitors| {
+            monitors.into_iter().find(|monitor| {
+                let origin = monitor.position();
+                let monitor_size = monitor.size();
+                monitor_contains_physical_point(
+                    origin.x as f64,
+                    origin.y as f64,
+                    monitor_size.width as f64,
+                    monitor_size.height as f64,
+                    center_x as f64,
+                    center_y as f64,
+                )
+            })
+        })
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+    let area = work_area_of(&monitor);
+    let margin = (FLYOUT_MARGIN * window.scale_factor().unwrap_or(1.0)).round() as i32;
+    let anchor_bottom = rect.3.min(area.3);
+    set_last_anchor_bottom_physical_y(anchor_bottom);
+    let (x, y) = flyout_origin(
+        beside_x(rect, width, margin, area),
+        anchor_bottom,
+        width,
+        height,
+        area,
+    );
+    set_anchor(Anchor::Middle(x + width / 2));
+    place(window, x, y);
 }
 
 #[derive(serde::Deserialize)]
@@ -971,6 +1045,17 @@ mod flyout_tests {
     fn clamps_into_the_work_area() {
         assert_eq!(flyout_origin(2400, 1380, 400, 541, AREA), (2160, 839)); // off the right edge
         assert_eq!(flyout_origin(-50, 1380, 400, 2000, AREA), (0, 0)); // taller than the screen
+    }
+
+    #[test]
+    fn a_widget_click_opens_the_panel_beside_the_widgets() {
+        // Left of them when it fits, else right of them, else as far left as it goes.
+        assert_eq!(
+            super::beside_x((2300, 1300, 2540, 1380), 400, 12, AREA),
+            1888
+        );
+        assert_eq!(super::beside_x((20, 300, 260, 340), 400, 12, AREA), 272);
+        assert_eq!(super::beside_x((200, 300, 2400, 340), 400, 12, AREA), 0);
     }
 
     #[test]

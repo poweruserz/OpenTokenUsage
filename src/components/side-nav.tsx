@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 import { getRelativeLuminance } from "@/lib/color"
 import { useDarkMode } from "@/hooks/use-dark-mode"
 import { t } from "@/lib/i18n"
+import { partyConfetti } from "@/lib/party"
 import { BmcCup } from "@/components/bmc-cup"
 import { HelpDialog } from "@/components/help-dialog"
 import { SupportDialog } from "@/components/support-dialog"
@@ -48,7 +49,7 @@ interface SideNavProps {
 
 interface NavButtonProps {
   isActive: boolean
-  onClick: () => void
+  onClick: (e: React.MouseEvent) => void
   onContextMenu?: (e: React.MouseEvent) => void
   children: React.ReactNode
   "aria-label"?: string
@@ -220,7 +221,11 @@ export function SideNav({
       {/* Home */}
       <NavButton
         isActive={activeView === "home"}
-        onClick={() => onViewChange("home")}
+        onClick={(e) => {
+          onViewChange("home")
+          // Party mode: a third click in a row.
+          if (e.detail === 3) partyConfetti()
+        }}
         aria-label={t("nav.home")}
       >
         <img src="/icon.png" alt="" className="size-5" draggable={false} />

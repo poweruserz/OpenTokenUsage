@@ -1,4 +1,5 @@
 import { ProviderCard } from "@/components/provider-card"
+import { SpendSummary } from "@/components/spend-summary"
 import type { PluginDisplayState } from "@/lib/plugin-types"
 import type { DisplayMode, ResetTimerDisplayMode, TimeFormatMode } from "@/lib/settings"
 import { t } from "@/lib/i18n"
@@ -10,6 +11,7 @@ interface OverviewPageProps {
   resetTimerDisplayMode: ResetTimerDisplayMode
   timeFormatMode?: TimeFormatMode
   onResetTimerDisplayModeToggle?: () => void
+  onDisplayModeToggle?: () => void
 }
 
 export function OverviewPage({
@@ -19,6 +21,7 @@ export function OverviewPage({
   resetTimerDisplayMode,
   timeFormatMode = "auto",
   onResetTimerDisplayModeToggle,
+  onDisplayModeToggle,
 }: OverviewPageProps) {
   if (plugins.length === 0) {
     return (
@@ -50,8 +53,10 @@ export function OverviewPage({
           resetTimerDisplayMode={resetTimerDisplayMode}
           timeFormatMode={timeFormatMode}
           onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
+          onDisplayModeToggle={onDisplayModeToggle}
         />
       ))}
+      <SpendSummary plugins={plugins} />
     </div>
   )
 }

@@ -14,6 +14,7 @@
 use std::sync::{Mutex, OnceLock};
 use tauri::AppHandle;
 
+pub mod desktop;
 mod placement;
 #[cfg(windows)]
 mod uia;
@@ -325,7 +326,7 @@ mod win {
     /// Only a fallback now: the clock's buttons come from UI Automation when it can see them.
     const SECONDARY_CLOCK_WIDTH: i32 = 88;
 
-    fn wide(text: &str) -> Vec<u16> {
+    pub(super) fn wide(text: &str) -> Vec<u16> {
         text.encode_utf16().chain(Some(0)).collect()
     }
 
@@ -392,7 +393,7 @@ mod win {
         }
     }
 
-    fn monitor_dpi(monitor: HMONITOR) -> u32 {
+    pub(super) fn monitor_dpi(monitor: HMONITOR) -> u32 {
         let (mut x, mut y) = (0u32, 0u32);
         let ok = unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut x, &mut y) } == 0;
         if ok && super::DPI_RANGE.contains(&x) {
@@ -802,7 +803,7 @@ mod win {
         }
     }
 
-    fn draw(hwnd: HWND, pixels: &super::Pixels) {
+    pub(super) fn draw(hwnd: HWND, pixels: &super::Pixels) {
         unsafe {
             static WARNED: AtomicBool = AtomicBool::new(false);
             let screen = GetDC(null_mut());
@@ -973,7 +974,9 @@ mod tests {
     fn lists_this_pcs_monitors() {
         let monitors = list_taskbar_monitors();
         println!("{monitors:#?}");
-        assert!(monitors.iter().any(|monitor| monitor.primary && monitor.has_taskbar));
+        assert!(monitors
+            .iter()
+            .any(|monitor| monitor.primary && monitor.has_taskbar));
     }
 
     #[test]

@@ -74,6 +74,8 @@ const koKR: PluginErrorMessages = {
   wslNotRunning: "WSL이 실행 중이 아닙니다. 이 카드를 업데이트하려면 WSL을 시작하세요.",
   cursorSecureStorageUnavailable: "Cursor 보안 저장소를 사용할 수 없습니다.",
   cursorSecureStorageUnreadable: "Cursor 보안 저장소를 읽을 수 없습니다.",
+
+  customBalanceNotSetUp: "사용자 지정 잔액이 설정되지 않았습니다. 설정에서 추가하세요.",
 }
 
 export default koKR

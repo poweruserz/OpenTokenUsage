@@ -427,6 +427,38 @@ fn redact_body(body: &str) -> String {
         "guardrail_id",
         "budget_id",
         "user_email",
+        // Codebuff and Kilo billing answers (customer, subscription and client ids).
+        "stripeCustomerId",
+        "stripe_customer_id",
+        "customerId",
+        "customer_id",
+        "subscriptionId",
+        "subscription_id",
+        "kiloUserId",
+        "kilo_user_id",
+        "fingerprintId",
+        "stripeSubscriptionId",
+        "stripe_subscription_id",
+        // New API, One API and Sub2API account answers (custom-balance): names, linked logins, settings.
+        "username",
+        "github_id",
+        "discord_id",
+        "oidc_id",
+        "wechat_id",
+        "telegram_id",
+        "linux_do_id",
+        "aff_code",
+        "setting",
+        "stripe_customer",
+        "nickname",
+        "real_name",
+        "phone",
+        "mobile",
+        "telephone",
+        "wechat",
+        "qq",
+        "notes",
+        "remark",
     ];
     for key in sensitive_keys {
         // Match "key": "value" or "key":"value"
@@ -436,6 +468,17 @@ fn redact_body(body: &str) -> String {
                 .replace_all(&result, |caps: &regex_lite::Captures| {
                     let value = &caps[1];
                     format!("\"{}\": \"{}\"", key, redact_value(value))
+                })
+                .to_string();
+        }
+    }
+
+    // A New API account's display name sits beside its username; elsewhere display_name names a model.
+    if result.contains("\"username\":") {
+        if let Ok(re) = regex_lite::Regex::new(r#""display_name":\s*"((?:[^"\\]|\\.)+)""#) {
+            result = re
+                .replace_all(&result, |caps: &regex_lite::Captures| {
+                    format!("\"display_name\": \"{}\"", redact_value(&caps[1]))
                 })
                 .to_string();
         }
@@ -484,6 +527,22 @@ fn redact_body(body: &str) -> String {
             .to_string();
     }
 
+    // [codebuff] /api/user/subscription keeps the subscription's own id as a bare `id`; model and
+    // credit ids elsewhere stay readable, so only redact it inside "subscription".
+    if let (Ok(subscription_re), Ok(id_re)) = (
+        regex_lite::Regex::new(r#""subscription":\s*\{[^{}]*\}"#),
+        regex_lite::Regex::new(r#""id":\s*"([^"]+)""#),
+    ) {
+        result = subscription_re
+            .replace_all(&result, |caps: &regex_lite::Captures| {
+                id_re
+                    .replace_all(&caps[0], |c: &regex_lite::Captures| {
+                        format!("\"id\": \"{}\"", redact_value(&c[1]))
+                    })
+                    .to_string()
+            })
+            .to_string();
+    }
     // [openrouter] /key's `label` is the key's name, by default part of the key itself. Other
     // providers use `label` for model names (Antigravity), so only a body with /key's
     // `limit_remaining` loses it.
@@ -674,6 +733,9 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     let probe_ctx = Object::new(ctx.clone())?;
 
     probe_ctx.set("nowIso", iso_now())?;
+    // This PC's calendar day (YYYY-MM-DD): CLI logs bucket by local day, and the JS runtime's
+    // own time zone isn't to be relied on.
+    probe_ctx.set("localDate", local_date())?;
 
     let app_obj = Object::new(ctx.clone())?;
     app_obj.set("version", app_version)?;
@@ -699,6 +761,12 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     inject_log(ctx, &host, plugin_id)?;
     inject_fs(ctx, &host, home.clone())?;
     inject_crypto(ctx, &host)?;
+    // custom-balance reads the keys its balances name (Settings; config.rs allows OTU_ names only).
+    let balance_env = if plugin_id == "custom-balance" {
+        crate::config::balance_env_names()
+    } else {
+        Vec::new()
+    };
     inject_env(
         ctx,
         &host,
@@ -706,6 +774,7 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
             .map(|account| account.env.clone())
             .unwrap_or_default(),
         isolated_env,
+        balance_env,
     )?;
     inject_http(ctx, &host, plugin_id, deadline)?;
     inject_keychain(ctx, &host, plugin_id)?;
@@ -970,12 +1039,15 @@ fn inject_env<'js>(
     host: &Object<'js>,
     overrides: Vec<(String, Option<String>)>,
     isolated: bool,
+    extra_allowed: Vec<String>,
 ) -> rquickjs::Result<()> {
     let env_obj = Object::new(ctx.clone())?;
     env_obj.set(
         "get",
         Function::new(ctx.clone(), move |name: String| -> Option<String> {
-            if isolated || !WHITELISTED_ENV_VARS.contains(&name.as_str()) {
+            if isolated
+                || !(WHITELISTED_ENV_VARS.contains(&name.as_str()) || extra_allowed.contains(&name))
+            {
                 return None;
             }
             if let Some((_, value)) = overrides.iter().find(|(key, _)| *key == name) {
@@ -1106,9 +1178,9 @@ fn inject_http<'js>(
                     .connect_timeout(timeout)
                     .redirect(reqwest::redirect::Policy::none());
 
-                // Apply pre-resolved proxy (localhost bypass already configured)
-                if let Some(resolved) = crate::config::get_resolved_proxy() {
-                    builder = builder.proxy(resolved.proxy.clone());
+                // The proxy in effect now (localhost bypass already configured)
+                if let Some(proxy) = crate::config::resolved_proxy() {
+                    builder = builder.proxy(proxy);
                     log::debug!("[http] proxy active");
                 } else {
                     log::debug!("[http] proxy not used");
@@ -2732,6 +2804,76 @@ fn run_ccusage_with_runner_timeout(
     }
 }
 
+/// Runs an npm package's command through the first JS package runner found, as ccusage runs, and
+/// returns its stdout when it exits 0 within `timeout`. A timeout stops there: another runner would
+/// read the same logs just as slowly.
+pub(crate) fn run_npm_package(
+    package_spec: &str,
+    bin: &str,
+    args: &[String],
+    timeout: Duration,
+) -> Option<String> {
+    let path = ccusage_enriched_path();
+    for (kind, program) in collect_ccusage_runners() {
+        let mut full: Vec<String> = match kind {
+            CcusageRunnerKind::Bunx => vec!["--silent".into(), package_spec.into()],
+            CcusageRunnerKind::PnpmDlx => vec!["-s".into(), "dlx".into(), package_spec.into()],
+            CcusageRunnerKind::YarnDlx => vec!["dlx".into(), "-q".into(), package_spec.into()],
+            CcusageRunnerKind::NpmExec => vec![
+                "exec".into(),
+                "--yes".into(),
+                format!("--package={package_spec}"),
+                "--".into(),
+                bin.into(),
+            ],
+            CcusageRunnerKind::Npx => vec!["--yes".into(), package_spec.into()],
+        };
+        full.extend(args.iter().cloned());
+        let mut command = silent_command(&program);
+        configure_ccusage_command(&mut command, &full, path.as_deref());
+        let Ok(mut child) = command.spawn() else {
+            continue;
+        };
+        let stdout = child.stdout.take().map(|mut out| {
+            std::thread::spawn(move || {
+                let mut v = Vec::new();
+                let _ = std::io::Read::read_to_end(&mut out, &mut v);
+                v
+            })
+        });
+        // Warnings go to stderr: drained so a full pipe never stalls the child.
+        if let Some(mut err) = child.stderr.take() {
+            std::thread::spawn(move || std::io::copy(&mut err, &mut std::io::sink()));
+        }
+        let start = Instant::now();
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break Some(status),
+                Ok(None) if start.elapsed() < timeout => {
+                    std::thread::sleep(Duration::from_millis(CCUSAGE_POLL_INTERVAL_MS))
+                }
+                _ => {
+                    if kill_ccusage_on_timeout(&mut child).is_err() {
+                        let _ = child.kill();
+                    }
+                    let _ = child.wait();
+                    break None;
+                }
+            }
+        };
+        let Some(status) = status else {
+            log::warn!("{} timed out via {}", bin, ccusage_runner_label(kind));
+            return None;
+        };
+        let out = stdout.and_then(|reader| reader.join().ok()).unwrap_or_default();
+        if status.success() {
+            return Some(String::from_utf8_lossy(&out).into_owned());
+        }
+        log::warn!("{} failed via {}", bin, ccusage_runner_label(kind));
+    }
+    None
+}
+
 fn run_ccusage_query_with_runners<F>(
     runners: Vec<(CcusageRunnerKind, String)>,
     opts: &CcusageQueryOpts,
@@ -3125,6 +3267,20 @@ fn inject_sqlite<'js>(
 
     host.set("sqlite", sqlite_obj)?;
     Ok(())
+}
+
+/// This PC's calendar day, YYYY-MM-DD: Windows' local time (UTC on other platforms).
+fn local_date() -> String {
+    #[cfg(windows)]
+    {
+        let mut now: windows_sys::Win32::Foundation::SYSTEMTIME = unsafe { std::mem::zeroed() };
+        unsafe { windows_sys::Win32::System::SystemInformation::GetLocalTime(&mut now) };
+        format!("{:04}-{:02}-{:02}", now.wYear, now.wMonth, now.wDay)
+    }
+    #[cfg(not(windows))]
+    {
+        iso_now()[..10].to_string()
+    }
 }
 
 fn iso_now() -> String {
@@ -4132,6 +4288,28 @@ mod tests {
     }
 
     #[test]
+    fn redact_body_redacts_the_subscription_id_only_inside_subscription() {
+        let body = r#"{"hasSubscription":true,"subscription":{"id":"sub_1abcdefghijklmnopq","status":"active"},"models":[{"id":"claude-opus-5-5"}]}"#;
+        let redacted = redact_body(body);
+        assert!(!redacted.contains("sub_1abcdefghijklmnopq"), "got: {}", redacted);
+        assert!(redacted.contains("\"id\":\"claude-opus-5-5\""), "got: {}", redacted);
+    }
+
+    #[test]
+    fn redact_body_redacts_billing_customer_and_subscription_ids() {
+        let body = r#"{"stripeCustomerId": "cus_abcdefghijklmnop", "subscription_id": "sub_1234567890abcdef", "kiloUserId": "kilo_abcdefghijklmnop", "fingerprintId": "fp-abcdefghijklmnop"}"#;
+        let redacted = redact_body(body);
+        for secret in [
+            "cus_abcdefghijklmnop",
+            "sub_1234567890abcdef",
+            "kilo_abcdefghijklmnop",
+            "fp-abcdefghijklmnop",
+        ] {
+            assert!(!redacted.contains(secret), "{secret} leaked: {redacted}");
+        }
+    }
+
+    #[test]
     fn redact_body_redacts_camel_case_user_and_account_ids() {
         let body = r#"{"userId": "user_abcdefghijklmnopqrstuvwxyz", "accountId": "acct_1234567890abcdef"}"#;
         let redacted = redact_body(body);
@@ -4299,6 +4477,20 @@ mod tests {
             "expected redacted path, got: {}",
             redacted
         );
+    }
+
+    #[test]
+    fn redact_body_redacts_new_api_account_identity() {
+        let body = r#"{"data":{"id":7,"username":"jane","display_name":"Jane Doe","email":"jane@example.com","github_id":"janegh","aff_code":"AFF9","setting":"{\"notify_email\":\"jane@example.com\"}","access_token":"abc","quota":500000}}"#;
+        let redacted = redact_body(body);
+        for secret in ["jane@example", "Jane Doe", "janegh", "AFF9", "notify_email", "\"abc\""] {
+            assert!(!redacted.contains(secret), "{secret} left in {redacted}");
+        }
+        assert!(redacted.contains("\"quota\":500000"));
+        let custom = redact_body(r#"{"data":{"balance":5,"nickname":"Jane","phone":"+905551112233","notes":"vip customer"}}"#);
+        for secret in ["Jane", "+905551112233", "vip customer"] {
+            assert!(!custom.contains(secret), "{secret} left in {custom}");
+        }
     }
 
     #[test]

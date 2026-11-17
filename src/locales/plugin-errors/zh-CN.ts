@@ -74,6 +74,8 @@ const zhCN: PluginErrorMessages = {
   wslNotRunning: "WSL 未运行。启动 WSL 以更新此卡片。",
   cursorSecureStorageUnavailable: "Cursor 安全存储不可用。",
   cursorSecureStorageUnreadable: "无法读取 Cursor 安全存储。",
+
+  customBalanceNotSetUp: "未设置自定义余额。请在设置中添加。",
 }
 
 export default zhCN

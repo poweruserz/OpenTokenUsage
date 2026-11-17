@@ -66,13 +66,13 @@ describe("detail page sections", () => {
     render(<ProviderCard name="Claude" displayMode="used" lines={LINES} />)
     fireEvent.click(title("Models"))
     expect(screen.getByText("claude-opus-5-5")).toBeInTheDocument()
-    expect(saveCollapsedSections).toHaveBeenLastCalledWith(["heatmap"])
+    expect(saveCollapsedSections).toHaveBeenLastCalledWith(["heatmap", "year"])
 
     fireEvent.click(title("Rate Limit Resets"))
     expect(screen.queryByText("Fable reset")).toBeNull()
     expect(screen.getByText("4 available")).toBeInTheDocument()
-    expect(saveCollapsedSections).toHaveBeenLastCalledWith(["heatmap", "resets"])
-    expect(useAppPreferencesStore.getState().collapsedSections).toEqual(["heatmap", "resets"])
+    expect(saveCollapsedSections).toHaveBeenLastCalledWith(["heatmap", "year", "resets"])
+    expect(useAppPreferencesStore.getState().collapsedSections).toEqual(["heatmap", "year", "resets"])
   })
 
   it("leaves the overview card as one run of lines", () => {

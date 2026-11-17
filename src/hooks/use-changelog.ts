@@ -9,7 +9,7 @@ export interface Release {
   html_url: string
 }
 
-async function fetchReleaseByTag(tag: string): Promise<Release | null> {
+export async function fetchReleaseByTag(tag: string): Promise<Release | null> {
   const url = `https://api.github.com/repos/PowerUserZ/OpenTokenUsage/releases/tags/${encodeURIComponent(
     tag,
   )}`

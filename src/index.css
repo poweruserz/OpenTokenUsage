@@ -149,6 +149,56 @@
   --track: rgba(255, 255, 255, 0.13);
 }
 
+/* Halloween: the dark theme's black with pumpkin orange (flat, no gradients). */
+:root.halloween {
+  --primary: #ff7518;
+  --primary-foreground: #000000;
+  --ring: #ff7518;
+  --foreground: #fff4e6;
+  --card-foreground: #fff4e6;
+  --muted-foreground: #d9b98c;
+  --chart-1: #ff7518;
+  --chart-2: #9acd32;
+  --chart-3: #ffb347;
+  --chart-4: #c2410c;
+  --chart-5: #f5f5f4;
+}
+
+/* Glass: Acrylic blurs the desktop behind the panel; every layer turns see-through, pure black too. */
+:root.glass,
+:root.glass.oled {
+  --background: transparent;
+  --card: rgba(255, 255, 255, 0.35);
+}
+:root.glass.dark,
+:root.glass.dark.oled {
+  --card: rgba(16, 16, 16, 0.4);
+}
+
+/* Party mode (`party.ts`): confetti falling over the panel. */
+.party-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 100;
+}
+.party-piece {
+  position: absolute;
+  top: -12px;
+  width: 6px;
+  height: 10px;
+  border-radius: 1px;
+  animation-name: party-fall;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.6, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes party-fall {
+  to {
+    transform: translate(var(--drift), 110vh) rotate(var(--spin));
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

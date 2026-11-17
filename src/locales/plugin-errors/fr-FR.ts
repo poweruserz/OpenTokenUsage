@@ -74,6 +74,8 @@ const frFR: PluginErrorMessages = {
   wslNotRunning: "WSL n'est pas lancé. Démarrez-le pour mettre à jour cette carte.",
   cursorSecureStorageUnavailable: "Le stockage sécurisé de Cursor n'est pas disponible.",
   cursorSecureStorageUnreadable: "Impossible de lire le stockage sécurisé de Cursor.",
+
+  customBalanceNotSetUp: "Aucun solde personnalisé configuré. Ajoutez-en un dans les paramètres.",
 }
 
 export default frFR

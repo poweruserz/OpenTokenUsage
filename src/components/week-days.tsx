@@ -2,10 +2,12 @@ import { useEffect, useState } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { DetailSection, useDetailSectionOpen } from "@/components/detail-section"
 import { hasUsageLogs } from "@/components/usage-heatmap"
-import { resetMinute } from "@/components/usage-projects"
+import { resetMinute, weekRange, type Projects } from "@/components/usage-projects"
 import { usePanelOpen } from "@/hooks/use-unseen-usage"
+import { formatMoney } from "@/lib/currency"
 import { getLocale, t } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 export const WEEK_DAYS_REFRESH_MS = 5 * 60_000
 /** Longest window shown: its local days stay within what `usage_by_day` takes (10 bounds, 9 days). */
@@ -29,6 +31,24 @@ type Weekly = { used: number; limit: number; resetsAt?: string; periodDurationMs
 /** `usage_by_day`: price-weighted tokens per day, and the logs it couldn't read. */
 type Days = { days: number[]; unreadable: number }
 
+/** Below this share used, the estimate swings too much to show. */
+const CAPACITY_MIN_USED = 0.1
+
+/**
+ * What the whole weekly limit is worth at this week's mix of models: the window's tokens (and,
+ * when ccusage priced them, its API-price dollars) over the share of the limit they used.
+ */
+export function weeklyCapacity(
+  used: number,
+  window: { totalTokens: number; totalCost: number; priced: boolean }
+): { tokens: number; cost: number | null } | null {
+  if (!(used >= CAPACITY_MIN_USED) || !(window.totalTokens > 0)) return null
+  return {
+    tokens: window.totalTokens / used,
+    cost: window.priced && window.totalCost > 0 ? window.totalCost / used : null,
+  }
+}
+
 /**
  * What each local day of the current weekly limit used of it, on a Claude or Codex detail page: the limit used so
  * far, shared out by each day's price-weighted tokens from the CLI's own logs (`usage_by_day`). Read every few
@@ -46,6 +66,9 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
   // Kept with the card and the limit it was read for: the detail page reuses this component.
   const key = `${pluginId}|${endMs}`
   const [read, setRead] = useState<{ key: string; bounds: number[]; days: number[]; unreadable: number } | null>(null)
+  // The window's tokens and cost (`usage_projects`), for the capacity line; kept with its limit too.
+  const [windowTotals, setWindowTotals] = useState<{ key: string; totals: Projects } | null>(null)
+  const currency = useAppPreferencesStore((state) => state.currency)
   // The card and limit whose last read failed: said in the section, over any rows read before.
   const [failed, setFailed] = useState<string | null>(null)
 
@@ -66,6 +89,10 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
           console.error("Failed to read the weekly limit by day:", error)
           if (live) setFailed(key)
         })
+      // ccusage prices it (cached for 15 min); without it the line shows tokens only, or nothing.
+      invoke<Projects>("usage_projects", { pluginId, ...weekRange(endMs, periodMs, new Date()) })
+        .then((totals) => live && setWindowTotals({ key, totals }))
+        .catch((error) => console.error("Failed to read the weekly limit's totals:", error))
     }
     load()
     const timer = setInterval(load, WEEK_DAYS_REFRESH_MS)
@@ -73,7 +100,7 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
       live = false
       clearInterval(timer)
     }
-  }, [open, shown, has, pluginId, key, startMs, endMs])
+  }, [open, shown, has, pluginId, key, startMs, endMs, periodMs])
 
   if (!has || !weekly) return null
   const title = t("weekDays.title")
@@ -91,6 +118,8 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
   const dayName = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" })
   const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 })
   const max = Math.max(...data.days)
+  const compact = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
+  const capacity = windowTotals?.key === key ? weeklyCapacity(used, windowTotals.totals) : null
   return (
     <DetailSection id="week" title={title}>
       {failure}
@@ -117,6 +146,16 @@ export function WeekDays({ pluginId, weekly }: { pluginId: string; weekly?: Week
       </ul>}
       {total > 0 && (
         <p className="mt-1 text-[10px] text-muted-foreground">{t("weekDays.note", { percent: percent.format(used) })}</p>
+      )}
+      {capacity && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          {capacity.cost !== null
+            ? t("weekDays.capacity", {
+                tokens: compact.format(capacity.tokens),
+                cost: formatMoney(capacity.cost, currency, locale),
+              })
+            : t("weekDays.capacityTokens", { tokens: compact.format(capacity.tokens) })}
+        </p>
       )}
       {data.unreadable > 0 && (
         <p className="mt-1 text-[10px] text-destructive">{t("heatmap.unreadable", { count: data.unreadable })}</p>

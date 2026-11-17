@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "kilo",
+  "name": "Kilo",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#F7C948",
+  "links": [
+    { "label": "Usage dashboard", "url": "https://app.kilo.ai/usage" }
+  ],
+  "lines": [
+    { "type": "progress", "label": "Credits", "scope": "overview", "primaryOrder": 1 },
+    { "type": "progress", "label": "Kilo Pass", "scope": "overview", "primaryOrder": 2 }
+  ]
+}

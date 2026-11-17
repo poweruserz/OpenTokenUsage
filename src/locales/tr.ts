@@ -89,6 +89,429 @@ export const tr: Messages = {
   "settings.tray.logoColors": "Renkli logolar",
   "settings.strip.title": "Görev çubuğu şeridi (deneysel)",
   "settings.strip.desc": "Görev çubuğunda sağlayıcı logoları ile oturum ve haftalık kullanım.",
+
+  "settings.widgets.title": "Masaüstü widget'ları",
+
+  "settings.widgets.desc": "Masaüstünde istediğiniz yerde sağlayıcı logoları ile oturum ve haftalık kullanım.",
+
+  "settings.stripLook.title": "Şerit ve widget görünümü",
+
+  "settings.stripLook.desc": "Şeridin ve widget'ların ortak sağlayıcıları, yazı tipi ve renkleri.",
+
+  "settings.categories": "Ayar kategorileri",
+
+
+  "settings.strip.desktopEdgeSide": "Kenar",
+
+
+  "settings.strip.desktopEdgeRight": "Sağ",
+
+
+  "settings.strip.desktopEdgeLeft": "Sol",
+
+
+  "settings.strip.desktopEdgeTop": "Üst",
+
+
+  "settings.strip.desktopPinned": "Ekran kenarı şeridi açık kalsın (raptiye düğmesi de yapar)",
+
+
+  "settings.strip.onlyWhileRunning": "Yalnızca bir yapay zekâ aracı çalışırken",
+
+
+  "settings.strip.onlyWhileRunningHint": "Şeritteki sağlayıcıların uygulamalarından veya komut satırı araçlarından (Claude Code, Codex, …) hiçbiri çalışmıyorken şerit gizlenir.",
+
+
+  "settings.strip.desktopSlide": "Ekran kenarı şeridi yumuşakça kayarak açılsın",
+
+
+  "settings.strip.desktopSlideMs": "Kayma süresi",
+
+
+  "settings.strip.desktopGradient": "Ekran kenarı şeridinde yumuşak renk geçişi",
+
+
+  "whatsNew.title": "Yenilikler",
+
+
+  "whatsNew.close": "Kapat",
+
+
+  "whatsNew.video": "Bu sürümdeki yenilikleri gösteren kısa bir video",
+
+
+  "settings.whatsNew.title": "Yenilikler",
+
+
+  "settings.whatsNew.label": "Güncellemeden sonra yenilikleri göster",
+
+
+  "settings.whatsNew.hint": "Güncellemeden sonra panel ilk açıldığında bir kez: sürüm notları ve güncelleme getirdiyse kısa bir video. Video, pencereyi kapattığında silinir.",
+
+
+  "rate.perMinute": "{tokens}/dk",
+
+
+  "settings.strip.tokenRate": "Dakikadaki canlı token (Claude, Codex), tepsi ipucunda da",
+
+
+  "settings.strip.desktopEdge": "Ekran kenarı",
+
+
+  "settings.strip.desktopEdgeHint": "Ekranın bir kenarına (sağ, sol veya üst) yerleşir, neredeyse görünmez; işaretçi gelince dışarı kayar.",
+
+
+  "settings.cards.tokscale": "tokscale ile 30 kadar araç daha (Gemini CLI, Copilot, Kiro…)",
+
+
+  "settings.cards.tokscaleHint": "Açık kaynaklı tokscale'i bunx veya npx ile çalıştırır (bun ya da Node.js gerekir); tokscale kendini ve fiyat listesini indirir. Bu araçların yerel kayıtlarını en çok 30 dakikada bir okur.",
+
+
+  "settings.balances.title": "Özel bakiyeler",
+
+
+  "settings.balances.desc": "New API, One API, Sub2API ya da kendi uç noktanız: bakiyeleri Özel bakiyeler kartında",
+
+
+  "settings.balances.name": "Ad",
+
+
+  "settings.balances.preset": "Tür",
+
+
+  "settings.balances.custom": "Özel uç nokta",
+
+
+  "settings.balances.url": "Adres",
+
+
+  "settings.balances.env": "Anahtarı tutan ortam değişkeni (OTU_…)",
+
+
+  "settings.balances.userId": "Kullanıcı kimliği",
+
+
+  "settings.balances.path": "Yol",
+
+
+  "settings.balances.remaining": "Bakiye alanı",
+
+
+  "settings.balances.used": "Kullanılan alanı",
+
+
+  "settings.balances.total": "Toplam alanı",
+
+
+  "settings.balances.divisor": "Bölen",
+
+
+  "settings.balances.currency": "Para birimi",
+
+
+  "settings.balances.auth": "Anahtar başlığı",
+
+
+  "settings.balances.remove": "Kaldır",
+
+
+  "settings.balances.add": "Bakiye ekle",
+
+
+  "settings.balances.save": "Kaydet",
+
+
+  "settings.balances.saved": "Kaydedildi. Görmek için Özel bakiyeler kartını açın.",
+
+
+  "settings.balances.invalid": "Kaydedilmedi: adresi, değişken adını (OTU_ ile başlar, sonra A–Z, 0–9, _) ve yolları denetleyin.",
+
+
+  "settings.balances.hint": "Anahtarın kendisi asla kaydedilmez: onu bir ortam değişkenine koyup değişkenin adını girin. Yollar yanıtın içini gösterir, örneğin data.balance.",
+
+
+  "year.title": "Yıllık kullanım",
+
+
+  "year.streak": "{days} günlük seri",
+
+
+  "year.summary": "En uzun seri {longest} gün · {active} aktif gün · {tokens} token",
+
+
+  "year.cell": "{date}: {tokens} token",
+
+
+  "settings.cards.yearHeatmap": "Claude ve Codex ayrıntı sayfalarında serileriyle bir yıllık günlük kullanım",
+
+
+  "settings.cards.keepUsage": "Kayıtları silinen kullanımı koru",
+
+
+  "settings.cards.keepUsageHint": "Claude Code kayıtlarını varsayılan olarak 30 gün sonra siler. Her günün tokenleri uygulamanın veri klasöründe tutulur; yıllık görünüm ve dışa aktarma onları saymaya devam eder.",
+
+
+  "settings.export.title": "Kullanım dışa aktarma",
+
+
+  "settings.export.desc": "Günlük tokenler ve son limitler, İndirilenler klasörüne CSV ve JSON olarak",
+
+
+  "settings.export.now": "Şimdi dışa aktar",
+
+
+  "settings.export.done": "Kaydedildi: {path}",
+
+
+  "settings.export.failed": "Dışa aktarma yazılamadı.",
+
+
+  "settings.export.daily": "Her gün yeniden yaz",
+
+
+  "card.sessions.cache": "önbellek {time}",
+
+
+  "card.sessions.cacheHint": "Bu oturumun istem önbelleğinin kalan süresi. Süre dolunca sonraki istem tüm bağlamı yeniden gönderir ve limitten daha çok harcar.",
+
+
+  "settings.cards.cacheTimer": "Claude oturumunun istem önbelleğinde kalan süre",
+
+
+  "settings.cards.contextFill": "Her oturumun bağlam penceresinin doluluğu",
+
+
+  "spend.planMultiple": "{name}: planının {times} katı",
+
+
+  "spend.planMultipleHint": "API fiyatlarıyla 30 gün ({cost}), planın aylık fiyatının ({price}) {times} katı.",
+
+
+  "settings.plans.title": "Abonelikler",
+
+
+  "settings.plans.desc": "Her planın aylık fiyatı; API fiyatlarıyla kullanımıyla karşılaştırmak için",
+
+
+  "settings.plans.multiple": "Harcama özetinde her planın kullanımını fiyatının katı olarak göster",
+
+
+  "settings.plans.price": "{name}: aylık fiyat",
+
+
+  "settings.claudeCode.retention": "Claude Code kayıtlarını sakla:",
+
+
+  "settings.claudeCode.retentionDays": "{days} gün",
+
+
+  "settings.claudeCode.retentionHint": "Claude Code başlarken daha eski konuşma kayıtlarını siler. Saat ızgarası, projeler ve harcama bu kayıtlardan okunur.",
+
+
+  "settings.alerts.refills": "Bir limit sıfırlanmadan önce dolduğunda (sıfırlama hakkı veya kısmi dolma)",
+
+
+  "settings.alerts.refillPoints": "En az",
+
+
+  "settings.alerts.points": "{points} puan",
+
+
+  "settings.strip.followDetail": "Ayrıntılı: her limit sıfırlanmaya kalan süresiyle",
+
+
+  "settings.strip.activityDots": "Ajanı çalışırken (mavi) veya seni beklerken (sarı) logoda nokta",
+
+
+  "settings.strip.desktopClickThroughKey": "Tıklamak veya sürüklemek için basılı tutulacak tuş",
+
+
+  "settings.cards.title": "Kartlarda",
+
+
+  "settings.cards.desc": "Genel bakışın limitler dışında gösterdikleri",
+
+
+  "settings.cards.liveSessions": "Claude Code ve Codex kartlarında canlı oturumlar",
+
+
+  "settings.cards.spend": "Kartların altında harcama özeti",
+
+
+  "settings.cards.spendTools": "Bu araçların kendi kayıtlarını da say",
+
+
+  "alert.refill.title": "{provider}: {label} erken doldu",
+
+
+  "alert.refill.body": "%{percent} yeniden kullanılabilir.",
+
+
+  "settings.strip.followActive": "Odaktaki uygulamayı izle",
+
+
+  "settings.strip.followActiveHint": "Kullandığın penceredeki yapay zekâ aracı başa geçer.",
+
+
+  "settings.strip.desktopClickThrough": "Tıklamalar arkadaki pencereye geçsin",
+
+
+  "spend.title": "Harcama",
+
+
+  "spend.today": "Bugün",
+
+
+  "spend.yesterday": "Dün",
+
+
+  "spend.month": "30 gün",
+
+
+  "spend.cost": "Maliyet",
+
+
+  "spend.tokens": "Token",
+
+
+  "spend.models": "Modeller, son 30 gün (token'a göre)",
+
+
+  "settings.strip.desktopCycle": "Sırayla",
+
+
+  "settings.strip.desktopCycleHint": "Her sağlayıcıyı 8 saniye gösteren tek bir widget",
+
+
+  "settings.theme.halloween": "Cadılar Bayramı",
+
+
+  "settings.theme.glass": "Cam",
+
+
+  "settings.theme.glassHint": "Panelin arkasındaki masaüstünü bulanıklaştırır (Windows 11)",
+
+
+  "label.Installed models": "Yüklü modeller",
+
+
+  "label.Loaded now": "Şu an bellekte",
+
+
+  "label.Vouchers": "Kuponlar",
+
+
+  "label.Cash": "Nakit",
+
+
+  "label.Requests today": "Bugünkü istekler",
+
+
+  "label.Requests this month": "Bu ayki istekler",
+
+
+  "label.Models": "Modeller",
+
+
+  "label.Token Plan usage": "Token Plan kullanımı",
+
+
+  "card.customize": "Satırları özelleştir",
+
+
+  "card.customizeHint": "Satırları sürükleyerek sıralayın, gerekmeyenleri gizleyin. Ctrl+Z geri alır, Esc kapatır.",
+
+
+  "card.customizeMove": "{row} satırını taşı",
+
+
+  "card.customizeShow": "{row} satırını göster",
+
+
+  "card.customizeHide": "{row} satırını gizle",
+
+
+  "card.customizeReset": "Varsayılana dön",
+
+
+  "card.customizeDone": "Bitti",
+
+
+  "weekDays.capacity": "Bu haftaki model karışımıyla limitin tamamı yaklaşık {tokens} token; API fiyatlarıyla {cost} değerinde.",
+
+
+  "weekDays.capacityTokens": "Bu haftaki model karışımıyla limitin tamamı yaklaşık {tokens} token.",
+
+
+  "card.copyImage": "Resim olarak kopyala",
+
+
+  "card.imageCopied": "Panoya kopyalandı",
+
+
+  "card.imageCopyFailed": "Resim kopyalanamadı",
+
+
+  "settings.privacy.title": "Gizlilik",
+
+
+  "settings.privacy.hideWhenSharing": "Ekran paylaşımında gizle",
+
+
+  "settings.privacy.hideWhenSharingHint": "Panel ve masaüstü widget'ları ekran paylaşımlarında, kayıtlarda ve ekran görüntülerinde hiç görünmez; siz yine görürsünüz. Windows ekranın paylaşıldığını uygulamalara bildirmediği için bildirim alanındaki sayılar ve görev çubuğu şeridi yalnızca sunum yaparken veya biri bu bilgisayarı uzaktan yönetirken gizlenir.",
+
+
+  "settings.backup.reset": "Tüm ayarları sıfırla",
+
+
+  "settings.backup.resetHint": "Tüm tercihler varsayılanına döner. Sağlayıcılarınız, hesaplarınız ve proje bütçeleriniz kalır. Uygulama yeniden başlar.",
+
+
+  "settings.backup.resetConfirm": "Sıfırla ve yeniden başlat",
+
+
+  "settings.backup.resetCancel": "İptal",
+
+
+  "settings.backup.resetError": "Ayarlar sıfırlanamadı.",
+
+
+  "settings.proxy.title": "Proxy",
+
+
+  "settings.proxy.desc": "Sağlayıcı, durum sayfası ve güncelleme isteklerini bir proxy sunucusu üzerinden gönderin.",
+
+
+  "settings.proxy.enable": "Proxy kullan",
+
+
+  "settings.proxy.url": "Proxy adresi",
+
+
+  "settings.proxy.save": "Kaydet",
+
+
+  "settings.proxy.saved": "Kaydedildi; bir sonraki istekten itibaren geçerli.",
+
+
+  "settings.proxy.invalid": "Bu bir proxy adresi değil. Bir sunucu adıyla http://, https://, socks5:// veya socks5h:// kullanın, örneğin http://127.0.0.1:8080.",
+
+
+  "settings.proxy.error": "Proxy kaydedilemedi.",
+
+
+  "card.showUsed": "Kullanılanı göster",
+
+
+  "card.showLeft": "Kalanı göster",
+
+  "settings.category.usage": "Kullanım",
+
+  "settings.category.taskbar": "Görev çubuğu ve masaüstü",
+
+  "settings.category.appearance": "Görünüm",
+
+  "settings.category.app": "Uygulama",
   "settings.strip.position": "Konum",
   "settings.strip.positionLeft": "Sol",
   "settings.strip.positionRight": "Sağ",
@@ -134,6 +557,8 @@ export const tr: Messages = {
   "settings.strip.colorTraffic": "Trafik ışığı (yeşil → sarı → kırmızı)",
   "settings.strip.colorCool": "Serin (mavi → mor → kırmızı)",
   "settings.strip.colorMono": "Sade, yalnızca limite yakın kırmızı",
+
+  "settings.strip.colorPace": "Tempoya göre",
   "settings.strip.colorThresholds": "Özel eşikler",
   "settings.strip.colorOff": "Kapalı",
   "settings.strip.drag": "{name} öğesini sürükle",
@@ -146,6 +571,23 @@ export const tr: Messages = {
   "settings.strip.criticalAt": "Kritik eşik",
   "settings.strip.usageColorsHint": "Limitin ne kadarının kullanıldığına göre.",
   "settings.strip.reset": "Görünümü sıfırla",
+  "settings.strip.desktop": "Masaüstünde göster",
+  "settings.strip.desktopHint": "İstediğiniz yere sürükleyebileceğiniz widget'lar; tıklayınca panel açılır, fareyle üstüne gelince limitlerin ne zaman sıfırlanacağı görünür. Artan bir sayı yanıp söner, sonra bir dakika vurgu renginde kalır. Tam ekran bir uygulama öndeyken gizlenirler. Aşağıdaki sağlayıcılar ve görünüm onlar için de geçerlidir.",
+  "settings.strip.desktopLayout": "Widget'lar",
+  "settings.strip.desktopRow": "Yan yana",
+
+  "settings.strip.desktopColumn": "Alt alta",
+  "settings.strip.desktopSeparate": "Ayrı",
+  "settings.strip.desktopPlate": "Arka plan opaklığı",
+  "settings.strip.desktopLogo": "Logolar",
+  "settings.strip.desktopLogoBrand": "Renkli",
+  "settings.strip.desktopLogoWhite": "Beyaz",
+  "settings.strip.desktopLogoBlack": "Siyah",
+  "settings.strip.desktopOnTop": "Her zaman üstte",
+  "settings.strip.desktopSnap": "Ekran kenarlarına ve birbirine yapışsın",
+  "settings.strip.desktopLocked": "Yerine kilitle (fare üstündeyken saydamlaşır)",
+
+  "settings.strip.desktopBars": "Rakamların altında çubuk",
   "settings.tray.perProviderHint": "Bir ikon ^ altına düşerse, saatin yanında kalması için görev çubuğu ayarlarından açın.",
   "settings.tray.openTaskbarSettings": "Görev çubuğu ayarlarını aç",
   "settings.tray.provider": "Sağlayıcı",
@@ -157,7 +599,7 @@ export const tr: Messages = {
   "settings.tray.auto": "Otomatik",
   "settings.tray.tightest": "En çok kullanılan",
   "settings.theme.title": "Tema",
-  "settings.theme.desc": "Koyu (tam siyah) veya açık",
+  "settings.theme.desc": "Koyu (tam siyah), açık veya Cadılar Bayramı",
   "settings.theme.light": "Açık",
   "settings.theme.dark": "Koyu",
   "settings.theme.darkHint": "Tam siyah, OLED ekranlar için ideal",
@@ -189,6 +631,9 @@ export const tr: Messages = {
   "settings.panel.desc": "Panelin açıldığı yer. Başlık çubuğundaki raptiye paneli diğer pencerelerin üstünde tutar.",
   "settings.panel.remember": "Konumumu hatırla",
   "settings.panel.rememberHint": "Paneli başlık çubuğundan tutup istediğiniz yere sürükleyin; bir dahaki sefere görev çubuğunun üstü yerine aynı yerde açılır.",
+  "settings.panel.navSide": "Sağlayıcı çubuğu",
+  "settings.panel.navLeft": "Sol",
+  "settings.panel.navRight": "Sağ",
   "settings.alerts.levels": "Bildirim seviyeleri",
   "settings.alerts.ticksHint": "Çubuklarda her seviye bir çentikle gösterilir.",
   "settings.alerts.perProvider": "Sağlayıcıya göre",

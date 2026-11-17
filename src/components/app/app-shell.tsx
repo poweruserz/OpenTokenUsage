@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppContent, type AppContentActionProps } from "@/components/app/app-content"
+import { ChangelogDialog } from "@/components/changelog-dialog"
 import { PanelFooter } from "@/components/panel-footer"
 import { SideNav, type NavPlugin, type PluginContextAction } from "@/components/side-nav"
 import { StarPromptCard } from "@/components/star-prompt"
@@ -11,6 +12,7 @@ import type { SettingsPluginState } from "@/hooks/app/use-settings-plugin-list"
 import { useAppVersion } from "@/hooks/app/use-app-version"
 import { usePanel } from "@/hooks/app/use-panel"
 import type { useAppUpdate } from "@/hooks/use-app-update"
+import { useWhatsNew } from "@/hooks/use-whats-new"
 import { useWindowsAppearance } from "@/hooks/use-windows-appearance"
 import { t } from "@/lib/i18n"
 import { savePanelPinned } from "@/lib/settings"
@@ -208,7 +210,9 @@ export function AppShell({
 
   useWindowsAppearance()
   const appVersion = useAppVersion()
+  const navRight = useAppPreferencesStore((state) => state.navRight)
   const { updateStatus, triggerInstall, checkForUpdates } = appUpdate
+  const whatsNew = useWhatsNew(appUpdate.afterUpdate)
 
   return (
     <div ref={containerRef} tabIndex={-1} className="relative flex flex-col bg-background outline-none">
@@ -225,7 +229,7 @@ export function AppShell({
         style={maxPanelHeightPx ? { maxHeight: `${maxPanelHeightPx}px` } : undefined}
       >
         <TitleBar />
-        <div className="flex flex-1 min-h-0 flex-row">
+        <div className={cn("flex flex-1 min-h-0", navRight ? "flex-row-reverse" : "flex-row")}>
           <SideNav
             activeView={activeView}
             onViewChange={setActiveView}
@@ -234,8 +238,13 @@ export function AppShell({
             isPluginRefreshAvailable={isPluginRefreshAvailable}
             onReorder={onNavReorder}
           />
-          {/* NavigationView content layer: rounded top-left corner over the Mica base */}
-          <div className="flex-1 flex flex-col px-3 pt-2 pb-1.5 min-w-0 bg-card border-t border-l rounded-tl-lg">
+          {/* NavigationView content layer: its corner next to the nav rounded, over the Mica base */}
+          <div
+            className={cn(
+              "flex-1 flex flex-col px-3 pt-2 pb-1.5 min-w-0 bg-card border-t",
+              navRight ? "border-r rounded-tr-lg" : "border-l rounded-tl-lg"
+            )}
+          >
             {/* Out to the card's edge, so the scrollbar sits there and the content keeps its right padding, as on the left. */}
             <div className="relative flex-1 min-h-0 -mr-3">
               <div ref={scrollRef} className="h-full overflow-y-auto pr-3">
@@ -265,6 +274,7 @@ export function AppShell({
             />
           </div>
         </div>
+        {whatsNew.version && <ChangelogDialog currentVersion={whatsNew.version} onClose={whatsNew.close} />}
       </div>
     </div>
   )

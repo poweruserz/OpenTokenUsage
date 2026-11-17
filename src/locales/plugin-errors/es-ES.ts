@@ -74,6 +74,8 @@ const esES: PluginErrorMessages = {
   wslNotRunning: "WSL no se está ejecutando. Inícialo para actualizar esta tarjeta.",
   cursorSecureStorageUnavailable: "El almacenamiento seguro de Cursor no está disponible.",
   cursorSecureStorageUnreadable: "No se ha podido leer el almacenamiento seguro de Cursor.",
+
+  customBalanceNotSetUp: "No hay saldos personalizados configurados. Añade uno en Ajustes.",
 }
 
 export default esES

@@ -8,6 +8,7 @@ import {
   alertLevelsFor,
   getEnabledPluginIds,
   loadSentUsageAlerts,
+  refillAlertPoints,
   saveSentUsageAlerts,
   type AlertSettings,
   type DisplayMode,
@@ -98,7 +99,8 @@ export function useUsageAlerts({
           nowMs: Date.now(),
           levels: alertLevelsFor(settings, id),
           displayMode,
-          workdays: paceWorkdays
+          workdays: paceWorkdays,
+          refillPoints: refillAlertPoints(settings)
         })
       )
     }

@@ -12,9 +12,14 @@ import {
   alertLevelsFor,
   arePluginSettingsEqual,
   normalizeAlertSettings,
+  normalizeCardFeatures,
+  DEFAULT_CARD_FEATURES,
+  refillAlertPoints,
   normalizePanelWidth,
   getEnabledPluginIds,
   loadAutoUpdateInterval,
+  loadCollapsedSections,
+  saveCollapsedSections,
   loadDisplayMode,
   loadGlobalShortcut,
   loadMenubarIconStyle,
@@ -74,11 +79,34 @@ describe("settings", () => {
     await expect(loadPluginSettings()).resolves.toEqual(DEFAULT_PLUGIN_SETTINGS)
   })
 
+  it("starts a detail section added since the list was saved closed, until the user opens it", async () => {
+    // Saved before the year existed: it starts closed like the defaults, the rest as chosen.
+    storeState.set("collapsedSections", ["heatmap"])
+    await expect(loadCollapsedSections()).resolves.toEqual(["heatmap", "year"])
+    // Opened once and saved: it stays open.
+    await saveCollapsedSections(["heatmap"])
+    await expect(loadCollapsedSections()).resolves.toEqual(["heatmap"])
+  })
+
   it("saves strip placement and restores it after reloading settings", async () => {
     const original = await loadTaskbarStripStyle()
     await saveTaskbarStripStyle({ ...original, position: "left", offset: 120 })
     expect(storeSaveMock).toHaveBeenCalled()
     await expect(loadTaskbarStripStyle()).resolves.toEqual({ ...original, position: "left", offset: 120 })
+  })
+
+  it("starts usage colors off on a new install and keeps them on for an install from before", async () => {
+    await expect(loadTaskbarStripStyle()).resolves.toMatchObject({ colorMode: "off" })
+    // Saved: the plugin settings a new install's first start saves don't make it look like an update.
+    storeState.set("plugins", { order: ["claude"], disabled: [] })
+    await expect(loadTaskbarStripStyle()).resolves.toMatchObject({ colorMode: "off" })
+
+    storeState.clear()
+    storeState.set("plugins", { order: ["claude"], disabled: [] })
+    await expect(loadTaskbarStripStyle()).resolves.toMatchObject({ colorMode: "heat" })
+    // A style the user saved is taken as it is.
+    storeState.set("taskbarStripStyle", { colorMode: "traffic" })
+    await expect(loadTaskbarStripStyle()).resolves.toMatchObject({ colorMode: "traffic" })
   })
 
   it("sanitizes stored settings", async () => {
@@ -498,6 +526,29 @@ describe("alert settings", () => {
     expect(normalizeAlertSettings(undefined).spikes).toBe(true)
     expect(normalizeAlertSettings({ levels: [80] }).spikes).toBe(true) // settings saved before spikes existed
     expect(normalizeAlertSettings({ spikes: false }).spikes).toBe(false)
+  })
+
+  it("keeps early refill notifications on at 10 points unless changed", () => {
+    expect(refillAlertPoints(normalizeAlertSettings(undefined))).toBe(10)
+    expect(refillAlertPoints(normalizeAlertSettings({ refillPoints: 20 }))).toBe(20)
+    expect(refillAlertPoints(normalizeAlertSettings({ refillPoints: 7 }))).toBe(10) // not an offered step
+    expect(refillAlertPoints(normalizeAlertSettings({ refills: false, refillPoints: 20 }))).toBeNull()
+  })
+
+  it("shows live sessions and every tool's spend unless turned off", () => {
+    expect(normalizeCardFeatures(undefined)).toEqual(DEFAULT_CARD_FEATURES)
+    expect(
+      normalizeCardFeatures({ liveSessions: false, spend: false, spendToolsOff: ["grok", "nope", 3], tokscale: "yes", autoExport: true })
+    ).toEqual({
+      ...DEFAULT_CARD_FEATURES,
+      liveSessions: false,
+      spend: false,
+      spendToolsOff: ["grok"],
+      autoExport: true,
+    })
+    // tokscale runs a downloaded package: only an explicit true turns it on.
+    expect(DEFAULT_CARD_FEATURES.tokscale).toBe(false)
+    expect(normalizeCardFeatures({ tokscale: true }).tokscale).toBe(true)
   })
 })
 

@@ -333,6 +333,58 @@ fn set_at(path: &Path, enabled: bool) -> Result<BridgeState, BridgeState> {
     })
 }
 
+/// Claude Code deletes transcripts older than `cleanupPeriodDays` (30 when unset) when it starts.
+const CLEANUP_KEY: &str = "cleanupPeriodDays";
+const DEFAULT_CLEANUP_DAYS: u64 = 30;
+/// What Settings offers: Claude's default, a quarter, a year and a bit (a whole year of history).
+const CLEANUP_CHOICES: [u64; 3] = [30, 90, 370];
+
+fn retention_at(path: &Path) -> Option<u64> {
+    let (entries, _) = read_entries(path).ok()?;
+    Some(
+        entries
+            .0
+            .iter()
+            .find(|(key, _)| key == CLEANUP_KEY)
+            .and_then(|(_, value)| serde_json::from_str::<u64>(value.get()).ok())
+            .unwrap_or(DEFAULT_CLEANUP_DAYS),
+    )
+}
+
+fn set_retention_at(path: &Path, days: u64) -> Result<u64, String> {
+    if !CLEANUP_CHOICES.contains(&days) {
+        return Err("unsupported retention".into());
+    }
+    let (mut entries, newline) =
+        read_entries(path).map_err(|_| "settings.json unreadable".to_string())?;
+    if days == DEFAULT_CLEANUP_DAYS {
+        entries.0.retain(|(key, _)| key != CLEANUP_KEY);
+    } else {
+        let value = RawValue::from_string(days.to_string()).map_err(|e| e.to_string())?;
+        match entries.0.iter_mut().find(|(key, _)| key == CLEANUP_KEY) {
+            Some((_, old)) => *old = value,
+            None => entries.0.push((CLEANUP_KEY.to_string(), value)),
+        }
+    }
+    write_atomic(path, &render(&entries, newline)).map_err(|e| {
+        log::error!("claude settings.json not written: {e}");
+        e.to_string()
+    })?;
+    Ok(days)
+}
+
+/// How many days Claude Code keeps its transcripts; None when its settings.json can't be read.
+#[tauri::command]
+pub fn claude_log_retention() -> Option<u64> {
+    retention_at(&settings_path()?)
+}
+
+/// Settings → Claude Code: keep transcripts 30, 90 or 370 days (30 drops the key: Claude's default).
+#[tauri::command]
+pub fn set_claude_log_retention(days: u64) -> Result<u64, String> {
+    set_retention_at(&settings_path().ok_or("no Claude folder")?, days)
+}
+
 #[tauri::command]
 pub fn claude_statusline_state() -> BridgeState {
     settings_path().map_or(BridgeState::Unreadable, |path| state_at(&path))
@@ -357,6 +409,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn log_retention_is_set_in_place_and_30_days_drops_the_key() {
+        let path = temp_dir("retention").join("settings.json");
+        std::fs::write(
+            &path,
+            "{\n  \"model\": \"opus\",\n  \"theme\": \"dark\"\n}\n",
+        )
+        .unwrap();
+        assert_eq!(retention_at(&path), Some(30));
+        assert_eq!(set_retention_at(&path, 370), Ok(370));
+        assert_eq!(retention_at(&path), Some(370));
+        assert_eq!(set_retention_at(&path, 90), Ok(90));
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            text,
+            "{\n  \"model\": \"opus\",\n  \"theme\": \"dark\",\n  \"cleanupPeriodDays\": 90\n}\n"
+        );
+        assert_eq!(set_retention_at(&path, 30), Ok(30));
+        assert!(!std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("cleanupPeriodDays"));
+        assert!(set_retention_at(&path, 7).is_err());
+        std::fs::write(&path, "not json").unwrap();
+        assert_eq!(retention_at(&path), None);
+        assert!(set_retention_at(&path, 370).is_err());
     }
 
     const POSTED: &str = r#"{"session_id":"s","model":{"id":"claude"},"rate_limits":{

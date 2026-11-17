@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "ollama",
+  "name": "Ollama",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#000000",
+  "links": [
+    { "label": "Models", "url": "https://ollama.com/library" }
+  ],
+  "lines": [
+    { "type": "text", "label": "Installed models", "scope": "overview" },
+    { "type": "text", "label": "Loaded now", "scope": "overview" }
+  ]
+}

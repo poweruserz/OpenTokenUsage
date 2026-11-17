@@ -102,6 +102,9 @@ export function AppContent({
     }))
   )
 
+  // A click on a bar's value flips used ⇄ left, the same setting as in Settings.
+  const onDisplayModeToggle = () => onDisplayModeChange(displayMode === "used" ? "left" : "used")
+
   if (activeView === "home") {
     return (
       <OverviewPage
@@ -111,6 +114,7 @@ export function AppContent({
         resetTimerDisplayMode={resetTimerDisplayMode}
         timeFormatMode={timeFormatMode}
         onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
+        onDisplayModeToggle={onDisplayModeToggle}
       />
     )
   }
@@ -161,6 +165,7 @@ export function AppContent({
       resetTimerDisplayMode={resetTimerDisplayMode}
       timeFormatMode={timeFormatMode}
       onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
+      onDisplayModeToggle={onDisplayModeToggle}
     />
   )
 }

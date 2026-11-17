@@ -5,11 +5,13 @@ import type { ThemeMode } from "@/lib/settings"
 
 export function useSettingsTheme(themeMode: ThemeMode) {
   useEffect(() => {
-    const dark = themeMode === "dark"
+    // Halloween is the dark theme with pumpkin orange (`.halloween` in index.css).
+    const dark = themeMode !== "light"
     const root = document.documentElement
     root.classList.toggle("dark", dark)
     // Dark is pure black (the `.oled` tokens in index.css).
     root.classList.toggle("oled", dark)
+    root.classList.toggle("halloween", themeMode === "halloween")
     // Mica takes its tint from the window's theme, not the page's: without this a light page sits
     // on dark Mica whenever Windows itself is dark (and the other way round).
     if (isTauri()) {

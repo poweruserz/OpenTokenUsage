@@ -63,6 +63,29 @@ Returns rate limit windows, optional credits, and available on-demand rate limit
 
 Both rate_limit windows are enforced simultaneously — hitting either limit throttles the user.
 
+A Business plan answers `"rate_limit": null` and carries the monthly per-user cap its admin set instead; the card
+shows it as a **Monthly** row (as [TaskbarQuota](https://github.com/zioder/TaskbarQuota), MIT, reads it):
+
+```jsonc
+"spend_control": {
+  "individual_limit": {
+    "limit": "2400", "used": "1434.58",     // credits, as strings
+    "used_percent": 60,                     // missing: used / limit
+    "reset_at": 1789000000,                 // unix seconds; missing or null: now + reset_after_seconds
+    "reset_after_seconds": 11831
+  }
+}
+```
+
+## Live sessions
+
+The Codex card (the usual login and each extra account) lists the Codex sessions running on this machine, read every 5
+seconds while the panel is shown. Codex keeps no file per process, so while N `codex.exe` processes run, its N newest logs
+in `sessions/YYYY/MM/DD` written in the last 6 hours are taken as theirs, named after the folder their last turn ran in.
+A session is idle once its last turn ended (`task_complete`, an aborted turn or the final answer) and working while a
+newer prompt or step was written in the last 10 minutes. A sub-agent writes its own log, so it can stand in for its
+parent. With the taskbar strip or desktop widgets on, the Codex logo gets a blue dot while a session works.
+
 OpenUsage floors the remaining credit balance to a whole number and displays its fixed USD
 equivalent at `$0.04` per credit. For example, `820.6969075` renders as
 `$32.80 · 820 credits`. The credit balance is unbounded; the API does not provide a maximum.

@@ -26,12 +26,18 @@ const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000
 
 // The quiet installer (tauri.conf.json) shows no window and closes the app; the app it starts
 // opens the panel again, so the update doesn't look like a crash. A failed install leaves the old
-// version running, which only clears the mark.
-async function reopenPanelAfterUpdate() {
+// version running, which only clears the mark. True when this start is the updated version's first.
+async function reopenPanelAfterUpdate(): Promise<boolean> {
   const version = await loadUpdateRelaunchVersion()
-  if (version === null) return
+  if (version === null) return false
   await saveUpdateRelaunchVersion(null)
-  if (version === (await getVersion())) await invoke("show_panel")
+  if (version !== (await getVersion())) return false
+  try {
+    await invoke("show_panel")
+  } catch (error) {
+    console.error(error)
+  }
+  return true
 }
 
 // Once per version, saved before it's sent: the 15-minute checks, a restart that downloads the same
@@ -48,14 +54,27 @@ async function notifyUpdateReady(version: string) {
   await invoke("play_alert_sound", { sound, preview: false })
 }
 
+/** Checks and downloads go through the proxy set in Settings (`config.rs`), as provider requests do. */
+async function updateCheckOptions(): Promise<{ proxy: string } | undefined> {
+  try {
+    const setting = await invoke<{ enabled: boolean; url: string } | undefined>("get_proxy_setting")
+    return setting?.enabled && setting.url ? { proxy: setting.url } : undefined
+  } catch {
+    return undefined
+  }
+}
+
 interface UseAppUpdateReturn {
   updateStatus: UpdateStatus
   triggerInstall: () => void
   checkForUpdates: () => void
+  /** This start is the first as the version an in-app update installed; null until that's known. */
+  afterUpdate: boolean | null
 }
 
 export function useAppUpdate(): UseAppUpdateReturn {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ status: "idle" })
+  const [afterUpdate, setAfterUpdate] = useState<boolean | null>(null)
   const statusRef = useRef<UpdateStatus>({ status: "idle" })
   const updateRef = useRef<Update | null>(null)
   const mountedRef = useRef(true)
@@ -81,7 +100,7 @@ export function useAppUpdate(): UseAppUpdateReturn {
     inFlightRef.current.checking = true
     setStatus({ status: "checking" })
     try {
-      const update = await check()
+      const update = await check(await updateCheckOptions())
       inFlightRef.current.checking = false
       if (!mountedRef.current) return
       if (!update) {
@@ -138,7 +157,11 @@ export function useAppUpdate(): UseAppUpdateReturn {
   }, [setStatus])
 
   useEffect(() => {
-    if (isTauri()) reopenPanelAfterUpdate().catch(console.error)
+    if (!isTauri()) return
+    reopenPanelAfterUpdate().then(setAfterUpdate, (error) => {
+      console.error(error)
+      setAfterUpdate(false)
+    })
   }, [])
 
   useEffect(() => {
@@ -182,5 +205,5 @@ export function useAppUpdate(): UseAppUpdateReturn {
     }
   }, [setStatus])
 
-  return { updateStatus, triggerInstall, checkForUpdates }
+  return { updateStatus, triggerInstall, checkForUpdates, afterUpdate }
 }

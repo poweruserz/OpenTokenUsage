@@ -3,21 +3,28 @@ import { backupStore, DEFAULT_ALERT_SETTINGS, DEFAULT_TASKBAR_STRIP_STYLE, norma
 
 /**
  * The preferences a settings backup carries (store keys). Left out: accounts and logins (never in
- * this store), the panel's position, sent-notification keys, and update and star-prompt state,
+ * this store), the panel's and desktop widgets' positions, sent-notification keys, and update and star-prompt state,
  * which belong to one machine or one moment. A new preference key belongs here too.
  */
 export const BACKUP_KEYS = [
   "alertSettings",
   "autoUpdateInterval",
+  "capturePrivacy",
+  "cardFeatures",
   "collapsedSections",
   "currency",
+  "desktopWidgets",
   "displayMode",
+  "glass",
   "globalShortcut",
   "language",
+  "lineLayouts",
   "menubarIconStyle",
+  "navRight",
   "paceWorkdays",
   "panelPinned",
   "panelWidth",
+  "planPrices",
   "plugins",
   "projectBudgets",
   "rememberPanelPosition",
@@ -33,6 +40,7 @@ export const BACKUP_KEYS = [
   "trayPercentColor",
   "trayProvider",
   "usageAlerts",
+  "whatsNewAfterUpdate",
 ] as const
 
 const BACKUP_APP = "OpenTokenUsage"
@@ -123,9 +131,14 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
     case "trayHiddenPlugins":
       return mergeCardList(has ? imported : [], local)
     case "projectBudgets":
+    case "planPrices":
+    case "lineLayouts":
       return mergeCardMap(has ? imported : {}, local)
     case "taskbarStripStyle": {
-      const base = has && Object.keys(asObject(imported)).length > 0 ? asObject(imported) : DEFAULT_TASKBAR_STRIP_STYLE
+      // 0.9.1 and later always save a style (`loadTaskbarStripStyle`): one without came from 0.8.6 or
+      // older, whose default colored by usage.
+      const base =
+        has && Object.keys(asObject(imported)).length > 0 ? asObject(imported) : { ...DEFAULT_TASKBAR_STRIP_STYLE, colorMode: "heat" }
       const localStyle = asObject(local)
       return {
         ...base,
@@ -141,6 +154,21 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
     default:
       return has ? imported : undefined
   }
+}
+
+/**
+ * Every preference back to its default (Settings → Reset all settings): restores a backup that holds
+ * only this PC's providers (which cards are on, in what order) and project budgets, so those and
+ * everything a backup never touches (accounts, logins, this PC's sound file) stay.
+ */
+export async function resetAllSettings(): Promise<void> {
+  // The style's default as a new install has it (usage colors off), not an old backup's.
+  const kept: Record<string, unknown> = { taskbarStripStyle: DEFAULT_TASKBAR_STRIP_STYLE }
+  for (const key of ["plugins", "projectBudgets"] as const) {
+    const value = await backupStore.get(key)
+    if (value !== undefined) kept[key] = value
+  }
+  await restoreSettingsBackup(JSON.stringify({ app: BACKUP_APP, version: 1, settings: kept }))
 }
 
 /**

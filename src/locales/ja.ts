@@ -89,6 +89,429 @@ export const ja: Messages = {
   "settings.tray.logoColors": "カラーのロゴ",
   "settings.strip.title": "タスク バー表示（試験的）",
   "settings.strip.desc": "タスクバーにプロバイダーのロゴとセッション・週間の使用状況を表示します。",
+
+  "settings.widgets.title": "デスクトップ ウィジェット",
+
+  "settings.widgets.desc": "プロバイダーのロゴとセッション・週間の使用量を、デスクトップの好きな場所に表示します。",
+
+  "settings.stripLook.title": "タスク バー表示とウィジェットの外観",
+
+  "settings.stripLook.desc": "タスク バー表示とウィジェットで共通のプロバイダー、フォント、色です。",
+
+  "settings.categories": "設定のカテゴリ",
+
+
+  "settings.strip.desktopEdgeSide": "端",
+
+
+  "settings.strip.desktopEdgeRight": "右",
+
+
+  "settings.strip.desktopEdgeLeft": "左",
+
+
+  "settings.strip.desktopEdgeTop": "上",
+
+
+  "settings.strip.desktopPinned": "画面端のレールを開いたままにする（ピンのボタンでも切り替え）",
+
+
+  "settings.strip.onlyWhileRunning": "AI ツールの実行中だけ表示",
+
+
+  "settings.strip.onlyWhileRunningHint": "この表示のプロバイダーのアプリや CLI（Claude Code、Codex など）がどれも動いていない間は隠れます。",
+
+
+  "settings.strip.desktopSlide": "画面端のレールをなめらかにスライドして表示する",
+
+
+  "settings.strip.desktopSlideMs": "スライドの長さ",
+
+
+  "settings.strip.desktopGradient": "画面端のレールをやわらかいグラデーションにする",
+
+
+  "whatsNew.title": "新機能",
+
+
+  "whatsNew.close": "閉じる",
+
+
+  "whatsNew.video": "このバージョンの新機能を紹介する短い動画",
+
+
+  "settings.whatsNew.title": "新機能",
+
+
+  "settings.whatsNew.label": "アップデート後に新機能を表示",
+
+
+  "settings.whatsNew.hint": "アップデート後に初めてパネルを開いたときに 1 回だけ、リリース ノートと、アップデートに含まれていれば短い動画を表示します。動画はウィンドウを閉じると削除されます。",
+
+
+  "rate.perMinute": "{tokens}/分",
+
+
+  "settings.strip.tokenRate": "1 分あたりのライブ トークン数 (Claude、Codex)。トレイのヒントにも表示",
+
+
+  "settings.strip.desktopEdge": "画面の端",
+
+
+  "settings.strip.desktopEdgeHint": "画面の端（右・左・上）に寄せて置き、ほとんど隠れます。ポインターを合わせるとスライドして出てきます。",
+
+
+  "settings.cards.tokscale": "tokscale でさらに約 30 のツール (Gemini CLI、Copilot、Kiro など)",
+
+
+  "settings.cards.tokscaleHint": "オープンソースの tokscale を bunx か npx で実行します (bun か Node.js が必要)。tokscale 本体と価格表がダウンロードされます。これらのツールのローカル ログを読むのは最大で 30 分に 1 回です。",
+
+
+  "settings.balances.title": "カスタム残高",
+
+
+  "settings.balances.desc": "New API、One API、Sub2API、または独自のエンドポイント: 残高を Custom balances カードに表示",
+
+
+  "settings.balances.name": "名前",
+
+
+  "settings.balances.preset": "種類",
+
+
+  "settings.balances.custom": "カスタム エンドポイント",
+
+
+  "settings.balances.url": "アドレス",
+
+
+  "settings.balances.env": "キーを入れた環境変数 (OTU_…)",
+
+
+  "settings.balances.userId": "ユーザー ID",
+
+
+  "settings.balances.path": "パス",
+
+
+  "settings.balances.remaining": "残高の場所",
+
+
+  "settings.balances.used": "使用量の場所",
+
+
+  "settings.balances.total": "合計の場所",
+
+
+  "settings.balances.divisor": "割る数",
+
+
+  "settings.balances.currency": "通貨",
+
+
+  "settings.balances.auth": "キーのヘッダー",
+
+
+  "settings.balances.remove": "削除",
+
+
+  "settings.balances.add": "残高を追加",
+
+
+  "settings.balances.save": "保存",
+
+
+  "settings.balances.saved": "保存しました。表示するには Custom balances カードをオンにしてください。",
+
+
+  "settings.balances.invalid": "保存されませんでした: アドレス、変数名 (OTU_ で始まり、続けて A–Z、0–9、_)、パスを確認してください。",
+
+
+  "settings.balances.hint": "キー自体は保存されません。キーを環境変数に入れ、その名前を入力してください。パスは応答内の場所を示します (例: data.balance)。",
+
+
+  "year.title": "1 年間の利用",
+
+
+  "year.streak": "{days} 日連続",
+
+
+  "year.summary": "最長連続 {longest} 日 · 利用日数 {active} 日 · {tokens} トークン",
+
+
+  "year.cell": "{date}: {tokens} トークン",
+
+
+  "settings.cards.yearHeatmap": "Claude と Codex の詳細ページに 1 年分の日別利用と連続記録",
+
+
+  "settings.cards.keepUsage": "ログが削除された利用も残す",
+
+
+  "settings.cards.keepUsageHint": "Claude Code は既定で 30 日後にログを削除します。各日のトークンはアプリのデータフォルダーに残り、年間表示とエクスポートで引き続き数えます。",
+
+
+  "settings.export.title": "利用のエクスポート",
+
+
+  "settings.export.desc": "日別トークンと最新の上限を CSV と JSON でダウンロードフォルダーへ",
+
+
+  "settings.export.now": "今すぐエクスポート",
+
+
+  "settings.export.done": "保存しました: {path}",
+
+
+  "settings.export.failed": "エクスポートを書き込めませんでした。",
+
+
+  "settings.export.daily": "1 日 1 回書き直す",
+
+
+  "card.sessions.cache": "キャッシュ {time}",
+
+
+  "card.sessions.cacheHint": "このセッションのプロンプトキャッシュの残り時間です。切れると次のプロンプトでコンテキスト全体を送り直し、上限をより多く使います。",
+
+
+  "settings.cards.cacheTimer": "Claude セッションのプロンプトキャッシュの残り時間",
+
+
+  "settings.cards.contextFill": "各セッションのコンテキストの使用率",
+
+
+  "spend.planMultiple": "{name}: プランの {times} 倍",
+
+
+  "spend.planMultipleHint": "API 価格での 30 日分（{cost}）はプラン月額（{price}）の {times} 倍です。",
+
+
+  "settings.plans.title": "サブスクリプション",
+
+
+  "settings.plans.desc": "各プランの月額。API 価格での利用額と比べるために使います",
+
+
+  "settings.plans.multiple": "利用額の概要に、各プランの利用を料金の何倍かで表示",
+
+
+  "settings.plans.price": "{name}: 月額",
+
+
+  "settings.claudeCode.retention": "Claude Code のログの保存期間",
+
+
+  "settings.claudeCode.retentionDays": "{days} 日",
+
+
+  "settings.claudeCode.retentionHint": "Claude Code は起動時に古い記録を削除します。時間帯グリッド、プロジェクト、利用額はこの記録から読みます。",
+
+
+  "settings.alerts.refills": "上限がリセット前に回復したとき（リセットクレジットや一部回復）",
+
+
+  "settings.alerts.refillPoints": "回復量の下限",
+
+
+  "settings.alerts.points": "{points} ポイント",
+
+
+  "settings.strip.followDetail": "詳細表示：各上限とリセットまでの時間",
+
+
+  "settings.strip.activityDots": "エージェントの作業中（青）や応答待ち（黄）にロゴへ点を表示",
+
+
+  "settings.strip.desktopClickThroughKey": "クリックやドラッグのときに押し続けるキー",
+
+
+  "settings.cards.title": "カード上",
+
+
+  "settings.cards.desc": "概要で上限以外に表示するもの",
+
+
+  "settings.cards.liveSessions": "Claude Code と Codex のカードに実行中のセッション",
+
+
+  "settings.cards.spend": "カードの下に利用額の概要",
+
+
+  "settings.cards.spendTools": "これらのツール自身の記録も数える",
+
+
+  "alert.refill.title": "{provider}: {label} が早めに回復しました",
+
+
+  "alert.refill.body": "{percent}% が再び使えます。",
+
+
+  "settings.strip.followActive": "使用中のアプリに合わせる",
+
+
+  "settings.strip.followActiveHint": "使っているウィンドウの AI ツールを先頭に表示します。",
+
+
+  "settings.strip.desktopClickThrough": "クリックを背後のウィンドウに通す",
+
+
+  "spend.title": "支出",
+
+
+  "spend.today": "今日",
+
+
+  "spend.yesterday": "昨日",
+
+
+  "spend.month": "30 日間",
+
+
+  "spend.cost": "コスト",
+
+
+  "spend.tokens": "トークン",
+
+
+  "spend.models": "モデル（過去 30 日間、トークン順）",
+
+
+  "settings.strip.desktopCycle": "順番に",
+
+
+  "settings.strip.desktopCycleHint": "各プロバイダーを 8 秒ずつ表示する 1 つのウィジェット",
+
+
+  "settings.theme.halloween": "ハロウィン",
+
+
+  "settings.theme.glass": "ガラス",
+
+
+  "settings.theme.glassHint": "パネルの背後のデスクトップをぼかします (Windows 11)",
+
+
+  "label.Installed models": "インストール済みモデル",
+
+
+  "label.Loaded now": "現在ロード中",
+
+
+  "label.Vouchers": "バウチャー",
+
+
+  "label.Cash": "現金",
+
+
+  "label.Requests today": "今日のリクエスト",
+
+
+  "label.Requests this month": "今月のリクエスト",
+
+
+  "label.Models": "モデル",
+
+
+  "label.Token Plan usage": "Token Plan の使用量",
+
+
+  "card.customize": "行をカスタマイズ",
+
+
+  "card.customizeHint": "行をドラッグして並べ替え、不要な行は非表示にできます。Ctrl+Z で元に戻し、Esc で閉じます。",
+
+
+  "card.customizeMove": "{row} を移動",
+
+
+  "card.customizeShow": "{row} を表示",
+
+
+  "card.customizeHide": "{row} を非表示",
+
+
+  "card.customizeReset": "既定に戻す",
+
+
+  "card.customizeDone": "完了",
+
+
+  "weekDays.capacity": "今週のモデルの使い方だと、上限全体は約 {tokens} トークン、API 料金で {cost} 相当です。",
+
+
+  "weekDays.capacityTokens": "今週のモデルの使い方だと、上限全体は約 {tokens} トークンです。",
+
+
+  "card.copyImage": "画像としてコピー",
+
+
+  "card.imageCopied": "クリップボードにコピーしました",
+
+
+  "card.imageCopyFailed": "画像をコピーできませんでした",
+
+
+  "settings.privacy.title": "プライバシー",
+
+
+  "settings.privacy.hideWhenSharing": "画面共有中は非表示にする",
+
+
+  "settings.privacy.hideWhenSharingHint": "パネルとデスクトップ ウィジェットは、画面共有、録画、スクリーンショットに一切写りません (ご自身には表示されます)。Windows は画面共有をアプリに知らせないため、通知領域の数値とタスク バー表示は、プレゼンテーション中またはこの PC がリモート操作されている間だけ非表示になります。",
+
+
+  "settings.backup.reset": "すべての設定をリセット",
+
+
+  "settings.backup.resetHint": "すべての設定が既定値に戻ります。プロバイダー、アカウント、プロジェクトの予算はそのまま残ります。アプリが再起動します。",
+
+
+  "settings.backup.resetConfirm": "リセットして再起動",
+
+
+  "settings.backup.resetCancel": "キャンセル",
+
+
+  "settings.backup.resetError": "設定をリセットできませんでした。",
+
+
+  "settings.proxy.title": "プロキシ",
+
+
+  "settings.proxy.desc": "プロバイダー、ステータス ページ、更新のリクエストをプロキシ サーバー経由で送信します。",
+
+
+  "settings.proxy.enable": "プロキシを使用する",
+
+
+  "settings.proxy.url": "プロキシのアドレス",
+
+
+  "settings.proxy.save": "保存",
+
+
+  "settings.proxy.saved": "保存しました。次のリクエストから適用されます。",
+
+
+  "settings.proxy.invalid": "プロキシのアドレスではありません。ホストを含む http://、https://、socks5:// または socks5h:// を使用してください (例: http://127.0.0.1:8080)。",
+
+
+  "settings.proxy.error": "プロキシを保存できませんでした。",
+
+
+  "card.showUsed": "使用量を表示",
+
+
+  "card.showLeft": "残量を表示",
+
+  "settings.category.usage": "使用量",
+
+  "settings.category.taskbar": "タスク バーとデスクトップ",
+
+  "settings.category.appearance": "外観",
+
+  "settings.category.app": "アプリ",
   "settings.strip.position": "位置",
   "settings.strip.positionLeft": "左",
   "settings.strip.positionRight": "右",
@@ -134,6 +557,8 @@ export const ja: Messages = {
   "settings.strip.colorTraffic": "信号（緑 → 黄 → 赤）",
   "settings.strip.colorCool": "クール（青 → 紫 → 赤）",
   "settings.strip.colorMono": "シンプル（上限間近のみ赤）",
+
+  "settings.strip.colorPace": "ペースで",
   "settings.strip.colorThresholds": "カスタムのしきい値",
   "settings.strip.colorOff": "オフ",
   "settings.strip.drag": "{name} をドラッグ",
@@ -146,6 +571,23 @@ export const ja: Messages = {
   "settings.strip.criticalAt": "危険のしきい値",
   "settings.strip.usageColorsHint": "上限のうち使用済みの割合に基づきます。",
   "settings.strip.reset": "見た目をリセット",
+  "settings.strip.desktop": "デスクトップに表示",
+  "settings.strip.desktopHint": "好きな場所にドラッグできるウィジェットです。クリックするとパネルが開き、ポインターを合わせると上限がリセットされる時刻が表示されます。値が増えると点滅し、その後 1 分間アクセント カラーで表示されます。全画面のアプリが前面にある間は非表示になります。下のプロバイダーと外観の設定はウィジェットにも適用されます。",
+  "settings.strip.desktopLayout": "ウィジェット",
+  "settings.strip.desktopRow": "横に並べる",
+
+  "settings.strip.desktopColumn": "縦に並べる",
+  "settings.strip.desktopSeparate": "個別",
+  "settings.strip.desktopPlate": "背景の不透明度",
+  "settings.strip.desktopLogo": "ロゴ",
+  "settings.strip.desktopLogoBrand": "カラー",
+  "settings.strip.desktopLogoWhite": "白",
+  "settings.strip.desktopLogoBlack": "黒",
+  "settings.strip.desktopOnTop": "常に手前に表示",
+  "settings.strip.desktopSnap": "画面の端やほかのウィジェットに吸着",
+  "settings.strip.desktopLocked": "位置を固定 (ポインターを合わせると透過)",
+
+  "settings.strip.desktopBars": "数値の下にバー",
   "settings.tray.perProviderHint": "アイコンが ^ の中に入った場合は、タスク バーの設定でオンにすると時計の横に表示されます。",
   "settings.tray.openTaskbarSettings": "タスク バーの設定を開く",
   "settings.tray.provider": "プロバイダー",
@@ -157,7 +599,7 @@ export const ja: Messages = {
   "settings.tray.auto": "自動",
   "settings.tray.tightest": "最も使用中",
   "settings.theme.title": "テーマ",
-  "settings.theme.desc": "ダーク（完全な黒）またはライト",
+  "settings.theme.desc": "ダーク（完全な黒）、ライト、またはハロウィン",
   "settings.theme.light": "ライト",
   "settings.theme.dark": "ダーク",
   "settings.theme.darkHint": "完全な黒。OLED ディスプレイに最適",
@@ -189,6 +631,9 @@ export const ja: Messages = {
   "settings.panel.desc": "パネルを開く位置。タイトル バーのピンで、ほかのウィンドウより手前に表示し続けます。",
   "settings.panel.remember": "位置を記憶する",
   "settings.panel.rememberHint": "タイトル バーをドラッグしてパネルを移動すると、次回からタスク バーの上ではなく同じ場所に開きます。",
+  "settings.panel.navSide": "プロバイダー バー",
+  "settings.panel.navLeft": "左",
+  "settings.panel.navRight": "右",
   "settings.alerts.levels": "通知する使用量",
   "settings.alerts.ticksHint": "各レベルはバーに目盛りで表示されます。",
   "settings.alerts.perProvider": "プロバイダーごと",

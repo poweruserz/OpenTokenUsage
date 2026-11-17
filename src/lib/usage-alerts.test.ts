@@ -123,7 +123,52 @@ describe("collectUsageAlerts", () => {
   })
 
   it("does not announce a reset of a lightly used window", () => {
-    expect(collect([line(0, 5 * HOUR)], [], [line(30, 10 * 60 * 1000)])).toEqual([])
+    // Seen by the first probe after its reset time.
+    expect(collect([line(0, 5 * HOUR)], [], [line(30, -10 * 60 * 1000)])).toEqual([])
+  })
+
+  it("announces an early refill of at least 10 points once", () => {
+    // The same window gives 30 points back two hours before its reset (a banked grant, say).
+    const [alert, ...rest] = collect([line(30, 2 * HOUR)], [], [line(60, 2 * HOUR)])
+    expect(rest).toEqual([])
+    expect(alert?.title).toBe("Claude: Session refilled early")
+    expect(alert?.body).toBe("70% is available again.")
+    expect(collect([line(30, 2 * HOUR)], alert!.keys, [line(60, 2 * HOUR)])).toEqual([])
+    // A small step back is noise; the first probe has nothing to compare.
+    expect(collect([line(55, 2 * HOUR)], [], [line(60, 2 * HOUR)])).toEqual([])
+    expect(collect([line(30, 2 * HOUR)])).toEqual([])
+    // Exactly 10 points counts (0.6 - 0.5 is 0.0999… in floating point).
+    expect(collect([line(50, 2 * HOUR)], [], [line(60, 2 * HOUR)])).toHaveLength(1)
+  })
+
+  it("follows the refill settings: its own threshold, or none at all", () => {
+    const refill = (refillPoints: number | null) =>
+      collectUsageAlerts({
+        pluginId: "claude",
+        providerName: "Claude",
+        lines: [line(50, 2 * HOUR)],
+        previousLines: [line(60, 2 * HOUR)],
+        sent: new Set(),
+        nowMs: NOW,
+        levels: [80, 95],
+        displayMode: "used",
+        refillPoints,
+      })
+    expect(refill(5)).toHaveLength(1)
+    expect(refill(20)).toEqual([])
+    expect(refill(null)).toEqual([])
+  })
+
+  it("never calls the drop of a line without a reset time an early refill", () => {
+    // Extra usage spent goes back to 0 at a new month; with no reset time that can't be told from early.
+    const monthly = (used: number): MetricLine => ({ type: "progress", label: "Extra usage spent", used, limit: 50, format: { kind: "dollars" } })
+    expect(collect([monthly(0)], [], [monthly(40)])).toEqual([])
+  })
+
+  it("an early reset of a half-used window is an early refill", () => {
+    // A reset credit spent: a new 5 h window starts two hours before the old one would reset.
+    const alerts = collect([line(0, 5 * HOUR)], [], [line(50, 2 * HOUR)])
+    expect(alerts.map((a) => a.title)).toEqual(["Claude: Session refilled early"])
   })
 
   // Claude's resets_at jitters by milliseconds between probes (05:59:59.760, .777, .819 …).

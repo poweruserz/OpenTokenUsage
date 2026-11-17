@@ -10,12 +10,15 @@ import {
 import {
   buildTaskbarStripItems,
   colorOnScale,
+  followedCard,
   makeTaskbarStripSvg,
   readableOnTaskbar,
   stripPluginSettings,
   stripTextLabel,
+  stripToolRunning,
 } from "@/lib/taskbar-strip"
 import { readableBrandColor } from "@/lib/tray-provider-icons"
+import { PACE_COLORS } from "@/lib/tray-primary-progress"
 import { normalizeStripDpis } from "@/hooks/app/use-taskbar-strip"
 
 const meta = (id: string, brandColor?: string, patch: Partial<PluginMeta> = {}) =>
@@ -55,8 +58,8 @@ describe("buildTaskbarStripItems", () => {
   it("puts the primary value on top and a separate weekly line below", () => {
     const [claude, codex] = build({ colorMode: "off" })
     expect(claude!.lines).toEqual([
-      { text: "58%", color: "#ffffff" },
-      { text: "12%", color: "#ffffff" },
+      { text: "58%", color: "#ffffff", used: 0.58, fill: 0.58, label: "Session" },
+      { text: "12%", color: "#ffffff", used: 0.12, fill: 0.12, label: "Weekly" },
     ])
     expect(claude!.logoColor).toBe("#DE7356")
     // Weekly is already the primary line: no duplicate; a black brand falls back to white.
@@ -74,6 +77,24 @@ describe("buildTaskbarStripItems", () => {
     // 0.95 left = 5% used: no warning color.
     const [, codex] = build({ colorMode: "thresholds" }, "left")
     expect(codex!.lines[0]!.color).toBe("#ffffff")
+    // The bar fills as far as the number says.
+    expect(codex!.lines[0]!.fill).toBe(0.95)
+    expect(codex!.lines[0]!.used).toBeCloseTo(0.05)
+  })
+
+  it("colors a line by its pace, in the card's pace colors; no pace keeps the text color", () => {
+    const [claude] = buildTaskbarStripItems({
+      order: ["claude"],
+      pluginStates: {},
+      primaryBars: [{ id: "claude", fraction: 0.58, label: "Session", pace: "behind" }],
+      weeklyBars: [{ id: "claude", fraction: 0.12, label: "Weekly", weekly: true }],
+      pluginsMeta,
+      onLightTaskbar: false,
+      logoColors: true,
+      displayMode: "used",
+      style: style({ colorMode: "pace" }),
+    })
+    expect(claude!.lines.map((line) => line.color)).toEqual([PACE_COLORS.dark.behind, "#ffffff"])
   })
 
   it("shows session, weekly or both per provider, and can drop the % sign", () => {
@@ -209,16 +230,133 @@ describe("stripPluginSettings", () => {
   const settings = { order: ["claude", "codex", "zai", "cursor"], disabled: ["zai"] }
 
   it("uses the strip's own order and skips disabled providers", () => {
-    expect(stripPluginSettings(["cursor", "zai", "claude"], settings)).toEqual({ order: ["cursor", "claude"], disabled: [] })
+    expect(stripPluginSettings(["cursor", "zai", "claude"], settings)).toEqual({
+      order: ["cursor", "claude"],
+      disabled: [],
+      focusId: null,
+    })
   })
 
   it("defaults to the enabled providers in nav order", () => {
     expect(stripPluginSettings(null, settings).order).toEqual(["claude", "codex", "cursor"])
   })
+
+  it("puts the followed tool's card first, even one the strip doesn't list", () => {
+    expect(stripPluginSettings(["cursor", "claude"], settings, "claude")).toEqual({
+      order: ["claude", "cursor"],
+      disabled: [],
+      focusId: "claude",
+    })
+    expect(stripPluginSettings(["cursor"], settings, "codex").order).toEqual(["codex", "cursor"])
+    // A disabled provider, or a tool without a card, changes nothing.
+    expect(stripPluginSettings(["cursor"], settings, "zai")).toEqual({ order: ["cursor"], disabled: [], focusId: null })
+    expect(stripPluginSettings(["cursor"], settings, "kiro").focusId).toBeNull()
+  })
+
+  it("counts a running tool only when one of the strip's cards stands for it", () => {
+    expect(stripToolRunning(["claude"], ["codex", "claude-1a2b3c4d"])).toBe(true)
+    expect(stripToolRunning(["copilot", "kimi"], ["codex", "kimi-api"])).toBe(false)
+    expect(stripToolRunning([], ["claude"])).toBe(false)
+    // A WSL login's CLI can't be seen from Windows: its card keeps the strip up.
+    expect(stripToolRunning([], ["codex", "claude-wsl-0011aabb"])).toBe(true)
+    expect(normalizeTaskbarStripStyle(undefined).onlyWhileRunning).toBe(false)
+    expect(normalizeTaskbarStripStyle({ onlyWhileRunning: true }).onlyWhileRunning).toBe(true)
+  })
+
+  it("follows a tool to an extra account's card, never to a WSL copy", () => {
+    const enabled = ["cursor", "claude-wsl-0011aabb", "claude-1a2b3c4d"]
+    expect(followedCard("claude", ["cursor"], enabled)).toBe("claude-1a2b3c4d")
+    // The card the strip already shows wins.
+    expect(followedCard("claude", ["claude-1a2b3c4d", "claude"], ["claude", "claude-1a2b3c4d"])).toBe("claude-1a2b3c4d")
+    expect(followedCard("claude", [], ["claude-wsl-0011aabb"])).toBeNull()
+    expect(followedCard(null, ["claude"], ["claude"])).toBeNull()
+    // Another provider sharing the prefix isn't an account of it.
+    expect(followedCard("kimi", ["kimi-api", "kimi"], ["kimi-api", "kimi"])).toBe("kimi")
+    expect(followedCard("kimi", ["kimi-api"], ["kimi-api"])).toBeNull()
+  })
+})
+
+describe("agent activity on the strip", () => {
+  it("marks a working or waiting card with a dot in Windows' colors, both lines for the followed one", () => {
+    const now = Date.parse("2026-11-15T12:00:00Z")
+    const items = buildTaskbarStripItems({
+      order: ["claude", "codex"],
+      pluginStates: {
+        codex: {
+          data: {
+            lines: [
+              { type: "progress", label: "Session", used: 40, limit: 100, format: { kind: "percent" }, resetsAt: new Date(now + 2 * 3_600_000).toISOString() },
+            ],
+          } as unknown as PluginOutput,
+        },
+      },
+      nowMs: now,
+      primaryBars: [
+        { id: "claude", fraction: 0.58, label: "Session" },
+        { id: "codex", fraction: 0.4, label: "Session" },
+      ],
+      weeklyBars: [
+        { id: "claude", fraction: 0.12, label: "Weekly", weekly: true },
+        { id: "codex", fraction: 0.2, label: "Weekly", weekly: true },
+      ],
+      pluginsMeta,
+      onLightTaskbar: false,
+      logoColors: true,
+      displayMode: "used",
+      style: style({ lineModes: { claude: "session", codex: "session" } }),
+      activity: { claude: "waiting", codex: "busy" },
+      focusId: "codex",
+    })
+    expect(items.map((item) => item.dot)).toEqual(["#FCE100", "#4CC2FF"])
+    expect(items.map((item) => item.lines.length)).toEqual([1, 2])
+    // The followed card in detail: each line's name, its number and the time to its reset.
+    expect(items[1]!.lines.map((line) => [line.text, line.value])).toEqual([
+      ["Session 40% · 2h 0m", "40%"],
+      ["Weekly 20%", "20%"],
+    ])
+    expect(items[0]!.lines[0]!.value).toBeUndefined()
+    expect(build()[0]!.dot).toBeUndefined()
+    const svg = makeTaskbarStripSvg({ items, style: style(), scale: 1 }).svg
+    expect(svg.match(/<circle /g)).toHaveLength(2)
+  })
+
+  it("puts a card's live token rate after its first number", () => {
+    const items = buildTaskbarStripItems({
+      order: ["claude", "codex"],
+      primaryBars: [
+        { id: "claude", fraction: 0.58, label: "Session" },
+        { id: "codex", fraction: 0.4, label: "Session" },
+      ],
+      weeklyBars: [
+        { id: "claude", fraction: 0.12, label: "Weekly", weekly: true },
+        { id: "codex", fraction: 0.2, label: "Weekly", weekly: true },
+      ],
+      pluginsMeta,
+      onLightTaskbar: false,
+      logoColors: true,
+      displayMode: "used",
+      style: style(),
+      rates: { claude: "12K/min" },
+    })
+    expect(items.map((item) => item.lines.map((line) => line.text))).toEqual([
+      ["58% · 12K/min", "12%"],
+      ["40%", "20%"],
+    ])
+  })
 })
 
 describe("makeTaskbarStripSvg", () => {
-  const item = { iconUrl: "data:x", logoColor: "white", lines: [{ text: "58%", color: "white" }, { text: "12%", color: "red" }] }
+  const item = { id: "claude", iconUrl: "data:x", logoColor: "white", lines: [{ text: "58%", color: "white" }, { text: "12%", color: "red" }] }
+
+  it("puts a desktop widget's items on a padded plate, still clickable at 0 %", () => {
+    const bare = makeTaskbarStripSvg({ items: [item], style: style(), scale: 1 })
+    const plated = makeTaskbarStripSvg({ items: [item], style: style(), scale: 1, plate: { color: "#000000", opacity: 0 } })
+    expect(plated.width).toBe(bare.width + 20)
+    expect(plated.svg).toContain('rx="8" fill="#000000" fill-opacity="0.004"')
+    expect(makeTaskbarStripSvg({ items: [item], style: style(), scale: 1, plate: { color: "#ffffff", opacity: 0.6 } }).svg).toContain(
+      'fill="#ffffff" fill-opacity="0.6"'
+    )
+  })
 
   it("lays items out left to right with their lines", () => {
     const one = makeTaskbarStripSvg({ items: [item], style: style(), scale: 1 })
@@ -227,6 +365,30 @@ describe("makeTaskbarStripSvg", () => {
     expect(one.height).toBe(40)
     expect(one.svg.match(/<text /g)).toHaveLength(2)
     expect(one.svg).toContain('fill="red"')
+  })
+
+  it("stacks a column widget's items, as wide as the widest", () => {
+    const items = [item, { ...item, lines: [{ text: "100%", color: "white" }] }]
+    const row = makeTaskbarStripSvg({ items, style: style(), scale: 1 })
+    const column = makeTaskbarStripSvg({ items, style: style(), scale: 1, column: true })
+    expect(column.height).toBe(80)
+    expect(column.width).toBeLessThan(row.width)
+    expect(column.svg).toContain('y="49"') // the second logo, a row down
+  })
+
+  it("draws a bar under each percent, filled as far as the number says, and leaves text values bare", () => {
+    const lines = [
+      { text: "50%", color: "#ff0000", fill: 0.5 },
+      { text: "$9", color: "white" },
+    ]
+    const drawn = makeTaskbarStripSvg({ items: [{ ...item, lines }], style: style(), scale: 1, bars: true })
+    const bars = [...drawn.svg.matchAll(/<rect x="\d+" y="\d+" width="(\d+)" height="2"[^>]*>/g)]
+    expect(bars).toHaveLength(2) // track and fill, for the percent only
+    expect(Number(bars[1]![1])).toBe(Math.round(Number(bars[0]![1]) / 2))
+    expect(bars[0]![0]).toContain('fill-opacity="0.25"')
+    expect(drawn.height).toBeGreaterThanOrEqual(40)
+    // Without bars the strip keeps its taskbar height and draws none.
+    expect(makeTaskbarStripSvg({ items: [{ ...item, lines }], style: style(), scale: 1 }).svg).not.toContain('height="2"')
   })
 
   // A text value comes from a plugin: markup in it must stay text, or the image fails to load.
@@ -261,6 +423,12 @@ describe("normalizeTaskbarStripStyle", () => {
       expect(normalizeTaskbarStripStyle({ offset }).offset).toBe(8)
     }
     for (const offset of [0, 4096]) expect(normalizeTaskbarStripStyle({ offset }).offset).toBe(offset)
+  })
+
+  it("shows the live token rate only when turned on", () => {
+    expect(normalizeTaskbarStripStyle({}).tokenRate).toBe(false)
+    expect(normalizeTaskbarStripStyle({ tokenRate: "yes" }).tokenRate).toBe(false)
+    expect(normalizeTaskbarStripStyle({ tokenRate: true }).tokenRate).toBe(true)
   })
 
   it("keeps valid fields and replaces broken ones", () => {

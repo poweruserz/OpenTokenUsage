@@ -7,6 +7,7 @@ import {
   DEFAULT_MENUBAR_ICON_STYLE,
   DEFAULT_RESET_TIMER_DISPLAY_MODE,
   DEFAULT_START_ON_LOGIN,
+  DEFAULT_DESKTOP_WIDGETS,
   DEFAULT_TASKBAR_STRIP_STYLE,
   DEFAULT_THEME_MODE,
   DEFAULT_TIME_FORMAT_MODE,
@@ -19,6 +20,7 @@ import {
   type GlobalShortcut,
   type MenubarIconStyle,
   type ResetTimerDisplayMode,
+  type DesktopWidgets,
   type TaskbarStripStyle,
   type ThemeMode,
   type TimeFormatMode,
@@ -27,9 +29,13 @@ import {
   type ProjectBudgets,
   type DetailSection,
   DEFAULT_COLLAPSED_SECTIONS,
+  DEFAULT_CARD_FEATURES,
+  type CardFeatures,
+  type PlanPrices,
   type TrayProvider,
 } from "@/lib/settings"
 import { DEFAULT_CURRENCY, type CurrencySetting } from "@/lib/currency"
+import type { LineLayouts } from "@/lib/line-layout"
 
 type AppPreferencesStore = {
   autoUpdateInterval: AutoUpdateInterval
@@ -55,6 +61,13 @@ type AppPreferencesStore = {
   paceWorkdays: boolean
   taskbarStrip: boolean
   taskbarStripStyle: TaskbarStripStyle
+  desktopWidgets: DesktopWidgets
+  navRight: boolean
+  capturePrivacy: boolean
+  glass: boolean
+  lineLayouts: LineLayouts
+  cardFeatures: CardFeatures
+  planPrices: PlanPrices
   setAutoUpdateInterval: (value: AutoUpdateInterval) => void
   setThemeMode: (value: ThemeMode) => void
   setDisplayMode: (value: DisplayMode) => void
@@ -78,6 +91,13 @@ type AppPreferencesStore = {
   setPaceWorkdays: (value: boolean) => void
   setTaskbarStrip: (value: boolean) => void
   setTaskbarStripStyle: (value: TaskbarStripStyle) => void
+  setDesktopWidgets: (value: DesktopWidgets) => void
+  setNavRight: (value: boolean) => void
+  setCapturePrivacy: (value: boolean) => void
+  setGlass: (value: boolean) => void
+  setLineLayouts: (value: LineLayouts) => void
+  setCardFeatures: (value: CardFeatures) => void
+  setPlanPrices: (value: PlanPrices) => void
   resetState: () => void
 }
 
@@ -105,6 +125,13 @@ const initialState = {
   paceWorkdays: false,
   taskbarStrip: false,
   taskbarStripStyle: DEFAULT_TASKBAR_STRIP_STYLE,
+  desktopWidgets: DEFAULT_DESKTOP_WIDGETS,
+  navRight: false,
+  capturePrivacy: false,
+  glass: false,
+  lineLayouts: {} as LineLayouts,
+  cardFeatures: DEFAULT_CARD_FEATURES,
+  planPrices: {} as PlanPrices,
 }
 
 export const useAppPreferencesStore = create<AppPreferencesStore>((set) => ({
@@ -132,5 +159,12 @@ export const useAppPreferencesStore = create<AppPreferencesStore>((set) => ({
   setPaceWorkdays: (value) => set({ paceWorkdays: value }),
   setTaskbarStrip: (value) => set({ taskbarStrip: value }),
   setTaskbarStripStyle: (value) => set({ taskbarStripStyle: value }),
+  setDesktopWidgets: (value) => set({ desktopWidgets: value }),
+  setNavRight: (value) => set({ navRight: value }),
+  setCapturePrivacy: (value) => set({ capturePrivacy: value }),
+  setGlass: (value) => set({ glass: value }),
+  setLineLayouts: (value) => set({ lineLayouts: value }),
+  setCardFeatures: (value) => set({ cardFeatures: value }),
+  setPlanPrices: (value) => set({ planPrices: value }),
   resetState: () => set(initialState),
 }))

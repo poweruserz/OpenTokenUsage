@@ -19,6 +19,10 @@ export type UsageAlert = {
 const PACE_MIN_FRACTION = 0.5
 /** A reset is worth announcing only if the window was nearly full before it. */
 const RESET_MIN_FRACTION = 0.8
+/** Points of the limit that must come back at once for an early refill to be announced, by default. */
+const REFILL_MIN_POINTS = 10
+/** A drop this close to the window's reset time is the reset itself, not an early refill. */
+const REFILL_RESET_SLACK_MS = 2 * 60 * 1000
 /**
  * Reset times this close are one window: Claude's resets_at jitters by milliseconds between probes,
  * others by minutes. Shortcut: assumes no window is shorter than 2 h (the shortest today is 5 h).
@@ -60,6 +64,8 @@ export function collectUsageAlerts(args: {
   displayMode: DisplayMode
   /** Weekly pace counts Monday to Friday only. */
   workdays?: boolean
+  /** Points an early refill must give back to notify; null: no refill alerts (`refillAlertPoints`). */
+  refillPoints?: number | null
 }): UsageAlert[] {
   const { pluginId, providerName, lines, previousLines, sent, nowMs, displayMode } = args
   const levels = [...args.levels].sort((a, b) => b - a)
@@ -76,6 +82,7 @@ export function collectUsageAlerts(args: {
 
     // Limit reset: same line, a clearly later reset time (not jitter), and it was nearly full before.
     const previous = previousByLabel.get(line.label)
+    let resetAlerted = false
     if (previous?.resetsAt && line.resetsAt && resetsAtMs - Date.parse(previous.resetsAt) > SAME_WINDOW_MS) {
       const resetKey = `${prefix}${previous.resetsAt}|reset`
       if (previous.used / previous.limit >= RESET_MIN_FRACTION && !wasSent(sent, prefix, previous.resetsAt, "|reset")) {
@@ -83,6 +90,26 @@ export function collectUsageAlerts(args: {
           title: t("alert.reset.title", { provider: providerName, label }),
           body: t("alert.reset.body"),
           keys: [resetKey]
+        })
+        resetAlerted = true
+      }
+    }
+
+    // Early refill: at least 10 points back before the window's own reset (a reset credit, a banked
+    // grant, a partial refill). A line without a reset time can't say "early": its drop is left alone.
+    // The first probe after a start has no previous one: never announced.
+    const previousResetMs = previous?.resetsAt ? Date.parse(previous.resetsAt) : Number.NaN
+    const beforeReset = Number.isFinite(previousResetMs) && nowMs < previousResetMs - REFILL_RESET_SLACK_MS
+    // In tenths of a point: 0.6 - 0.5 is 0.0999… in floating point.
+    const gained = previous ? Math.round((previous.used / previous.limit - fraction) * 1000) : 0
+    const refillPoints = args.refillPoints === undefined ? REFILL_MIN_POINTS : args.refillPoints
+    if (previous && refillPoints !== null && !resetAlerted && beforeReset && gained >= refillPoints * 10) {
+      const refillKey = `${base}|refill${Math.round(fraction * 100)}`
+      if (!sent.has(refillKey)) {
+        alerts.push({
+          title: t("alert.refill.title", { provider: providerName, label }),
+          body: t("alert.refill.body", { percent: Math.max(0, Math.round((1 - fraction) * 100)) }),
+          keys: [refillKey]
         })
       }
     }
