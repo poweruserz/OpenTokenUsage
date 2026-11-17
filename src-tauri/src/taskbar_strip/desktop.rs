@@ -520,6 +520,8 @@ mod win {
         static TOOLTIP: Cell<HWND> = const { Cell::new(null_mut()) };
         /// Whether that tooltip is in the dark theme; None until first set.
         static TOOLTIP_DARK: Cell<Option<bool>> = const { Cell::new(None) };
+        /// Whether that tooltip is kept out of screen capture now, like the widgets.
+        static TOOLTIP_EXCLUDED: Cell<bool> = const { Cell::new(false) };
         /// The widget under the pointer, if any (a locked one fades).
         static HOVERED: Cell<HWND> = const { Cell::new(null_mut()) };
         /// The monitor a full-screen app has in front, if any: the widgets there hide.
@@ -770,6 +772,17 @@ mod win {
         TOOLTIP_DARK.set(Some(dark));
     }
 
+    /// "Hide from screen sharing" keeps the hover text out of capture too: it names providers and
+    /// their usage, and is a window of its own.
+    fn sync_tooltip_privacy(private: bool) {
+        let tip = TOOLTIP.get();
+        if tip.is_null() || TOOLTIP_EXCLUDED.get() == private {
+            return;
+        }
+        crate::capture_privacy::win::exclude(tip, private);
+        TOOLTIP_EXCLUDED.set(private);
+    }
+
     /// The whole widget's opacity, its image kept (UpdateLayeredWindow without a source).
     fn set_alpha(hwnd: HWND, alpha: u8) {
         let blend = BLENDFUNCTION {
@@ -852,6 +865,7 @@ mod win {
             }
             TOOLTIP.set(create_tooltip(instance));
             TOOLTIP_DARK.set(None);
+            TOOLTIP_EXCLUDED.set(false);
             FULLSCREEN.set(fullscreen_monitor());
             let fullscreen_check = SetTimer(null_mut(), 0, FULLSCREEN_CHECK_MS, None);
             let mut timer: usize = 0;
@@ -1008,6 +1022,7 @@ mod win {
         };
         let ids: Vec<&String> = widgets.iter().map(|(id, _)| id).collect();
         sync_tooltip_theme(options.dark);
+        sync_tooltip_privacy(crate::capture_privacy::enabled());
         // Take the list out: the Win32 calls below send messages to window_proc, which borrows it.
         let mut windows = WINDOWS.with(|windows| std::mem::take(&mut *windows.borrow_mut()));
         unsafe {

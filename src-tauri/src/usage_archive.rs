@@ -75,25 +75,26 @@ fn fill_deleted(
     }
 }
 
-fn read_archive(path: &Path) -> Archive {
-    std::fs::read(path)
-        .ok()
-        .and_then(|bytes| {
-            serde_json::from_slice::<HashMap<String, BTreeMap<String, u64>>>(&bytes).ok()
-        })
-        .map(|cards| {
-            cards
+/// The archive, empty when there is no file yet. A file that can't be read or parsed is an error:
+/// treated as empty, the next write would drop every day only it still holds.
+fn read_archive(path: &Path) -> Result<Archive, String> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Archive::new()),
+        Err(e) => return Err(format!("can't read it: {e}")),
+    };
+    let cards = serde_json::from_slice::<HashMap<String, BTreeMap<String, u64>>>(&bytes)
+        .map_err(|e| format!("not valid: {e}"))?;
+    Ok(cards
+        .into_iter()
+        .map(|(card, days)| {
+            let days = days
                 .into_iter()
-                .map(|(card, days)| {
-                    let days = days
-                        .into_iter()
-                        .filter_map(|(day, tokens)| Some((day.parse().ok()?, tokens)))
-                        .collect();
-                    (card, days)
-                })
-                .collect()
+                .filter_map(|(day, tokens)| Some((day.parse().ok()?, tokens)))
+                .collect();
+            (card, days)
         })
-        .unwrap_or_default()
+        .collect())
 }
 
 fn write_archive(path: &Path, archive: &Archive) -> std::io::Result<()> {
@@ -118,12 +119,17 @@ pub(crate) fn year_usage(
         // Two cards' reads mustn't interleave their read-modify-write of the one file.
         static ARCHIVE_LOCK: Mutex<()> = Mutex::new(());
         let _guard = ARCHIVE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let mut archive = read_archive(path);
-        let kept = archive.entry(card.to_owned()).or_default();
-        merge(kept, &utc);
-        fill_deleted(&mut days, kept, &utc);
-        if let Err(e) = write_archive(path, &archive) {
-            log::warn!("usage archive not written: {e}");
+        match read_archive(path) {
+            Ok(mut archive) => {
+                let kept = archive.entry(card.to_owned()).or_default();
+                merge(kept, &utc);
+                fill_deleted(&mut days, kept, &utc);
+                if let Err(e) = write_archive(path, &archive) {
+                    log::warn!("usage archive not written: {e}");
+                }
+            }
+            // Left as it is (the logs alone are shown): a later read may succeed.
+            Err(e) => log::warn!("usage archive {e}; not used or written"),
         }
     }
     let today = (now
@@ -314,7 +320,7 @@ mod tests {
         assert_eq!(read(0).days, vec![(day, 1_000)]);
         assert_eq!(read(3 * 3600).days, vec![(day + 1, 1_000)]);
         assert_eq!(
-            read_archive(&path)["claude"],
+            read_archive(&path).unwrap()["claude"],
             BTreeMap::from([(day, 1_000)])
         );
     }
@@ -364,9 +370,27 @@ mod tests {
         );
         assert_eq!(year.days, vec![(19_990, 1234)]);
         // The other card's days stay in the file; nothing is kept with `keep` off.
-        let archive = read_archive(&path);
+        let archive = read_archive(&path).unwrap();
         assert_eq!(archive["codex"], BTreeMap::from([(19_999, 9)]));
         let fresh = year_usage(Log::Claude, &[dir.join("none")], "claude", None, now, 0);
         assert!(fresh.days.is_empty());
+
+        // A damaged file is left alone, never replaced by what the logs hold now.
+        std::fs::write(&path, r#"{"claude":{"19990":12"#).unwrap();
+        assert!(read_archive(&path).is_err());
+        year_usage(
+            Log::Claude,
+            &[dir.join("none")],
+            "claude",
+            Some(&path),
+            now,
+            0,
+        );
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            r#"{"claude":{"19990":12"#
+        );
+        // No file yet: an empty archive.
+        assert!(read_archive(&dir.join("missing.json")).unwrap().is_empty());
     }
 }

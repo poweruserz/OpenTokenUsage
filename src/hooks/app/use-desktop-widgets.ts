@@ -191,8 +191,9 @@ export function useDesktopWidgets(args: {
   const rateText = edge && totalRate > 0 ? formatTokenRate(totalRate, locale) : null
 
   useEffect(() => {
-    if (!settings.enabled && !showingRef.current) return
+    // Bumped first: turning the widgets off drops a first render still under way, shown or not.
     const generation = ++generationRef.current
+    if (!settings.enabled && !showingRef.current) return
     const timer = window.setTimeout(() => {
       // `dark`: the hover text in Windows' dark tooltips, like the plate.
       const options = {
@@ -291,7 +292,11 @@ export function useDesktopWidgets(args: {
         .then((widgets) => {
           // A newer update (turning the widgets off, say) started while this one drew: it wins.
           if (generation !== generationRef.current) return
-          return invoke("set_desktop_widgets", { widgets, options }).then(() => (showingRef.current = widgets.length > 0))
+          // Counted as shown from the call on: an update that turns them off meanwhile still sends the hide.
+          if (widgets.length > 0) showingRef.current = true
+          return invoke("set_desktop_widgets", { widgets, options }).then(() => {
+            if (generation === generationRef.current) showingRef.current = widgets.length > 0
+          })
         })
         .catch((error) => console.error("Failed to update the desktop widgets:", error))
     }, UPDATE_DEBOUNCE_MS)
