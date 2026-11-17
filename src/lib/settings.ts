@@ -3,6 +3,7 @@ import type { PluginMeta } from "@/lib/plugin-types";
 import { isLanguagePreference, type LanguagePreference } from "@/lib/i18n";
 import type { MessageKey } from "@/locales/en";
 import { normalizeCurrency, type CurrencySetting } from "@/lib/currency";
+import { normalizeLineLayouts, type LineLayouts } from "@/lib/line-layout";
 
 // Refresh cooldown duration in milliseconds (5 minutes)
 export const REFRESH_COOLDOWN_MS = 300_000;
@@ -16,8 +17,8 @@ export type PluginSettings = {
 
 export type AutoUpdateInterval = 5 | 15 | 30 | 60 | "smart";
 
-/** "dark" is pure black (the former OLED theme). */
-export type ThemeMode = "dark" | "light";
+/** "dark" is pure black (the former OLED theme); "halloween" is that black with pumpkin orange. */
+export type ThemeMode = "dark" | "light" | "halloween";
 
 export type DisplayMode = "used" | "left";
 
@@ -56,6 +57,7 @@ const CURRENCY_KEY = "currency";
 const PROJECT_BUDGETS_KEY = "projectBudgets";
 const COLLAPSED_SECTIONS_KEY = "collapsedSections";
 const PANEL_PINNED_KEY = "panelPinned";
+const PANEL_WIDTH_KEY = "panelWidth";
 // Read by src-tauri/src/tray.rs, which also writes the position while the user drags the panel.
 const REMEMBER_PANEL_POSITION_KEY = "rememberPanelPosition";
 const PANEL_POSITION_KEY = "panelPosition";
@@ -63,6 +65,8 @@ const TRAY_LOGO_COLORS_KEY = "trayLogoColors";
 const PACE_WORKDAYS_KEY = "paceWorkdays";
 const TASKBAR_STRIP_KEY = "taskbarStrip";
 const TASKBAR_STRIP_STYLE_KEY = "taskbarStripStyle";
+const DESKTOP_WIDGETS_KEY = "desktopWidgets";
+const NAV_RIGHT_KEY = "navRight";
 const SENT_USAGE_ALERTS_KEY = "sentUsageAlerts";
 const SENT_PROJECT_ALERTS_KEY = "sentProjectAlerts";
 /** Enough for every provider x line x level for a few windows; oldest keys drop off first. */
@@ -88,7 +92,7 @@ export const DEFAULT_GLOBAL_SHORTCUT: GlobalShortcut = null;
 export const DEFAULT_START_ON_LOGIN = true;
 
 const AUTO_UPDATE_INTERVALS: AutoUpdateInterval[] = [5, 15, 30, 60, "smart"];
-const THEME_MODES: ThemeMode[] = ["dark", "light"];
+const THEME_MODES: ThemeMode[] = ["dark", "light", "halloween"];
 const DISPLAY_MODES: DisplayMode[] = ["used", "left"];
 const RESET_TIMER_DISPLAY_MODES: ResetTimerDisplayMode[] = ["relative", "absolute"];
 const TIME_FORMAT_MODES: TimeFormatMode[] = ["auto", "12h", "24h"];
@@ -420,9 +424,28 @@ export type AlertSettings = {
   customSoundName: string | null;
   /** Whether a Claude or Codex session using tokens far faster than usual (often a loop) notifies. On unless false. */
   spikes?: boolean;
+  /** Whether a limit that refills before its reset (by `refillPoints` or more) notifies. On unless false. */
+  refills?: boolean;
+  refillPoints?: number;
 };
 
-export const DEFAULT_ALERT_SETTINGS: AlertSettings = { levels: [80, 95], sound: "windows", customSoundName: null, spikes: true };
+/** How many points of a limit an early refill gives back before it notifies. */
+export const REFILL_POINTS = [5, 10, 20, 30] as const;
+const DEFAULT_REFILL_POINTS = 10;
+
+export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
+  levels: [80, 95],
+  sound: "windows",
+  customSoundName: null,
+  spikes: true,
+  refills: true,
+  refillPoints: DEFAULT_REFILL_POINTS,
+};
+
+/** The points an early refill must give back to notify, or null when those alerts are off. */
+export function refillAlertPoints(settings: AlertSettings): number | null {
+  return settings.refills === false ? null : (settings.refillPoints ?? DEFAULT_REFILL_POINTS);
+}
 
 function knownLevels(value: unknown[]): number[] {
   return USAGE_ALERT_LEVELS.filter((level) => value.includes(level));
@@ -442,7 +465,18 @@ export function normalizeAlertSettings(value: unknown): AlertSettings {
       if (/^[a-z0-9-]+$/.test(id) && Array.isArray(own)) providerLevels[id] = knownLevels(own);
     }
   }
-  return { levels, providerLevels, sound, customSoundName, spikes: raw.spikes !== false };
+  const refillPoints = (REFILL_POINTS as readonly unknown[]).includes(raw.refillPoints)
+    ? (raw.refillPoints as number)
+    : DEFAULT_REFILL_POINTS;
+  return {
+    levels,
+    providerLevels,
+    sound,
+    customSoundName,
+    spikes: raw.spikes !== false,
+    refills: raw.refills !== false,
+    refillPoints,
+  };
 }
 
 /** The usage levels that notify for one provider: its own, or everyone's. */
@@ -493,23 +527,34 @@ export async function saveProjectBudgets(value: ProjectBudgets): Promise<void> {
   await store.save();
 }
 
-/** The parts of a provider's detail page that a click on their title closes, for every provider. */
-export const DETAIL_SECTIONS = ["resets", "cost", "models", "sessions", "week", "heatmap", "projects"] as const;
+/** The parts of a provider's detail page (and the overview's spend) that a click on their title closes, for every provider. */
+export const DETAIL_SECTIONS = ["resets", "cost", "models", "sessions", "week", "heatmap", "year", "projects", "spend"] as const;
 export type DetailSection = (typeof DETAIL_SECTIONS)[number];
-/** Closed until opened: the two longest parts, and the hour grid reads the logs only once it's open. */
-export const DEFAULT_COLLAPSED_SECTIONS: DetailSection[] = ["models", "heatmap"];
+/** Closed until opened: the two longest parts, and the hour grid and the year read the logs only once open. */
+export const DEFAULT_COLLAPSED_SECTIONS: DetailSection[] = ["models", "heatmap", "year"];
 
 export function normalizeCollapsedSections(value: unknown): DetailSection[] {
   if (!Array.isArray(value)) return DEFAULT_COLLAPSED_SECTIONS;
   return DETAIL_SECTIONS.filter((section) => value.includes(section));
 }
 
+/** The sections that existed when the list was last saved; a list saved before it knew "year". */
+const SEEN_SECTIONS_KEY = "detailSectionsSeen";
+
+/** The saved list, with a section added since it was saved closed when it starts closed by default. */
 export async function loadCollapsedSections(): Promise<DetailSection[]> {
-  return normalizeCollapsedSections(await store.get<unknown>(COLLAPSED_SECTIONS_KEY));
+  const saved = await store.get<unknown>(COLLAPSED_SECTIONS_KEY);
+  const collapsed = normalizeCollapsedSections(saved);
+  if (!Array.isArray(saved)) return collapsed;
+  const seenValue = await store.get<unknown>(SEEN_SECTIONS_KEY);
+  const seen: unknown[] = Array.isArray(seenValue) ? seenValue : DETAIL_SECTIONS.filter((section) => section !== "year");
+  const added = DEFAULT_COLLAPSED_SECTIONS.filter((section) => !seen.includes(section));
+  return DETAIL_SECTIONS.filter((section) => collapsed.includes(section) || added.includes(section));
 }
 
 export async function saveCollapsedSections(value: DetailSection[]): Promise<void> {
   await store.set(COLLAPSED_SECTIONS_KEY, value);
+  await store.set(SEEN_SECTIONS_KEY, DETAIL_SECTIONS);
   await store.save();
 }
 
@@ -523,9 +568,152 @@ async function saveBoolean(key: string, value: boolean): Promise<void> {
   await store.save();
 }
 
+/** The provider nav on the panel's right side instead of its left. */
+export const loadNavRight = () => loadBoolean(NAV_RIGHT_KEY, false);
+export const saveNavRight = (value: boolean) => saveBoolean(NAV_RIGHT_KEY, value);
+/** What's new (`use-whats-new.ts`): shown once after an update unless turned off; the version it was last handled for. */
+const WHATS_NEW_KEY = "whatsNewAfterUpdate";
+const WHATS_NEW_SEEN_KEY = "whatsNewVersion";
+export const loadWhatsNew = () => loadBoolean(WHATS_NEW_KEY, true);
+export const saveWhatsNew = (value: boolean) => saveBoolean(WHATS_NEW_KEY, value);
+export async function loadWhatsNewSeen(): Promise<string | null> {
+  const stored = await store.get<unknown>(WHATS_NEW_SEEN_KEY);
+  return typeof stored === "string" ? stored : null;
+}
+export async function saveWhatsNewSeen(version: string): Promise<void> {
+  await store.set(WHATS_NEW_SEEN_KEY, version);
+  await store.save();
+}
+/** Each card's row order and hidden rows (`line-layout.ts`). */
+const LINE_LAYOUTS_KEY = "lineLayouts";
+export async function loadLineLayouts(): Promise<LineLayouts> {
+  return normalizeLineLayouts(await store.get<unknown>(LINE_LAYOUTS_KEY));
+}
+export async function saveLineLayouts(value: LineLayouts): Promise<void> {
+  await store.set(LINE_LAYOUTS_KEY, value);
+  await store.save();
+}
+/** Other tools whose own records the spend summary can add (`local_spend.rs` ids). */
+export const SPEND_TOOLS = [
+  { id: "opencode-go", name: "OpenCode" },
+  { id: "zai", name: "Z.ai" },
+  { id: "grok", name: "Grok" },
+  { id: "cline", name: "Cline" },
+] as const;
+
+/** Extra parts of the overview and cards: live sessions, the spend summary and the tools it counts. */
+export type CardFeatures = {
+  liveSessions: boolean;
+  /** On a live Claude session: when its prompt cache runs out. */
+  cacheTimer: boolean;
+  /** On a live session: how full its context window is. */
+  contextFill: boolean;
+  spend: boolean;
+  /** `SPEND_TOOLS` ids the spend summary leaves out (their logs are not read). */
+  spendToolsOff: string[];
+  /** Also some 30 more tools through tokscale (`tokscale.rs`, run with bunx/npx); off unless chosen. */
+  tokscale: boolean;
+  /** In the spend summary: a card's 30 days at API prices as a multiple of its plan's price. */
+  planMultiple: boolean;
+  /** On a Claude/Codex detail page: a year of daily use with streaks. */
+  yearHeatmap: boolean;
+  /** Keep every day's tokens seen (`usage-archive.json`), so days whose logs were deleted still count. */
+  keepUsage: boolean;
+  /** Write the usage export (`usage_export.rs`) to Downloads once a day. */
+  autoExport: boolean;
+};
+export const DEFAULT_CARD_FEATURES: CardFeatures = {
+  liveSessions: true,
+  cacheTimer: true,
+  contextFill: true,
+  spend: true,
+  spendToolsOff: [],
+  tokscale: false,
+  planMultiple: true,
+  yearHeatmap: true,
+  keepUsage: true,
+  autoExport: false,
+};
+export function normalizeCardFeatures(value: unknown): CardFeatures {
+  const raw = (value && typeof value === "object" ? value : {}) as Partial<Record<keyof CardFeatures, unknown>>;
+  const known: readonly string[] = SPEND_TOOLS.map((tool) => tool.id);
+  return {
+    liveSessions: raw.liveSessions !== false,
+    cacheTimer: raw.cacheTimer !== false,
+    contextFill: raw.contextFill !== false,
+    spend: raw.spend !== false,
+    spendToolsOff: Array.isArray(raw.spendToolsOff)
+      ? raw.spendToolsOff.filter((id): id is string => typeof id === "string" && known.includes(id))
+      : [],
+    tokscale: raw.tokscale === true,
+    planMultiple: raw.planMultiple !== false,
+    yearHeatmap: raw.yearHeatmap !== false,
+    keepUsage: raw.keepUsage !== false,
+    autoExport: raw.autoExport === true,
+  };
+}
+/** What each card's plan costs a month, in US dollars (Settings → Subscriptions), by card id. */
+export type PlanPrices = Record<string, number>;
+export function normalizePlanPrices(value: unknown): PlanPrices {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      (entry): entry is [string, number] =>
+        /^[a-z0-9-]+$/.test(entry[0]) && typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0 && entry[1] <= 100_000
+    )
+  );
+}
+const PLAN_PRICES_KEY = "planPrices";
+export async function loadPlanPrices(): Promise<PlanPrices> {
+  return normalizePlanPrices(await store.get<unknown>(PLAN_PRICES_KEY));
+}
+export async function savePlanPrices(value: PlanPrices): Promise<void> {
+  await store.set(PLAN_PRICES_KEY, value);
+  await store.save();
+}
+
+const CARD_FEATURES_KEY = "cardFeatures";
+export async function loadCardFeatures(): Promise<CardFeatures> {
+  return normalizeCardFeatures(await store.get<unknown>(CARD_FEATURES_KEY));
+}
+export async function saveCardFeatures(value: CardFeatures): Promise<void> {
+  await store.set(CARD_FEATURES_KEY, value);
+  await store.save();
+}
+
+/** Glass (`window_style::set_window_glass`): Acrylic behind see-through layers, in place of Mica. */
+const GLASS_KEY = "glass";
+export const loadGlass = () => loadBoolean(GLASS_KEY, false);
+export const saveGlass = (value: boolean) => saveBoolean(GLASS_KEY, value);
+
+/** "Hide from screen sharing" (`capture_privacy.rs`). */
+const CAPTURE_PRIVACY_KEY = "capturePrivacy";
+export const loadCapturePrivacy = () => loadBoolean(CAPTURE_PRIVACY_KEY, false);
+export const saveCapturePrivacy = (value: boolean) => saveBoolean(CAPTURE_PRIVACY_KEY, value);
+
 /** Title bar pin: keep the panel above other windows. */
 export const loadPanelPinned = () => loadBoolean(PANEL_PINNED_KEY, false);
 export const savePanelPinned = (value: boolean) => saveBoolean(PANEL_PINNED_KEY, value);
+
+/** The panel's width in logical px: dragging its left or right edge makes it up to 40% wider. */
+export const PANEL_MIN_WIDTH = 400;
+export const PANEL_MAX_WIDTH = 560;
+/** The settings view's width: its sections sit in two columns. `resize_panel` (lib.rs) allows up to this. */
+export const SETTINGS_PANEL_WIDTH = 760;
+
+export function normalizePanelWidth(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return PANEL_MIN_WIDTH;
+  return Math.round(Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, value)));
+}
+
+export async function loadPanelWidth(): Promise<number> {
+  return normalizePanelWidth(await store.get<unknown>(PANEL_WIDTH_KEY));
+}
+
+export async function savePanelWidth(value: number): Promise<void> {
+  await store.set(PANEL_WIDTH_KEY, normalizePanelWidth(value));
+  await store.save();
+}
 
 /** Open the panel where the user last dragged it instead of above the taskbar (`tray.rs`). */
 export const loadRememberPanelPosition = () => loadBoolean(REMEMBER_PANEL_POSITION_KEY, false);
@@ -658,8 +846,9 @@ export const TASKBAR_STRIP_COLOR_SCALES = {
   mono: [[0, "base"], [90, "base"], [100, "#EF4444"]],
 } as const satisfies Record<string, readonly (readonly [number, string])[]>;
 
-export type TaskbarStripColorMode = "off" | "thresholds" | keyof typeof TASKBAR_STRIP_COLOR_SCALES;
-export const TASKBAR_STRIP_COLOR_MODES: TaskbarStripColorMode[] = ["heat", "traffic", "cool", "mono", "thresholds", "off"];
+/** "pace": the line's pace in its window, in the card's pace colors (`PACE_COLORS`). */
+export type TaskbarStripColorMode = "off" | "thresholds" | "pace" | keyof typeof TASKBAR_STRIP_COLOR_SCALES;
+export const TASKBAR_STRIP_COLOR_MODES: TaskbarStripColorMode[] = ["heat", "traffic", "cool", "mono", "pace", "thresholds", "off"];
 
 /**
  * Which taskbars show the strip: the main one, every one, or picked monitors. A picked monitor keeps
@@ -690,6 +879,16 @@ export type TaskbarStripStyle = {
   lineModes: Record<string, TaskbarStripLineMode>;
   showPercentSign: boolean;
   monitors: TaskbarStripMonitors;
+  /** The focused window's AI tool (`foreground.rs`) goes first. */
+  followActive: boolean;
+  /** ...in detail: both its lines, each with its name and time to reset. */
+  followDetail: boolean;
+  /** A dot on a logo while its agent sessions work or wait (`agent_activity`). */
+  activityDots: boolean;
+  /** Claude/Codex tokens per minute (`token_rates`) after their first number, and in the tray's hover text. */
+  tokenRate: boolean;
+  /** The strip hides while no AI tool behind its cards runs (`running_ai_tools`). */
+  onlyWhileRunning: boolean;
 };
 
 export const DEFAULT_TASKBAR_STRIP_STYLE: TaskbarStripStyle = {
@@ -700,7 +899,7 @@ export const DEFAULT_TASKBAR_STRIP_STYLE: TaskbarStripStyle = {
   fontSize: 12,
   bold: true,
   textColor: null,
-  colorMode: "heat",
+  colorMode: "off",
   warnAt: 70,
   criticalAt: 90,
   warnColor: "#F5A524",
@@ -708,6 +907,11 @@ export const DEFAULT_TASKBAR_STRIP_STYLE: TaskbarStripStyle = {
   lineModes: {},
   showPercentSign: true,
   monitors: "primary",
+  followActive: false,
+  followDetail: true,
+  activityDots: true,
+  tokenRate: false,
+  onlyWhileRunning: false,
 };
 
 function normalizeStripMonitors(value: unknown): TaskbarStripMonitors {
@@ -758,7 +962,10 @@ export function normalizeTaskbarStripStyle(value: unknown): TaskbarStripStyle {
       ? (raw.colorMode as TaskbarStripColorMode)
       : (raw as { usageColors?: unknown }).usageColors === false // before color modes existed
         ? "off"
-        : d.colorMode,
+        : // A saved style without one is from before color modes, whose default colored by usage.
+          value && typeof value === "object"
+          ? "heat"
+          : d.colorMode,
     warnAt: isPercent(raw.warnAt) ? raw.warnAt : d.warnAt,
     criticalAt: isPercent(raw.criticalAt) ? raw.criticalAt : d.criticalAt,
     warnColor: isHexColor(raw.warnColor) ? raw.warnColor : d.warnColor,
@@ -770,15 +977,144 @@ export function normalizeTaskbarStripStyle(value: unknown): TaskbarStripStyle {
     ),
     showPercentSign: typeof raw.showPercentSign === "boolean" ? raw.showPercentSign : d.showPercentSign,
     monitors: normalizeStripMonitors(raw.monitors),
+    followActive: raw.followActive === true,
+    followDetail: raw.followDetail !== false,
+    activityDots: raw.activityDots !== false,
+    tokenRate: raw.tokenRate === true,
+    onlyWhileRunning: raw.onlyWhileRunning === true,
   };
 }
 
+/**
+ * Usage colors were on by default up to 0.8.6: an install from before then (it has plugin settings,
+ * saved on every first start, after this runs) keeps them, a new install starts with them off. Either
+ * is saved the first time, so a new install's later starts don't look like an update.
+ */
 export async function loadTaskbarStripStyle(): Promise<TaskbarStripStyle> {
-  return normalizeTaskbarStripStyle(await store.get<unknown>(TASKBAR_STRIP_STYLE_KEY));
+  const stored = await store.get<unknown>(TASKBAR_STRIP_STYLE_KEY);
+  if (stored != null) return normalizeTaskbarStripStyle(stored);
+  const existing = (await store.get<unknown>(PLUGIN_SETTINGS_KEY)) != null;
+  const first = { colorMode: existing ? "heat" : "off" };
+  await store.set(TASKBAR_STRIP_STYLE_KEY, first);
+  await store.save();
+  return normalizeTaskbarStripStyle(first);
 }
 
 export async function saveTaskbarStripStyle(value: TaskbarStripStyle): Promise<void> {
   await store.set(TASKBAR_STRIP_STYLE_KEY, value);
+  await store.save();
+}
+
+export type DesktopWidgetLogo = "brand" | "white" | "black";
+/**
+ * All providers in one widget, side by side or stacked, one widget per provider, one widget showing each
+ * in turn, or against a screen edge (`edgeSide`), sliding out under the pointer (the edge dock).
+ */
+export type DesktopWidgetLayout = "row" | "column" | "separate" | "cycle" | "edge";
+const DESKTOP_WIDGET_LAYOUTS: DesktopWidgetLayout[] = ["row", "column", "separate", "cycle", "edge"];
+
+/** The screen edge the edge dock sits on; on the top one its rail lies side by side. */
+export const EDGE_SIDES = ["right", "left", "top"] as const;
+export type EdgeSide = (typeof EDGE_SIDES)[number];
+
+/**
+ * The taskbar strip's providers and look as floating desktop widgets (`taskbar_strip/desktop.rs`):
+ * one widget per provider or all joined in one. Where each one sits is `desktopWidgetPositions`,
+ * which only the host writes (per PC, so not in the settings backup).
+ */
+export type DesktopWidgets = {
+  enabled: boolean;
+  layout: DesktopWidgetLayout;
+  /** A thin bar under each percent, filled as far as the number says. */
+  bars: boolean;
+  /** The background plate's opacity, 0-100 %; logos and numbers stay opaque. */
+  plateOpacity: number;
+  /** White and black logos also set the plate (dark, light) and the default text color. */
+  logo: DesktopWidgetLogo;
+  /** The edge rail's plate fades from its color at the top to Windows blue at the bottom. */
+  gradient: boolean;
+  /** The edge rail slides out and back over `slideMs` (else it jumps). */
+  slide: boolean;
+  slideMs: number;
+  /** The edge rail stays out (its pin button, or Settings) instead of tucking away. */
+  edgePinned: boolean;
+  edgeSide: EdgeSide;
+  onTop: boolean;
+  /** Line up with screen edges and other widgets while dragged. */
+  snap: boolean;
+  /** Can't be dragged; a click still opens the panel. */
+  locked: boolean;
+  /** Clicks go to the window behind; with `clickThroughKey` held they reach the widget. */
+  clickThrough: boolean;
+  clickThroughKey: ClickThroughKey;
+};
+
+/** The edge rail's slide duration slider, in ms. */
+export const EDGE_SLIDE_MS = { min: 100, max: 600, step: 50 } as const;
+
+export const CLICK_THROUGH_KEYS = ["ctrl", "alt", "shift"] as const;
+export type ClickThroughKey = (typeof CLICK_THROUGH_KEYS)[number];
+
+export const DEFAULT_DESKTOP_WIDGETS: DesktopWidgets = {
+  enabled: false,
+  layout: "row",
+  bars: true,
+  plateOpacity: 60,
+  logo: "brand",
+  gradient: false,
+  slide: true,
+  slideMs: 200,
+  edgePinned: false,
+  edgeSide: "right",
+  onTop: true,
+  snap: true,
+  locked: false,
+  clickThrough: false,
+  clickThroughKey: "ctrl",
+};
+
+export function normalizeDesktopWidgets(value: unknown): DesktopWidgets {
+  const raw = (value && typeof value === "object" ? value : {}) as Partial<Record<keyof DesktopWidgets, unknown>>;
+  const d = DEFAULT_DESKTOP_WIDGETS;
+  const flag = (key: "enabled" | "bars" | "gradient" | "slide" | "edgePinned" | "onTop" | "snap" | "locked" | "clickThrough") =>
+    typeof raw[key] === "boolean" ? (raw[key] as boolean) : d[key];
+  const opacity = raw.plateOpacity;
+  const slideMs = raw.slideMs;
+  return {
+    enabled: flag("enabled"),
+    layout: DESKTOP_WIDGET_LAYOUTS.includes(raw.layout as DesktopWidgetLayout)
+      ? (raw.layout as DesktopWidgetLayout)
+      : (raw as { joined?: unknown }).joined === false // before layouts existed
+        ? "separate"
+        : d.layout,
+    bars: flag("bars"),
+    plateOpacity:
+      typeof opacity === "number" && Number.isFinite(opacity) ? Math.round(Math.min(100, Math.max(0, opacity))) : d.plateOpacity,
+    logo: raw.logo === "white" || raw.logo === "black" ? raw.logo : d.logo,
+    gradient: flag("gradient"),
+    slide: flag("slide"),
+    slideMs:
+      typeof slideMs === "number" && Number.isFinite(slideMs)
+        ? Math.round(Math.min(EDGE_SLIDE_MS.max, Math.max(EDGE_SLIDE_MS.min, slideMs)))
+        : d.slideMs,
+    edgePinned: flag("edgePinned"),
+    edgeSide: EDGE_SIDES.includes(raw.edgeSide as EdgeSide) ? (raw.edgeSide as EdgeSide) : d.edgeSide,
+    onTop: flag("onTop"),
+    snap: flag("snap"),
+    locked: flag("locked"),
+    clickThrough: flag("clickThrough"),
+    clickThroughKey: CLICK_THROUGH_KEYS.includes(raw.clickThroughKey as ClickThroughKey)
+      ? (raw.clickThroughKey as ClickThroughKey)
+      : d.clickThroughKey,
+  };
+}
+
+export async function loadDesktopWidgets(): Promise<DesktopWidgets> {
+  return normalizeDesktopWidgets(await store.get<unknown>(DESKTOP_WIDGETS_KEY));
+}
+
+export async function saveDesktopWidgets(value: DesktopWidgets): Promise<void> {
+  await store.set(DESKTOP_WIDGETS_KEY, value);
   await store.save();
 }
 

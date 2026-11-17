@@ -74,6 +74,8 @@ const jaJP: PluginErrorMessages = {
   wslNotRunning: "WSL が実行されていません。このカードを更新するには WSL を起動してください。",
   cursorSecureStorageUnavailable: "Cursor の安全なストレージは利用できません。",
   cursorSecureStorageUnreadable: "Cursor の安全なストレージを読み取れませんでした。",
+
+  customBalanceNotSetUp: "カスタム残高が設定されていません。設定で追加してください。",
 }
 
 export default jaJP

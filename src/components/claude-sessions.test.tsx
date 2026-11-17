@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   ClaudeSessionList,
-  isClaudeLogin,
+  hasLiveSessions,
   useClaudeSessions,
   type LiveSession,
 } from "@/components/claude-sessions"
@@ -27,21 +27,23 @@ describe("claude sessions", () => {
     panelOpen = true
   })
 
-  it("lists sessions only for the usual Claude login and its extra accounts", () => {
-    expect(isClaudeLogin("claude")).toBe(true)
-    expect(isClaudeLogin("claude-1a2b3c4d")).toBe(true)
-    expect(isClaudeLogin("claude-wsl-0011aabb")).toBe(false)
-    expect(isClaudeLogin("codex")).toBe(false)
+  it("lists sessions only for the usual Claude and Codex logins and their extra accounts", () => {
+    expect(hasLiveSessions("claude")).toBe(true)
+    expect(hasLiveSessions("claude-1a2b3c4d")).toBe(true)
+    expect(hasLiveSessions("codex")).toBe(true)
+    expect(hasLiveSessions("codex-1a2b3c4d")).toBe(true)
+    expect(hasLiveSessions("claude-wsl-0011aabb")).toBe(false)
+    expect(hasLiveSessions("cursor")).toBe(false)
   })
 
-  it("asks the host for a Claude card's sessions and none for other cards", async () => {
+  it("asks the host for a Claude or Codex card's sessions and none for other cards", async () => {
     vi.mocked(invoke).mockResolvedValue([session({})])
-    const { result } = renderHook(() => useClaudeSessions("claude"))
+    const { result } = renderHook(() => useClaudeSessions("codex"))
     await waitFor(() => expect(result.current).toHaveLength(1))
-    expect(invoke).toHaveBeenCalledWith("claude_sessions", { pluginId: "claude" })
+    expect(invoke).toHaveBeenCalledWith("live_sessions", { pluginId: "codex" })
 
     vi.mocked(invoke).mockClear()
-    renderHook(() => useClaudeSessions("codex"))
+    renderHook(() => useClaudeSessions("cursor"))
     expect(invoke).not.toHaveBeenCalled()
   })
 

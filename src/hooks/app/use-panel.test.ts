@@ -24,6 +24,16 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: listenMock,
 }))
 
+const { loadPanelWidthMock, savePanelWidthMock } = vi.hoisted(() => ({
+  loadPanelWidthMock: vi.fn(),
+  savePanelWidthMock: vi.fn(),
+}))
+vi.mock("@/lib/settings", async (original) => ({
+  ...(await original<typeof import("@/lib/settings")>()),
+  loadPanelWidth: loadPanelWidthMock,
+  savePanelWidth: savePanelWidthMock,
+}))
+
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: getCurrentWindowMock,
   currentMonitor: currentMonitorMock,
@@ -47,6 +57,8 @@ describe("usePanel", () => {
     listenMock.mockReset()
     getCurrentWindowMock.mockReset()
     currentMonitorMock.mockReset()
+    loadPanelWidthMock.mockReset().mockResolvedValue(400)
+    savePanelWidthMock.mockReset().mockResolvedValue(undefined)
 
     isTauriMock.mockReturnValue(true)
     invokeMock.mockResolvedValue(undefined)
@@ -57,6 +69,7 @@ describe("usePanel", () => {
 
   it("handles tray show-about event", async () => {
     const setShowAbout = vi.fn()
+    const setActiveView = vi.fn()
     const callbacks = new Map<string, (event: { payload: unknown }) => void>()
 
     listenMock.mockImplementation(async (event: string, callback: (event: { payload: unknown }) => void) => {
@@ -67,7 +80,7 @@ describe("usePanel", () => {
     renderHook(() =>
       usePanel({
         activeView: "home",
-        setActiveView: vi.fn(),
+        setActiveView,
         showAbout: false,
         setShowAbout,
         displayPlugins: [],
@@ -151,12 +164,14 @@ describe("usePanel", () => {
           })
       )
 
+    const setActiveView = vi.fn()
+    const setShowAbout = vi.fn()
     const { unmount } = renderHook(() =>
       usePanel({
         activeView: "home",
-        setActiveView: vi.fn(),
+        setActiveView,
         showAbout: false,
-        setShowAbout: vi.fn(),
+        setShowAbout,
         displayPlugins: [],
       })
     )
@@ -361,5 +376,99 @@ describe("usePanel", () => {
 
     document.body.removeChild(container)
     requestAnimationFrameSpy.mockRestore()
+  })
+
+  it("opens at the kept width; an edge drag resizes through the host, within bounds, and is kept", async () => {
+    const setSize = vi.fn().mockResolvedValue(undefined)
+    getCurrentWindowMock.mockReturnValue({ setSize })
+    loadPanelWidthMock.mockResolvedValue(480)
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    try {
+      const { result, rerender } = renderHook(
+        ({ view }: { view: string }) => {
+          const panel = usePanel({ activeView: view, setActiveView: vi.fn(), showAbout: false, setShowAbout: vi.fn(), displayPlugins: [] })
+          panel.containerRef.current = container
+          return panel
+        },
+        { initialProps: { view: "home" } }
+      )
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 480 })))
+
+      // Dragged past the bound on the left edge: the host gets the bound and keeps the right edge.
+      await act(async () => {
+        await result.current.resizePanel(700, "West")
+      })
+      expect(invokeMock).toHaveBeenCalledWith("resize_panel", { fromWidth: 480, width: 560, keepRight: true })
+      expect(result.current.panelWidth()).toBe(560)
+
+      // The same width again sends nothing; the next content resize keeps the new width.
+      invokeMock.mockClear()
+      await act(async () => {
+        await result.current.resizePanel(560.2, "East")
+      })
+      expect(invokeMock).not.toHaveBeenCalledWith("resize_panel", expect.anything())
+      setSize.mockClear()
+      rerender({ view: "codex" })
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 560 })))
+
+      act(() => result.current.keepPanelWidth())
+      expect(savePanelWidthMock).toHaveBeenCalledWith(560)
+    } finally {
+      document.body.removeChild(container)
+    }
+  })
+
+  it("gives settings its own wider width and goes back to the kept width, the host picking the edge", async () => {
+    const setSize = vi.fn().mockResolvedValue(undefined)
+    getCurrentWindowMock.mockReturnValue({ setSize })
+    loadPanelWidthMock.mockResolvedValue(480)
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    try {
+      const { rerender } = renderHook(
+        ({ view }: { view: string }) => {
+          const panel = usePanel({ activeView: view, setActiveView: vi.fn(), showAbout: false, setShowAbout: vi.fn(), displayPlugins: [] })
+          panel.containerRef.current = container
+          return panel
+        },
+        { initialProps: { view: "home" } }
+      )
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 480 })))
+      expect(invokeMock).not.toHaveBeenCalledWith("resize_panel", expect.anything())
+
+      rerender({ view: "settings" })
+      await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("resize_panel", { fromWidth: 480, width: 760 }))
+      await waitFor(() => expect(setSize).toHaveBeenLastCalledWith(expect.objectContaining({ width: 760 })))
+
+      invokeMock.mockClear()
+      rerender({ view: "home" })
+      await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("resize_panel", { fromWidth: 760, width: 480 }))
+      await waitFor(() => expect(setSize).toHaveBeenLastCalledWith(expect.objectContaining({ width: 480 })))
+      expect(invokeMock.mock.calls.filter(([name]) => name === "resize_panel")).toHaveLength(1)
+    } finally {
+      document.body.removeChild(container)
+    }
+  })
+
+  it("keeps settings inside a work area narrower than its width", async () => {
+    const setSize = vi.fn().mockResolvedValue(undefined)
+    getCurrentWindowMock.mockReturnValue({ setSize })
+    currentMonitorMock.mockResolvedValue({
+      size: { width: 700, height: 1200 },
+      workArea: { size: { width: 700, height: 1152 } },
+    })
+    const container = document.createElement("div")
+    document.body.appendChild(container)
+    try {
+      renderHook(() => {
+        const panel = usePanel({ activeView: "settings", setActiveView: vi.fn(), showAbout: false, setShowAbout: vi.fn(), displayPlugins: [] })
+        panel.containerRef.current = container
+        return panel
+      })
+      await waitFor(() => expect(setSize).toHaveBeenCalledWith(expect.objectContaining({ width: 700 })))
+    } finally {
+      document.body.removeChild(container)
+    }
   })
 })

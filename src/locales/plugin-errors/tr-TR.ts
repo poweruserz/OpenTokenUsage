@@ -74,6 +74,8 @@ const trTR: PluginErrorMessages = {
   wslNotRunning: "WSL çalışmıyor. Bu kartı güncellemek için WSL'yi başlatın.",
   cursorSecureStorageUnavailable: "Cursor güvenli depolaması kullanılamıyor.",
   cursorSecureStorageUnreadable: "Cursor güvenli depolaması okunamadı.",
+
+  customBalanceNotSetUp: "Özel bakiye kurulmamış. Ayarlar'dan bir tane ekleyin.",
 }
 
 export default trTR

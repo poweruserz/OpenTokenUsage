@@ -47,8 +47,8 @@ async fn fetch_status(base_url: &str) -> Result<ProviderStatus, String> {
     let mut builder = reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)
         .user_agent("OpenTokenUsage");
-    if let Some(resolved) = crate::config::get_resolved_proxy() {
-        builder = builder.proxy(resolved.proxy.clone());
+    if let Some(proxy) = crate::config::resolved_proxy() {
+        builder = builder.proxy(proxy);
     }
     let client = builder.build().map_err(|e| e.to_string())?;
     let response = client

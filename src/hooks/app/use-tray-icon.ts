@@ -17,6 +17,8 @@ import {
 import { formatTrayPercentText, formatTrayTooltip } from "@/lib/tray-tooltip"
 import type { PluginState } from "@/hooks/app/types"
 import { isAppTrayIconHidden } from "@/hooks/app/use-provider-tray-icons"
+import { formatTokenRate, useTokenRateStore } from "@/hooks/app/use-agent-activity"
+import { getLocale } from "@/lib/i18n"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 type TrayUpdateReason = "probe" | "settings" | "init"
@@ -34,6 +36,8 @@ type UseTrayIconArgs = {
   trayPercentColor: string
   themeMode: string
   activeView: string
+  /** The screen is shared ("Hide from screen sharing"): no usage in the hover text either. */
+  sharing?: boolean
 }
 
 export type TraySettingsPreview = {
@@ -76,6 +80,7 @@ export function useTrayIcon({
   trayPercentColor,
   themeMode,
   activeView,
+  sharing = false,
 }: UseTrayIconArgs) {
   const trayRef = useRef<TrayIcon | null>(null)
   const trayGaugeIconPathRef = useRef<string | null>(null)
@@ -143,6 +148,11 @@ export function useTrayIcon({
     activeViewRef.current = activeView
   }, [activeView])
 
+  const sharingRef = useRef(sharing)
+  useEffect(() => {
+    sharingRef.current = sharing
+  }, [sharing])
+
   const scheduleTrayIconUpdate = useCallback((
     _reason: TrayUpdateReason,
     delayMs = 0,
@@ -193,7 +203,7 @@ export function useTrayIcon({
         return Promise.resolve()
       }
 
-      const restoreGaugeIcon = () => {
+      const restoreGaugeIcon = (tooltip = "OpenTokenUsage") => {
         if (isAppTrayIconHidden()) {
           finalizeUpdate()
           return
@@ -203,7 +213,7 @@ export function useTrayIcon({
           Promise.all([
             tray.setIcon(gaugePath),
             setTrayTitle(""),
-            setTrayTooltip("OpenTokenUsage"),
+            setTrayTooltip(tooltip),
           ])
             .catch((e) => {
               console.error("Failed to restore tray gauge icon:", e)
@@ -320,7 +330,12 @@ export function useTrayIcon({
         preferredMetric,
         preferWeekly,
       })
-      const tooltip = formatTrayTooltip(tooltipBars, pluginsMetaRef.current, preferWeekly)
+      // Live token rates (Settings → the strip and widgets' look), one line per shown card that has one.
+      const rateLines = Object.entries(useTokenRateStore.getState().rates).flatMap(([id, rate]) => {
+        const name = pluginsMetaRef.current.find((meta) => meta.id === id)?.name
+        return name && enabledPluginIds.includes(id) ? [`${name}: ${formatTokenRate(rate, getLocale())}`] : []
+      })
+      const tooltip = [formatTrayTooltip(tooltipBars, pluginsMetaRef.current, preferWeekly), ...rateLines].join("\n")
       const updateTooltip = () => setTrayTooltip(tooltip)
 
       if (isPerProviderTrayStyle(style) || isAppTrayIconHidden()) {
@@ -331,8 +346,9 @@ export function useTrayIcon({
       }
 
       if (style === "icon") {
-        // The app logo is full color, so one icon works on light and dark taskbars.
-        restoreGaugeIcon()
+        // The app logo is full color, so one icon works on light and dark taskbars. The strip sets
+        // this style, so its live rates go in the hover text here too (not while the screen is shared).
+        restoreGaugeIcon(["OpenTokenUsage", ...(sharingRef.current ? [] : rateLines)].join("\n"))
         return
       }
 
@@ -427,7 +443,7 @@ export function useTrayIcon({
   useEffect(() => {
     if (!trayReady) return
     scheduleTrayIconUpdate("settings", 0)
-  }, [activeView, menubarIconStyle, paceWorkdays, scheduleTrayIconUpdate, trayReady])
+  }, [activeView, menubarIconStyle, paceWorkdays, sharing, scheduleTrayIconUpdate, trayReady])
 
   // Pace moves with time, not only with usage: redraw a pace-colored number between probes.
   useEffect(() => {

@@ -6,12 +6,24 @@ import { ClaudeCodeSection } from "@/components/claude-code-section"
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }))
 
-// The state on opening, then what switching answers.
-const answer = (state: string, switched = state) =>
-  vi.mocked(invoke).mockResolvedValueOnce(state).mockResolvedValueOnce(switched)
+// The state on opening, then what switching answers (a rejection: what Tauri rejects with); the log
+// retention beside it keeps Claude's default.
+const answer = (state: string, switched: string | { rejected: string } = state) =>
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "claude_statusline_state") return state
+    if (command === "set_claude_statusline") {
+      if (typeof switched === "object") throw switched.rejected
+      return switched
+    }
+    if (command === "claude_log_retention") return 30
+    throw new Error(`unexpected ${command}`)
+  })
 
 describe("ClaudeCodeSection", () => {
-  beforeEach(() => vi.mocked(invoke).mockReset())
+  // Braces: a function returned from beforeEach is run as a cleanup hook.
+  beforeEach(() => {
+    vi.mocked(invoke).mockReset()
+  })
 
   it("switches the bridge on and off from the checkbox", async () => {
     answer("off", "on")
@@ -34,7 +46,7 @@ describe("ClaudeCodeSection", () => {
 
   it("shows the reason when settings.json turns out to be unreadable on switching", async () => {
     // Tauri rejects with the command's error value: here the state that kept it from switching.
-    vi.mocked(invoke).mockResolvedValueOnce("off").mockRejectedValueOnce("unreadable")
+    answer("off", { rejected: "unreadable" })
     render(<ClaudeCodeSection />)
     await userEvent.click(await screen.findByRole("checkbox"))
     expect(await screen.findByText(/couldn't be read as JSON/)).toBeInTheDocument()

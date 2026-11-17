@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "qwen-code",
+  "name": "Qwen Code",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#615CED",
+  "links": [
+    { "label": "Token Plan usage", "url": "https://home.qwencloud.com/analytics/token-plan/individual?region=ap-southeast-1" }
+  ],
+  "lines": [
+    { "type": "text", "label": "Requests today", "scope": "overview", "primaryOrder": 1 },
+    { "type": "text", "label": "Requests this month", "scope": "overview", "primaryOrder": 2 }
+  ]
+}

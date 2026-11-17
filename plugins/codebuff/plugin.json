@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "codebuff",
+  "name": "Codebuff",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#16A34A",
+  "links": [
+    { "label": "Usage dashboard", "url": "https://www.codebuff.com/usage" }
+  ],
+  "lines": [
+    { "type": "progress", "label": "Credits", "scope": "overview", "primaryOrder": 1 },
+    { "type": "progress", "label": "Weekly", "scope": "overview", "period": "weekly", "primaryOrder": 2 }
+  ]
+}

@@ -89,6 +89,432 @@ export const zhCN: Messages = {
   "settings.tray.logoColors": "彩色徽标",
   "settings.strip.title": "任务栏显示（实验性）",
   "settings.strip.desc": "在任务栏上显示提供商标志及会话和每周用量。",
+
+  "settings.widgets.title": "桌面小组件",
+
+  "settings.widgets.desc": "在桌面任意位置显示提供商标志及会话和每周用量。",
+
+  "settings.stripLook.title": "任务栏显示和小组件外观",
+
+  "settings.stripLook.desc": "任务栏显示和小组件共用的提供商、字体和颜色。",
+
+  "settings.categories": "设置类别",
+
+
+  "settings.configBroken": "未保存：~/.openusage/config.json 不是有效的 JSON。请修复或删除该文件后再保存。",
+
+
+  "settings.strip.desktopEdgeSide": "边缘",
+
+
+  "settings.strip.desktopEdgeRight": "右侧",
+
+
+  "settings.strip.desktopEdgeLeft": "左侧",
+
+
+  "settings.strip.desktopEdgeTop": "顶部",
+
+
+  "settings.strip.desktopPinned": "保持屏幕边缘栏展开（也可用其固定按钮）",
+
+
+  "settings.strip.onlyWhileRunning": "仅在 AI 工具运行时显示",
+
+
+  "settings.strip.onlyWhileRunningHint": "此显示中提供商的应用或 CLI（Claude Code、Codex 等）都没有运行时将隐藏。",
+
+
+  "settings.strip.desktopSlide": "屏幕边缘栏平滑滑出",
+
+
+  "settings.strip.desktopSlideMs": "滑动时长",
+
+
+  "settings.strip.desktopGradient": "屏幕边缘栏使用柔和渐变",
+
+
+  "whatsNew.title": "新功能",
+
+
+  "whatsNew.close": "关闭",
+
+
+  "whatsNew.video": "介绍此版本新功能的短视频",
+
+
+  "settings.whatsNew.title": "新功能",
+
+
+  "settings.whatsNew.label": "更新后显示新功能",
+
+
+  "settings.whatsNew.hint": "更新后首次打开面板时显示一次：版本说明，以及更新附带的短视频（如有）。关闭窗口后视频即被删除。",
+
+
+  "rate.perMinute": "{tokens}/分钟",
+
+
+  "settings.strip.tokenRate": "每分钟实时令牌数（Claude、Codex），托盘悬停提示中也会显示",
+
+
+  "settings.strip.desktopEdge": "屏幕边缘",
+
+
+  "settings.strip.desktopEdgeHint": "停靠在屏幕边缘（右侧、左侧或顶部），几乎看不见；指针移上去时滑出。",
+
+
+  "settings.cards.tokscale": "通过 tokscale 再加约 30 个工具（Gemini CLI、Copilot、Kiro…）",
+
+
+  "settings.cards.tokscaleHint": "用 bunx 或 npx 运行开源的 tokscale（需要 bun 或 Node.js），它会下载自身和价格表。读取这些工具本地日志的频率最多每 30 分钟一次。",
+
+
+  "settings.balances.title": "自定义余额",
+
+
+  "settings.balances.desc": "New API、One API、Sub2API 或你自己的接口：在 Custom balances 卡片上显示其余额",
+
+
+  "settings.balances.name": "名称",
+
+
+  "settings.balances.preset": "类型",
+
+
+  "settings.balances.custom": "自定义接口",
+
+
+  "settings.balances.url": "地址",
+
+
+  "settings.balances.env": "存放密钥的环境变量（OTU_…）",
+
+
+  "settings.balances.userId": "用户 ID",
+
+
+  "settings.balances.path": "路径",
+
+
+  "settings.balances.remaining": "余额位置",
+
+
+  "settings.balances.used": "已用位置",
+
+
+  "settings.balances.total": "总额位置",
+
+
+  "settings.balances.divisor": "除以",
+
+
+  "settings.balances.currency": "货币",
+
+
+  "settings.balances.auth": "密钥请求头",
+
+
+  "settings.balances.remove": "移除",
+
+
+  "settings.balances.add": "添加余额",
+
+
+  "settings.balances.save": "保存",
+
+
+  "settings.balances.saved": "已保存。打开 Custom balances 卡片即可查看。",
+
+
+  "settings.balances.invalid": "未保存：请检查地址、变量名（以 OTU_ 开头，后接 A–Z、0–9、_）和路径。",
+
+
+  "settings.balances.hint": "密钥本身从不保存：把它放进环境变量并填写变量名。路径指向响应中的位置，例如 data.balance。",
+
+
+  "year.title": "全年用量",
+
+
+  "year.streak": "连续 {days} 天",
+
+
+  "year.summary": "最长连续 {longest} 天 · 活跃 {active} 天 · {tokens} 个 token",
+
+
+  "year.cell": "{date}：{tokens} 个 token",
+
+
+  "settings.cards.yearHeatmap": "在 Claude 和 Codex 详情页显示一年的每日用量和连续天数",
+
+
+  "settings.cards.keepUsage": "保留日志已被删除的用量",
+
+
+  "settings.cards.keepUsageHint": "Claude Code 默认 30 天后删除日志。每天的 token 会保存在应用数据文件夹中，全年视图和导出仍会计入。",
+
+
+  "settings.export.title": "用量导出",
+
+
+  "settings.export.desc": "每日 token 和最新限额，以 CSV 和 JSON 保存到“下载”文件夹",
+
+
+  "settings.export.now": "立即导出",
+
+
+  "settings.export.done": "已保存：{path}",
+
+
+  "settings.export.failed": "无法写入导出文件。",
+
+
+  "settings.export.daily": "每天重新写入一次",
+
+
+  "card.sessions.cache": "缓存 {time}",
+
+
+  "card.sessions.cacheHint": "此会话的提示缓存剩余时间。过期后，下一条提示会重新发送全部上下文，消耗更多限额。",
+
+
+  "settings.cards.cacheTimer": "Claude 会话的提示缓存剩余时间",
+
+
+  "settings.cards.contextFill": "每个会话的上下文窗口占用",
+
+
+  "spend.planMultiple": "{name}：套餐的 {times} 倍",
+
+
+  "spend.planMultipleHint": "按 API 价格计算的 30 天（{cost}）是套餐月费（{price}）的 {times} 倍。",
+
+
+  "settings.plans.title": "订阅",
+
+
+  "settings.plans.desc": "每个套餐的月费，用来与按 API 价格计算的用量对比",
+
+
+  "settings.plans.multiple": "在花费汇总中按价格倍数显示每个套餐的用量",
+
+
+  "settings.plans.price": "{name}：月费",
+
+
+  "settings.claudeCode.retention": "Claude Code 日志保留",
+
+
+  "settings.claudeCode.retentionDays": "{days} 天",
+
+
+  "settings.claudeCode.retentionHint": "Claude Code 启动时会删除更早的记录。小时网格、项目和花费都从这些记录读取。",
+
+
+  "settings.alerts.refills": "限额在重置前恢复时（重置额度或部分恢复）",
+
+
+  "settings.alerts.refillPoints": "至少恢复",
+
+
+  "settings.alerts.points": "{points} 个百分点",
+
+
+  "settings.strip.followDetail": "详细显示：每项限额及距重置的时间",
+
+
+  "settings.strip.activityDots": "代理工作时（蓝）或等待你时（黄）在图标上显示圆点",
+
+
+  "settings.strip.desktopClickThroughKey": "按住此键可点击或拖动",
+
+
+  "settings.cards.title": "卡片上",
+
+
+  "settings.cards.desc": "概览中限额以外显示的内容",
+
+
+  "settings.cards.liveSessions": "在 Claude Code 和 Codex 卡片上显示运行中的会话",
+
+
+  "settings.cards.spend": "卡片下方的花费汇总",
+
+
+  "settings.cards.spendTools": "同时统计这些工具自己的记录",
+
+
+  "alert.refill.title": "{provider}：{label} 提前恢复",
+
+
+  "alert.refill.body": "{percent}% 已重新可用。",
+
+
+  "settings.strip.followActive": "跟随当前应用",
+
+
+  "settings.strip.followActiveHint": "你正在使用的窗口中的 AI 工具排在最前面。",
+
+
+  "settings.strip.desktopClickThrough": "让点击穿透到后面的窗口",
+
+
+  "spend.title": "花费",
+
+
+  "spend.today": "今天",
+
+
+  "spend.yesterday": "昨天",
+
+
+  "spend.month": "30 天",
+
+
+  "spend.cost": "费用",
+
+
+  "spend.tokens": "令牌",
+
+
+  "spend.models": "模型，近 30 天（按令牌）",
+
+
+  "settings.strip.desktopCycle": "轮流",
+
+
+  "settings.strip.desktopCycleHint": "一个小组件，每个提供商显示 8 秒",
+
+
+  "settings.theme.halloween": "万圣节",
+
+
+  "settings.theme.glass": "玻璃",
+
+
+  "settings.theme.glassHint": "模糊面板后面的桌面 (Windows 11)",
+
+
+  "label.Installed models": "已安装模型",
+
+
+  "label.Loaded now": "当前已加载",
+
+
+  "label.Vouchers": "代金券",
+
+
+  "label.Cash": "现金",
+
+
+  "label.Requests today": "今日请求",
+
+
+  "label.Requests this month": "本月请求",
+
+
+  "label.Models": "模型",
+
+
+  "label.Token Plan usage": "Token Plan 用量",
+
+
+  "card.customize": "自定义行",
+
+
+  "card.customizeHint": "拖动行来调整顺序，隐藏不需要的行。Ctrl+Z 撤销，Esc 关闭。",
+
+
+  "card.customizeMove": "移动 {row}",
+
+
+  "card.customizeShow": "显示 {row}",
+
+
+  "card.customizeHide": "隐藏 {row}",
+
+
+  "card.customizeReset": "恢复默认",
+
+
+  "card.customizeDone": "完成",
+
+
+  "weekDays.capacity": "按本周的模型使用比例，整个额度约为 {tokens} 个令牌，按 API 价格约值 {cost}。",
+
+
+  "weekDays.capacityTokens": "按本周的模型使用比例，整个额度约为 {tokens} 个令牌。",
+
+
+  "card.copyImage": "复制为图片",
+
+
+  "card.imageCopied": "已复制到剪贴板",
+
+
+  "card.imageCopyFailed": "无法复制图片",
+
+
+  "settings.privacy.title": "隐私",
+
+
+  "settings.privacy.hideWhenSharing": "屏幕共享时隐藏",
+
+
+  "settings.privacy.hideWhenSharingHint": "面板和桌面小组件不会出现在屏幕共享、录屏或截图中，你自己仍然可以看到。Windows 不会告诉应用屏幕正在共享，因此通知区域的数字和任务栏显示仅在你演示或有人远程控制这台电脑时隐藏。",
+
+
+  "settings.backup.reset": "重置所有设置",
+
+
+  "settings.backup.resetHint": "所有偏好设置都将恢复为默认值。你的提供商、账户和项目预算会保留。应用将重新启动。",
+
+
+  "settings.backup.resetConfirm": "重置并重新启动",
+
+
+  "settings.backup.resetCancel": "取消",
+
+
+  "settings.backup.resetError": "无法重置设置。",
+
+
+  "settings.proxy.title": "代理",
+
+
+  "settings.proxy.desc": "通过代理服务器发送提供商、状态页面和更新请求。",
+
+
+  "settings.proxy.enable": "使用代理",
+
+
+  "settings.proxy.url": "代理地址",
+
+
+  "settings.proxy.save": "保存",
+
+
+  "settings.proxy.saved": "已保存，从下一个请求开始生效。",
+
+
+  "settings.proxy.invalid": "这不是代理地址。请使用带主机名的 http://、https://、socks5:// 或 socks5h://，例如 http://127.0.0.1:8080。",
+
+
+  "settings.proxy.error": "无法保存代理。",
+
+
+  "card.showUsed": "显示已用量",
+
+
+  "card.showLeft": "显示剩余量",
+
+  "settings.category.usage": "用量",
+
+  "settings.category.taskbar": "任务栏和桌面",
+
+  "settings.category.appearance": "外观",
+
+  "settings.category.app": "应用",
   "settings.strip.position": "位置",
   "settings.strip.positionLeft": "左侧",
   "settings.strip.positionRight": "右侧",
@@ -134,6 +560,8 @@ export const zhCN: Messages = {
   "settings.strip.colorTraffic": "红绿灯（绿 → 黄 → 红）",
   "settings.strip.colorCool": "冷色（蓝 → 紫 → 红）",
   "settings.strip.colorMono": "简洁，仅接近上限时变红",
+
+  "settings.strip.colorPace": "按速度",
   "settings.strip.colorThresholds": "自定义阈值",
   "settings.strip.colorOff": "关闭",
   "settings.strip.drag": "拖动 {name}",
@@ -146,6 +574,23 @@ export const zhCN: Messages = {
   "settings.strip.criticalAt": "严重阈值",
   "settings.strip.usageColorsHint": "根据已用额度的比例。",
   "settings.strip.reset": "重置外观",
+  "settings.strip.desktop": "在桌面上显示",
+  "settings.strip.desktopHint": "可拖到任意位置的小组件，点击即可打开面板，鼠标悬停可查看额度何时重置。数值上升时会闪烁，之后以强调色显示一分钟。全屏应用在前台时会自动隐藏。下方的提供商和外观设置同样适用于它们。",
+  "settings.strip.desktopLayout": "小组件",
+  "settings.strip.desktopRow": "并排",
+
+  "settings.strip.desktopColumn": "竖排",
+  "settings.strip.desktopSeparate": "分开显示",
+  "settings.strip.desktopPlate": "背景不透明度",
+  "settings.strip.desktopLogo": "标志",
+  "settings.strip.desktopLogoBrand": "彩色",
+  "settings.strip.desktopLogoWhite": "白色",
+  "settings.strip.desktopLogoBlack": "黑色",
+  "settings.strip.desktopOnTop": "始终置顶",
+  "settings.strip.desktopSnap": "吸附到屏幕边缘和彼此",
+  "settings.strip.desktopLocked": "锁定位置（鼠标悬停时变透明）",
+
+  "settings.strip.desktopBars": "数字下方显示进度条",
   "settings.tray.perProviderHint": "如果图标被放进了 ^ 里，请在任务栏设置中打开它，让它显示在时钟旁。",
   "settings.tray.openTaskbarSettings": "打开任务栏设置",
   "settings.tray.provider": "提供商",
@@ -157,7 +602,7 @@ export const zhCN: Messages = {
   "settings.tray.auto": "自动",
   "settings.tray.tightest": "用量最高",
   "settings.theme.title": "主题",
-  "settings.theme.desc": "深色（纯黑）或浅色",
+  "settings.theme.desc": "深色（纯黑）、浅色或万圣节",
   "settings.theme.light": "浅色",
   "settings.theme.dark": "深色",
   "settings.theme.darkHint": "纯黑，适合 OLED 屏幕",
@@ -189,6 +634,9 @@ export const zhCN: Messages = {
   "settings.panel.desc": "面板打开的位置。标题栏中的图钉可让面板保持在其他窗口之上。",
   "settings.panel.remember": "记住位置",
   "settings.panel.rememberHint": "拖动标题栏移动面板后，下次会在同一位置打开，而不是在任务栏上方。",
+  "settings.panel.navSide": "提供商栏",
+  "settings.panel.navLeft": "左侧",
+  "settings.panel.navRight": "右侧",
   "settings.alerts.levels": "通知级别",
   "settings.alerts.ticksHint": "进度条会在每个级别处显示刻度。",
   "settings.alerts.perProvider": "按提供商",

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react"
 import { invoke } from "@tauri-apps/api/core"
 import { beforeEach, expect, it, vi } from "vitest"
-import { dayBounds, WeekDays } from "@/components/week-days"
+import { dayBounds, WeekDays, weeklyCapacity } from "@/components/week-days"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }))
@@ -60,6 +60,25 @@ it("says when logs couldn't be read, and when the read failed", async () => {
   vi.mocked(invoke).mockRejectedValue("scan failed")
   render(<WeekDays pluginId="claude" weekly={weekly} />)
   expect(await screen.findByText(/Couldn't read the days/)).toBeInTheDocument()
+})
+
+it("works out what the whole limit is worth from the share used so far, once that share says enough", () => {
+  const window = { totalTokens: 1_000_000, totalCost: 40, priced: true }
+  expect(weeklyCapacity(0.4, window)).toEqual({ tokens: 2_500_000, cost: 100 })
+  expect(weeklyCapacity(0.4, { ...window, priced: false })).toEqual({ tokens: 2_500_000, cost: null })
+  expect(weeklyCapacity(0.05, window)).toBeNull() // too early to tell
+  expect(weeklyCapacity(0.4, { ...window, totalTokens: 0 })).toBeNull()
+})
+
+it("says what the whole weekly limit is worth under the days", async () => {
+  vi.mocked(invoke).mockImplementation(async (command: string) =>
+    command === "usage_by_day"
+      ? { days: [1, 3], unreadable: 0 }
+      : { priced: true, totalTokens: 1_000_000, totalCost: 40, projects: [], unreadable: 0 }
+  )
+  const resetsAt = new Date(Date.now() + 6 * DAY).toISOString()
+  render(<WeekDays pluginId="claude" weekly={{ used: 40, limit: 100, resetsAt, periodDurationMs: 7 * DAY }} />)
+  expect(await screen.findByText(/the whole limit is about 2\.5M tokens, worth \$100/)).toBeInTheDocument()
 })
 
 it("leaves out a window longer than a week, which Codex can also call weekly", () => {

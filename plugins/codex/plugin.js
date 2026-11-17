@@ -409,6 +409,32 @@
     }
   }
 
+  // Business plans answer `rate_limit: null` and carry the admin-set monthly per-user cap here
+  // (`used`/`limit` and the reset may come as strings). As TaskbarQuota (MIT) reads it.
+  function pushSpendControlLine(ctx, lines, nowSec, data) {
+    const limit = data.spend_control && data.spend_control.individual_limit
+    if (!limit || typeof limit !== "object") return
+    // Number(null) is 0: a missing field must stay missing.
+    const num = (value) => (value == null || value === "" ? null : readNumber(value))
+    let used = num(limit.used_percent)
+    if (used === null) {
+      const spent = num(limit.used)
+      const cap = num(limit.limit)
+      if (spent !== null && cap !== null && cap > 0) used = (spent / cap) * 100
+    }
+    if (used === null) return
+    const resetAt = num(limit.reset_at)
+    const resetAfter = num(limit.reset_after_seconds)
+    lines.push(ctx.line.progress({
+      label: "Monthly",
+      used: Math.min(100, Math.max(0, used)),
+      limit: 100,
+      format: { kind: "percent" },
+      resetsAt:
+        resetAt !== null ? ctx.util.toIso(resetAt) : resetAfter !== null ? ctx.util.toIso(nowSec + resetAfter) : null,
+    }))
+  }
+
   function queryTokenUsage(ctx, authState) {
     if (!ctx.host.ccusage || typeof ctx.host.ccusage.query !== "function") {
       return { status: "no_runner", data: null }
@@ -795,6 +821,7 @@
         readPercent(resp.headers["x-codex-primary-used-percent"]),
         readPercent(resp.headers["x-codex-secondary-used-percent"]),
       ])
+      if (!data.rate_limit || typeof data.rate_limit !== "object") pushSpendControlLine(ctx, lines, nowSec, data)
 
       if (Array.isArray(data.additional_rate_limits)) {
         for (const entry of data.additional_rate_limits) {

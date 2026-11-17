@@ -74,6 +74,8 @@ const ptBR: PluginErrorMessages = {
   wslNotRunning: "O WSL não está em execução. Inicie-o para atualizar este cartão.",
   cursorSecureStorageUnavailable: "O armazenamento seguro do Cursor não está disponível.",
   cursorSecureStorageUnreadable: "Não foi possível ler o armazenamento seguro do Cursor.",
+
+  customBalanceNotSetUp: "Nenhum saldo personalizado configurado. Adicione um nas Configurações.",
 }
 
 export default ptBR

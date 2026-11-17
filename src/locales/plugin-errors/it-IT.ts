@@ -74,6 +74,8 @@ const itIT: PluginErrorMessages = {
   wslNotRunning: "WSL non è in esecuzione. Avvialo per aggiornare questa scheda.",
   cursorSecureStorageUnavailable: "L'archivio protetto di Cursor non è disponibile.",
   cursorSecureStorageUnreadable: "Impossibile leggere l'archivio protetto di Cursor.",
+
+  customBalanceNotSetUp: "Nessun saldo personalizzato configurato. Aggiungine uno nelle impostazioni.",
 }
 
 export default itIT

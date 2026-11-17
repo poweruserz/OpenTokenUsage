@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { buildSettingsBackup, restoreSettingsBackup } from "@/lib/settings-backup"
+import { buildSettingsBackup, resetAllSettings, restoreSettingsBackup } from "@/lib/settings-backup"
 import { loadAlertSettings, loadProviderDetectionPending, loadThemeMode } from "@/lib/settings"
 
 const storeState = new Map<string, unknown>()
@@ -61,6 +61,31 @@ describe("settings backup", () => {
     expect(storeState.get("panelPosition")).toEqual({ x: 1, y: 2 })
   })
 
+  it("resets every preference but keeps the providers and the project budgets", async () => {
+    const plugins = { order: ["claude", "codex"], disabled: ["codex"] }
+    const budgets = { claude: { "C:/repo": 50 } }
+    storeState.set("plugins", plugins)
+    storeState.set("projectBudgets", budgets)
+    storeState.set("themeMode", "light")
+    storeState.set("navRight", true)
+    storeState.set("panelPosition", { x: 1, y: 2 })
+    storeState.set("taskbarStripStyle", { colorMode: "traffic", lineModes: { "claude-1a2b3c4d": "weekly" } })
+    storeState.set("lineLayouts", { "claude-1a2b3c4d": { hidden: ["x"] } })
+    storeState.set("alertSettings", { levels: [95], providerLevels: { "claude-1a2b3c4d": [50] }, customSoundName: "mine.wav" })
+    await resetAllSettings()
+    // An extra account's preferences go back to their defaults too; the sound file stays choosable.
+    expect(storeState.get("lineLayouts")).toEqual({})
+    expect(storeState.get("alertSettings")).toMatchObject({ providerLevels: {}, customSoundName: "mine.wav" })
+    expect(storeState.get("taskbarStripStyle")).toMatchObject({ lineModes: {} })
+    expect(storeState.get("plugins")).toEqual(plugins)
+    expect(storeState.get("projectBudgets")).toEqual(budgets)
+    expect(storeState.get("taskbarStripStyle")).toMatchObject({ colorMode: "off" })
+    expect(storeState.has("themeMode")).toBe(false)
+    expect(storeState.has("navRight")).toBe(false)
+    // Not a preference a backup carries: left alone.
+    expect(storeState.get("panelPosition")).toEqual({ x: 1, y: 2 })
+  })
+
   it("keeps this PC's sound when the backup's is a custom file it doesn't carry", async () => {
     await restoreSettingsBackup(backup({ alertSettings: { levels: [80], sound: "custom", customSoundName: "ding.mp3" } }))
     expect(await loadAlertSettings()).toMatchObject({ levels: [80], sound: "windows", customSoundName: null })
@@ -103,7 +128,8 @@ describe("settings backup", () => {
     // A backup that never changed these keeps this PC's cards in them too.
     await restoreSettingsBackup(backup({ themeMode: "light" }))
     expect(storeState.get("trayHiddenPlugins")).toEqual(["claude-1a2b3c4d"])
-    expect(storeState.get("taskbarStripStyle")).toMatchObject({ providers: null, lineModes: { "claude-1a2b3c4d": "weekly" } })
+    // ...and, from 0.8.6 or older (it saved no style), its usage colors.
+    expect(storeState.get("taskbarStripStyle")).toMatchObject({ providers: null, lineModes: { "claude-1a2b3c4d": "weekly" }, colorMode: "heat" })
   })
 
   it("keeps this PC's provider list and sound when the backup's values are damaged", async () => {

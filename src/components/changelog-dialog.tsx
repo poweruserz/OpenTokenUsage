@@ -1,5 +1,7 @@
-import { useEffect } from "react"
-import { Loader2, ChevronRight, ExternalLink as ExternalLinkIcon } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Loader2, ChevronRight, ExternalLink as ExternalLinkIcon, X } from "lucide-react"
+import { invoke, isTauri } from "@tauri-apps/api/core"
+import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useChangelog } from "@/hooks/use-changelog"
 import { Button } from "@/components/ui/button"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -7,8 +9,68 @@ import { getLocale, t } from "@/lib/i18n"
 
 interface ChangelogDialogProps {
   currentVersion: string
-  onBack: () => void
+  /** From About: a back button. Without it this is what's new after an update, with its video. */
+  onBack?: () => void
   onClose: () => void
+}
+
+/**
+ * Whether the panel's window is shown, asked from the OS every second while what's new is up: the
+ * webview of a panel hidden since start reports itself visible, and a show doesn't always bring focus.
+ */
+function usePanelShown(on: boolean) {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (!on || !isTauri()) return
+    const check = () => {
+      getCurrentWindow().isVisible().then(setShown, () => {})
+    }
+    check()
+    const id = window.setInterval(check, 1000)
+    return () => window.clearInterval(id)
+  }, [on])
+  return shown
+}
+
+/** The video the update shipped (`whats_new.rs`), held in memory only while the window is open. */
+function WhatsNewVideo({ panelOpen }: { panelOpen: boolean }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  // Often ready while the panel is still hidden after a start: it plays from the beginning once shown.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!src || !video || !panelOpen) return
+    video.currentTime = 0
+    void video.play().catch(() => {})
+  }, [src, panelOpen])
+  useEffect(() => {
+    let url: string | null = null
+    let cancelled = false
+    invoke<ArrayBuffer>("whats_new_video")
+      .then((bytes) => {
+        if (cancelled) return
+        url = URL.createObjectURL(new Blob([bytes], { type: "video/webm" }))
+        setSrc(url)
+      })
+      .catch(() => {}) // no video in this update: the notes alone
+    return () => {
+      cancelled = true
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [])
+  if (!src) return null
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      muted
+      loop
+      playsInline
+      controls
+      aria-label={t("whatsNew.video")}
+      className="w-full rounded-md border mb-4 bg-black"
+    />
+  )
 }
 
 function SimpleMarkdown({ content }: { content: string }) {
@@ -185,6 +247,15 @@ export function ChangelogDialog({ currentVersion, onBack, onClose }: ChangelogDi
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [onClose])
 
+  // What's new closes with the panel once it was shown.
+  const panelOpen = usePanelShown(!onBack)
+  const shownRef = useRef(false)
+  useEffect(() => {
+    if (onBack) return
+    if (panelOpen) shownRef.current = true
+    else if (shownRef.current) onClose()
+  }, [onBack, onClose, panelOpen])
+
   const currentRelease = releases.find(r => 
     r.tag_name === currentVersion || 
     r.tag_name === `v${currentVersion}` ||
@@ -193,19 +264,37 @@ export function ChangelogDialog({ currentVersion, onBack, onClose }: ChangelogDi
   )
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-popover rounded-lg border shadow-2xl flex flex-col w-[92%] h-[88%] animate-in fade-in zoom-in-95 duration-200">
+    <div data-panel-dialog className="absolute inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div
+        role="dialog"
+        aria-label={onBack ? t("changelog.title") : t("whatsNew.title")}
+        className="bg-popover rounded-lg border shadow-2xl flex flex-col w-[92%] h-[88%] animate-in fade-in zoom-in-95 duration-200"
+      >
         <div className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center gap-2">
-            <button
-              onClick={onBack}
-              className="p-1.5 hover:bg-accent rounded-md transition-colors text-muted-foreground hover:text-foreground"
-              title={t("changelog.back")}
-            >
-              <ChevronRight className="w-5 h-5 rotate-180" />
-            </button>
-            <h2 className="font-semibold text-sm">{t("changelog.title")}</h2>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="p-1.5 hover:bg-accent rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                title={t("changelog.back")}
+              >
+                <ChevronRight className="w-5 h-5 rotate-180" />
+              </button>
+            )}
+            <h2 className={onBack ? "font-semibold text-sm" : "font-semibold text-sm pl-1.5"}>
+              {onBack ? t("changelog.title") : t("whatsNew.title")}
+            </h2>
           </div>
+          {!onBack && (
+            <button
+              onClick={onClose}
+              className="p-1.5 hover:bg-accent rounded-md transition-colors text-muted-foreground hover:text-foreground"
+              title={t("whatsNew.close")}
+              aria-label={t("whatsNew.close")}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 overflow-x-hidden">
@@ -224,6 +313,7 @@ export function ChangelogDialog({ currentVersion, onBack, onClose }: ChangelogDi
             </div>
           ) : currentRelease ? (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {!onBack && <WhatsNewVideo panelOpen={panelOpen} />}
               <div className="flex items-baseline justify-between mb-4 border-b pb-4">
                 <div>
                   <h3 className="font-bold text-lg">{currentRelease.name || currentRelease.tag_name}</h3>

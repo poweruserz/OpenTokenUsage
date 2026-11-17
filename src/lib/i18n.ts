@@ -78,7 +78,11 @@ export function t(key: MessageKey, vars?: Vars): string {
 /** Plugin line labels ("Session", "Weekly", ...) come from manifests; translate the known ones. */
 export function tLabel(label: string): string {
   const key = `label.${label}` as MessageKey
-  return key in en ? t(key) : label
+  if (key in en) return t(key)
+  // One of several of a kind ("Balance 2") keeps its number.
+  const numbered = /^(.+) (\d+)$/.exec(label)
+  const base = numbered && (`label.${numbered[1]}` as MessageKey)
+  return base && base in en ? `${t(base)} ${numbered[2]}` : label
 }
 
 export function getLocale(): LanguageCode {

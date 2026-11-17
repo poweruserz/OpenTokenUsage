@@ -74,6 +74,8 @@ const deDE: PluginErrorMessages = {
   wslNotRunning: "WSL läuft nicht. Starten Sie WSL, um diese Karte zu aktualisieren.",
   cursorSecureStorageUnavailable: "Der sichere Speicher von Cursor ist nicht verfügbar.",
   cursorSecureStorageUnreadable: "Der sichere Speicher von Cursor konnte nicht gelesen werden.",
+
+  customBalanceNotSetUp: "Kein eigenes Guthaben eingerichtet. Fügen Sie eines in den Einstellungen hinzu.",
 }
 
 export default deDE

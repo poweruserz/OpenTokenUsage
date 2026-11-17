@@ -89,6 +89,432 @@ export const it: Messages = {
   "settings.tray.logoColors": "Loghi a colori",
   "settings.strip.title": "Striscia nella barra delle applicazioni (sperimentale)",
   "settings.strip.desc": "Loghi dei fornitori con utilizzo della sessione e settimanale sulla barra delle applicazioni.",
+
+  "settings.widgets.title": "Widget sul desktop",
+
+  "settings.widgets.desc": "Loghi dei fornitori con l'utilizzo di sessione e settimanale, dove vuoi sul desktop.",
+
+  "settings.stripLook.title": "Aspetto di striscia e widget",
+
+  "settings.stripLook.desc": "I fornitori, il carattere e i colori comuni alla striscia e ai widget.",
+
+  "settings.categories": "Categorie delle impostazioni",
+
+
+  "settings.configBroken": "Non salvato: ~/.openusage/config.json non è un JSON valido. Correggi o elimina il file, poi salva di nuovo.",
+
+
+  "settings.strip.desktopEdgeSide": "Bordo",
+
+
+  "settings.strip.desktopEdgeRight": "Destra",
+
+
+  "settings.strip.desktopEdgeLeft": "Sinistra",
+
+
+  "settings.strip.desktopEdgeTop": "Alto",
+
+
+  "settings.strip.desktopPinned": "Tieni aperta la barra al bordo dello schermo (anche con il suo pulsante puntina)",
+
+
+  "settings.strip.onlyWhileRunning": "Solo mentre è in esecuzione uno strumento IA",
+
+
+  "settings.strip.onlyWhileRunningHint": "La striscia si nasconde finché nessuna app o CLI dei suoi provider (Claude Code, Codex, …) è in esecuzione.",
+
+
+  "settings.strip.desktopSlide": "Fai scorrere dolcemente la barra al bordo dello schermo",
+
+
+  "settings.strip.desktopSlideMs": "Durata dello scorrimento",
+
+
+  "settings.strip.desktopGradient": "Sfumatura morbida sulla barra al bordo dello schermo",
+
+
+  "whatsNew.title": "Novità",
+
+
+  "whatsNew.close": "Chiudi",
+
+
+  "whatsNew.video": "Un breve video delle novità di questa versione",
+
+
+  "settings.whatsNew.title": "Novità",
+
+
+  "settings.whatsNew.label": "Mostra le novità dopo un aggiornamento",
+
+
+  "settings.whatsNew.hint": "Una volta, alla prima apertura del pannello dopo un aggiornamento: le note di rilascio e un breve video, se l'aggiornamento ne porta uno. Il video viene eliminato quando chiudi la finestra.",
+
+
+  "rate.perMinute": "{tokens}/min",
+
+
+  "settings.strip.tokenRate": "Token al minuto in tempo reale (Claude, Codex), anche nel suggerimento dell'area di notifica",
+
+
+  "settings.strip.desktopEdge": "Bordo dello schermo",
+
+
+  "settings.strip.desktopEdgeHint": "Agganciato a un bordo dello schermo (destra, sinistra o alto), quasi nascosto; scorre fuori sotto il puntatore.",
+
+
+  "settings.cards.tokscale": "Circa 30 strumenti in più tramite tokscale (Gemini CLI, Copilot, Kiro…)",
+
+
+  "settings.cards.tokscaleHint": "Avvia tokscale, open source, con bunx o npx (serve bun o Node.js), che scarica sé stesso e il suo listino prezzi. Legge i log locali di quegli strumenti al massimo ogni 30 minuti.",
+
+
+  "settings.balances.title": "Saldi personalizzati",
+
+
+  "settings.balances.desc": "New API, One API, Sub2API o un tuo endpoint: il loro saldo nella scheda Custom balances",
+
+
+  "settings.balances.name": "Nome",
+
+
+  "settings.balances.preset": "Tipo",
+
+
+  "settings.balances.custom": "Endpoint personalizzato",
+
+
+  "settings.balances.url": "Indirizzo",
+
+
+  "settings.balances.env": "Variabile d'ambiente con la chiave (OTU_…)",
+
+
+  "settings.balances.userId": "ID utente",
+
+
+  "settings.balances.path": "Percorso",
+
+
+  "settings.balances.remaining": "Saldo in",
+
+
+  "settings.balances.used": "Usato in",
+
+
+  "settings.balances.total": "Totale in",
+
+
+  "settings.balances.divisor": "Dividi per",
+
+
+  "settings.balances.currency": "Valuta",
+
+
+  "settings.balances.auth": "Intestazione della chiave",
+
+
+  "settings.balances.remove": "Rimuovi",
+
+
+  "settings.balances.add": "Aggiungi saldo",
+
+
+  "settings.balances.save": "Salva",
+
+
+  "settings.balances.saved": "Salvato. Attiva la scheda Custom balances per vederli.",
+
+
+  "settings.balances.invalid": "Non salvato: controlla l'indirizzo, il nome della variabile (OTU_ e poi A–Z, 0–9, _) e i percorsi.",
+
+
+  "settings.balances.hint": "La chiave non viene mai salvata: mettila in una variabile d'ambiente e inserisci il suo nome. I percorsi puntano dentro la risposta, ad esempio data.balance.",
+
+
+  "year.title": "Uso nell'anno",
+
+
+  "year.streak": "{days} giorni di fila",
+
+
+  "year.summary": "Serie più lunga {longest} giorni · {active} giorni attivi · {tokens} token",
+
+
+  "year.cell": "{date}: {tokens} token",
+
+
+  "settings.cards.yearHeatmap": "Un anno di uso giornaliero con le serie nelle pagine di Claude e Codex",
+
+
+  "settings.cards.keepUsage": "Conserva l'uso i cui log sono stati eliminati",
+
+
+  "settings.cards.keepUsageHint": "Claude Code elimina i suoi log dopo 30 giorni per impostazione predefinita. I token di ogni giorno restano nella cartella dati dell'app, così l'anno e l'esportazione li contano ancora.",
+
+
+  "settings.export.title": "Esportazione dell'uso",
+
+
+  "settings.export.desc": "Token giornalieri e ultimi limiti in CSV e JSON in Download",
+
+
+  "settings.export.now": "Esporta ora",
+
+
+  "settings.export.done": "Salvato: {path}",
+
+
+  "settings.export.failed": "Impossibile scrivere l'esportazione.",
+
+
+  "settings.export.daily": "Riscrivila una volta al giorno",
+
+
+  "card.sessions.cache": "cache {time}",
+
+
+  "card.sessions.cacheHint": "Tempo rimasto alla cache del prompt di questa sessione. Scaduto, il prompt successivo reinvia tutto il contesto e consuma più limite.",
+
+
+  "settings.cards.cacheTimer": "Tempo rimasto alla cache del prompt di una sessione Claude",
+
+
+  "settings.cards.contextFill": "Quanto è piena la finestra di contesto di ogni sessione",
+
+
+  "spend.planMultiple": "{name}: {times}× il suo piano",
+
+
+  "spend.planMultipleHint": "30 giorni ai prezzi API ({cost}) valgono {times} volte il prezzo mensile del piano ({price}).",
+
+
+  "settings.plans.title": "Abbonamenti",
+
+
+  "settings.plans.desc": "Il costo mensile di ogni piano, da confrontare con l'uso ai prezzi API",
+
+
+  "settings.plans.multiple": "Mostra nel riepilogo della spesa l'uso di ogni piano come multiplo del suo prezzo",
+
+
+  "settings.plans.price": "{name}: prezzo mensile",
+
+
+  "settings.claudeCode.retention": "Conserva i log di Claude Code per",
+
+
+  "settings.claudeCode.retentionDays": "{days} giorni",
+
+
+  "settings.claudeCode.retentionHint": "Claude Code elimina le trascrizioni più vecchie all'avvio. Griglia oraria, progetti e spesa si leggono da queste.",
+
+
+  "settings.alerts.refills": "Quando un limite si ricarica prima del reset (un credito di reset o una ricarica parziale)",
+
+
+  "settings.alerts.refillPoints": "Di almeno",
+
+
+  "settings.alerts.points": "{points} punti",
+
+
+  "settings.strip.followDetail": "In dettaglio: ogni limite con il tempo al reset",
+
+
+  "settings.strip.activityDots": "Punto sul logo mentre il suo agente lavora (blu) o ti aspetta (giallo)",
+
+
+  "settings.strip.desktopClickThroughKey": "Tieni premuto questo tasto per cliccare o trascinare",
+
+
+  "settings.cards.title": "Sulle schede",
+
+
+  "settings.cards.desc": "Cosa mostra la panoramica oltre ai limiti",
+
+
+  "settings.cards.liveSessions": "Sessioni attive di Claude Code e Codex sulle loro schede",
+
+
+  "settings.cards.spend": "Riepilogo della spesa sotto le schede",
+
+
+  "settings.cards.spendTools": "Conta anche i registri di questi strumenti",
+
+
+  "alert.refill.title": "{provider}: {label} ricaricato in anticipo",
+
+
+  "alert.refill.body": "Il {percent}% è di nuovo disponibile.",
+
+
+  "settings.strip.followActive": "Segui l'app attiva",
+
+
+  "settings.strip.followActiveHint": "Lo strumento di IA della finestra che stai usando va per primo.",
+
+
+  "settings.strip.desktopClickThrough": "Lascia passare i clic alla finestra dietro",
+
+
+  "spend.title": "Spesa",
+
+
+  "spend.today": "Oggi",
+
+
+  "spend.yesterday": "Ieri",
+
+
+  "spend.month": "30 giorni",
+
+
+  "spend.cost": "Costo",
+
+
+  "spend.tokens": "Token",
+
+
+  "spend.models": "Modelli, ultimi 30 giorni (per token)",
+
+
+  "settings.strip.desktopCycle": "A turno",
+
+
+  "settings.strip.desktopCycleHint": "Un solo widget che mostra ogni provider per 8 secondi",
+
+
+  "settings.theme.halloween": "Halloween",
+
+
+  "settings.theme.glass": "Vetro",
+
+
+  "settings.theme.glassHint": "Sfoca il desktop dietro il pannello (Windows 11)",
+
+
+  "label.Installed models": "Modelli installati",
+
+
+  "label.Loaded now": "Caricati ora",
+
+
+  "label.Vouchers": "Voucher",
+
+
+  "label.Cash": "Contanti",
+
+
+  "label.Requests today": "Richieste oggi",
+
+
+  "label.Requests this month": "Richieste questo mese",
+
+
+  "label.Models": "Modelli",
+
+
+  "label.Token Plan usage": "Utilizzo Token Plan",
+
+
+  "card.customize": "Personalizza le righe",
+
+
+  "card.customizeHint": "Trascina le righe per ordinarle e nascondi quelle che non servono. Ctrl+Z annulla, Esc chiude.",
+
+
+  "card.customizeMove": "Sposta {row}",
+
+
+  "card.customizeShow": "Mostra {row}",
+
+
+  "card.customizeHide": "Nascondi {row}",
+
+
+  "card.customizeReset": "Torna all'impostazione predefinita",
+
+
+  "card.customizeDone": "Fine",
+
+
+  "weekDays.capacity": "Con il mix di modelli di questa settimana, l'intero limite vale circa {tokens} token, pari a {cost} ai prezzi API.",
+
+
+  "weekDays.capacityTokens": "Con il mix di modelli di questa settimana, l'intero limite vale circa {tokens} token.",
+
+
+  "card.copyImage": "Copia come immagine",
+
+
+  "card.imageCopied": "Copiato negli appunti",
+
+
+  "card.imageCopyFailed": "Impossibile copiare l'immagine",
+
+
+  "settings.privacy.title": "Privacy",
+
+
+  "settings.privacy.hideWhenSharing": "Nascondi durante la condivisione dello schermo",
+
+
+  "settings.privacy.hideWhenSharingHint": "Il pannello e i widget sul desktop non compaiono mai nelle condivisioni dello schermo, nelle registrazioni o negli screenshot; tu continui a vederli. Windows non avvisa le app quando lo schermo è condiviso, quindi i numeri nell'area di notifica e la striscia nella barra delle applicazioni si nascondono solo mentre presenti o qualcuno controlla questo PC da remoto.",
+
+
+  "settings.backup.reset": "Ripristina tutte le impostazioni",
+
+
+  "settings.backup.resetHint": "Tutte le preferenze tornano ai valori predefiniti. Fornitori, account e budget dei progetti restano. L'app si riavvia.",
+
+
+  "settings.backup.resetConfirm": "Ripristina e riavvia",
+
+
+  "settings.backup.resetCancel": "Annulla",
+
+
+  "settings.backup.resetError": "Impossibile ripristinare le impostazioni.",
+
+
+  "settings.proxy.title": "Proxy",
+
+
+  "settings.proxy.desc": "Invia le richieste a fornitori, pagine di stato e aggiornamenti tramite un server proxy.",
+
+
+  "settings.proxy.enable": "Usa un proxy",
+
+
+  "settings.proxy.url": "Indirizzo del proxy",
+
+
+  "settings.proxy.save": "Salva",
+
+
+  "settings.proxy.saved": "Salvato; vale dalla prossima richiesta.",
+
+
+  "settings.proxy.invalid": "Non è un indirizzo proxy. Usa http://, https://, socks5:// o socks5h:// con un host, per esempio http://127.0.0.1:8080.",
+
+
+  "settings.proxy.error": "Impossibile salvare il proxy.",
+
+
+  "card.showUsed": "Mostra l'usato",
+
+
+  "card.showLeft": "Mostra il rimanente",
+
+  "settings.category.usage": "Utilizzo",
+
+  "settings.category.taskbar": "Barra delle applicazioni e desktop",
+
+  "settings.category.appearance": "Aspetto",
+
+  "settings.category.app": "App",
   "settings.strip.position": "Posizione",
   "settings.strip.positionLeft": "Sinistra",
   "settings.strip.positionRight": "Destra",
@@ -134,6 +560,8 @@ export const it: Messages = {
   "settings.strip.colorTraffic": "Semaforo (verde → giallo → rosso)",
   "settings.strip.colorCool": "Freddo (blu → viola → rosso)",
   "settings.strip.colorMono": "Semplice, rosso solo vicino al limite",
+
+  "settings.strip.colorPace": "In base al ritmo",
   "settings.strip.colorThresholds": "Soglie personalizzate",
   "settings.strip.colorOff": "Disattivato",
   "settings.strip.drag": "Trascina {name}",
@@ -146,6 +574,23 @@ export const it: Messages = {
   "settings.strip.criticalAt": "Critico da",
   "settings.strip.usageColorsHint": "In base alla quota del limite già usata.",
   "settings.strip.reset": "Ripristina l'aspetto",
+  "settings.strip.desktop": "Mostra sul desktop",
+  "settings.strip.desktopHint": "Widget da trascinare dove vuoi; un clic apre il pannello e con il puntatore sopra vedi quando si ripristinano i limiti. Un valore che sale lampeggia, poi resta per un minuto nel colore principale. Si nascondono quando un'app a schermo intero è in primo piano. I fornitori e l'aspetto qui sotto valgono anche per loro.",
+  "settings.strip.desktopLayout": "Widget",
+  "settings.strip.desktopRow": "Affiancati",
+
+  "settings.strip.desktopColumn": "In colonna",
+  "settings.strip.desktopSeparate": "Separati",
+  "settings.strip.desktopPlate": "Opacità dello sfondo",
+  "settings.strip.desktopLogo": "Loghi",
+  "settings.strip.desktopLogoBrand": "Colori",
+  "settings.strip.desktopLogoWhite": "Bianco",
+  "settings.strip.desktopLogoBlack": "Nero",
+  "settings.strip.desktopOnTop": "Sempre in primo piano",
+  "settings.strip.desktopSnap": "Aggancia ai bordi dello schermo e tra loro",
+  "settings.strip.desktopLocked": "Blocca la posizione (trasparente sotto il puntatore)",
+
+  "settings.strip.desktopBars": "Barre sotto i numeri",
   "settings.tray.perProviderHint": "Se un'icona finisce sotto ^, attivala nelle impostazioni della barra delle applicazioni per tenerla accanto all'orologio.",
   "settings.tray.openTaskbarSettings": "Apri impostazioni della barra delle applicazioni",
   "settings.tray.provider": "Provider",
@@ -157,7 +602,7 @@ export const it: Messages = {
   "settings.tray.auto": "Automatico",
   "settings.tray.tightest": "Più utilizzato",
   "settings.theme.title": "Tema",
-  "settings.theme.desc": "Scuro (nero puro) o chiaro",
+  "settings.theme.desc": "Scuro (nero puro), chiaro o Halloween",
   "settings.theme.light": "Chiaro",
   "settings.theme.dark": "Scuro",
   "settings.theme.darkHint": "Nero puro, ideale per gli schermi OLED",
@@ -189,6 +634,9 @@ export const it: Messages = {
   "settings.panel.desc": "Dove si apre il pannello. La puntina nella barra del titolo lo tiene sopra le altre finestre.",
   "settings.panel.remember": "Ricorda la posizione",
   "settings.panel.rememberHint": "Trascina il pannello dalla barra del titolo: la prossima volta si aprirà nello stesso punto invece che sopra la barra delle applicazioni.",
+  "settings.panel.navSide": "Barra dei fornitori",
+  "settings.panel.navLeft": "Sinistra",
+  "settings.panel.navRight": "Destra",
   "settings.alerts.levels": "Notifica al",
   "settings.alerts.ticksHint": "Le barre segnano ogni livello con una tacca.",
   "settings.alerts.perProvider": "Per provider",

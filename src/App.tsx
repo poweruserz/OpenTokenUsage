@@ -11,7 +11,7 @@ import { useSettingsPluginList } from "@/hooks/app/use-settings-plugin-list"
 import { useSettingsSystemActions } from "@/hooks/app/use-settings-system-actions"
 import { useSettingsTheme } from "@/hooks/app/use-settings-theme"
 import { useTrayIcon } from "@/hooks/app/use-tray-icon"
-import { REFRESH_COOLDOWN_MS, getEnabledPluginIds, savePluginSettings } from "@/lib/settings"
+import { REFRESH_COOLDOWN_MS, getEnabledPluginIds, loadCardFeatures, loadLineLayouts, loadPlanPrices, savePluginSettings } from "@/lib/settings"
 import { listen } from "@tauri-apps/api/event"
 import type { PluginsChange } from "@/lib/accounts"
 import { type PluginContextAction } from "@/components/side-nav"
@@ -28,6 +28,13 @@ import { useUsageSpikeAlerts } from "@/hooks/app/use-usage-spike-alerts"
 import { useLoginRecovery } from "@/hooks/app/use-login-recovery"
 import { useProviderTrayIcons } from "@/hooks/app/use-provider-tray-icons"
 import { useTaskbarStrip } from "@/hooks/app/use-taskbar-strip"
+import { useCapturePrivacy } from "@/hooks/app/use-capture-privacy"
+import { useGlass } from "@/hooks/app/use-glass"
+import { useAgentActivity, useForegroundProvider, useRunningTools, useTokenRates } from "@/hooks/app/use-agent-activity"
+import { stripPluginSettings, stripToolRunning } from "@/lib/taskbar-strip"
+import { useDesktopWidgets } from "@/hooks/app/use-desktop-widgets"
+import { useTodaySpend } from "@/components/spend-summary"
+import { useDailyUsageExport, useUsageArchive } from "@/hooks/app/use-usage-archive"
 
 const TRAY_PROBE_DEBOUNCE_MS = 500
 const TRAY_SETTINGS_DEBOUNCE_MS = 2000
@@ -87,6 +94,9 @@ function App() {
     setTaskbarStrip,
     taskbarStripStyle,
     setTaskbarStripStyle,
+    desktopWidgets,
+    setDesktopWidgets,
+    setNavRight,
     resetTimerDisplayMode,
     setResetTimerDisplayMode,
     setTimeFormatMode,
@@ -123,6 +133,9 @@ function App() {
       setTrayLogoColors: state.setTrayLogoColors,
       setPaceWorkdays: state.setPaceWorkdays,
       setTaskbarStrip: state.setTaskbarStrip,
+      desktopWidgets: state.desktopWidgets,
+      setDesktopWidgets: state.setDesktopWidgets,
+      setNavRight: state.setNavRight,
       resetTimerDisplayMode: state.resetTimerDisplayMode,
       setResetTimerDisplayMode: state.setResetTimerDisplayMode,
       setTimeFormatMode: state.setTimeFormatMode,
@@ -165,6 +178,8 @@ function App() {
   const enabledIds = useMemo(() => (pluginSettings ? getEnabledPluginIds(pluginSettings) : []), [pluginSettings])
   useProjectBudgetAlerts({ pluginsMeta, enabledIds, enabled: usageAlerts, settings: alertSettings })
   useUsageSpikeAlerts({ pluginsMeta, enabledIds, enabled: usageAlerts, settings: alertSettings })
+  useUsageArchive(enabledIds)
+  useDailyUsageExport()
   useStoredDetailSections()
   useLoginRecovery({
     pluginStates,
@@ -177,17 +192,41 @@ function App() {
     startBatch,
   })
 
+  // Each card's Customize layout (row order, hidden rows): the overview needs it from the start.
+  const setLineLayouts = useAppPreferencesStore((state) => state.setLineLayouts)
+  useEffect(() => {
+    loadLineLayouts()
+      .then(setLineLayouts)
+      .catch((error) => console.error("Failed to load card layouts:", error))
+  }, [setLineLayouts])
+
+  // Live sessions and the spend summary (Settings → Usage → On the cards).
+  const setCardFeatures = useAppPreferencesStore((state) => state.setCardFeatures)
+  const setPlanPrices = useAppPreferencesStore((state) => state.setPlanPrices)
+  useEffect(() => {
+    loadCardFeatures()
+      .then(setCardFeatures)
+      .catch((error) => console.error("Failed to load card features:", error))
+    loadPlanPrices()
+      .then(setPlanPrices)
+      .catch((error) => console.error("Failed to load plan prices:", error))
+  }, [setCardFeatures, setPlanPrices])
+
+  // While the user presents (with "Hide from screen sharing" on), the tray and the strip show no numbers.
+  const sharing = useCapturePrivacy()
+  const shownMenubarIconStyle = sharing ? "icon" : menubarIconStyle
   const { scheduleTrayIconUpdate, traySettingsPreview } = useTrayIcon({
     pluginsMeta,
     pluginSettings: trayPluginSettings,
     pluginStates,
     displayMode,
-    menubarIconStyle,
+    menubarIconStyle: shownMenubarIconStyle,
     trayProvider,
     trayMetric,
     trayPercentColor,
     themeMode,
     activeView,
+    sharing,
   })
 
   const redrawAppTrayIcon = useCallback(() => scheduleTrayIconUpdate("settings", 0), [scheduleTrayIconUpdate])
@@ -196,15 +235,27 @@ function App() {
     pluginSettings: trayPluginSettings,
     pluginStates,
     displayMode,
-    style: menubarIconStyle,
+    style: shownMenubarIconStyle,
     trayMetric,
     themeMode,
     logoColors: trayLogoColors,
     onAppIconShown: redrawAppTrayIcon,
   })
 
+  const stripShown = taskbarStrip && !sharing
+  const agentActivity = useAgentActivity(taskbarStripStyle.activityDots && (stripShown || desktopWidgets.enabled))
+  const followed = useForegroundProvider(taskbarStripStyle.followActive && (stripShown || desktopWidgets.enabled))
+  // Its switch shows only while the strip or the widgets do: off with them, no logs are read for it.
+  const tokenRates = useTokenRates(taskbarStripStyle.tokenRate && (stripShown || desktopWidgets.enabled))
+  const runningTools = useRunningTools(stripShown && taskbarStripStyle.onlyWhileRunning)
+  const stripIdle =
+    runningTools !== null &&
+    pluginSettings !== null &&
+    // The same cards the strip draws, the followed tool's included.
+    !stripToolRunning(runningTools, stripPluginSettings(taskbarStripStyle.providers, pluginSettings, followed).order)
+
   useTaskbarStrip({
-    enabled: taskbarStrip,
+    enabled: stripShown,
     pluginsMeta,
     pluginSettings,
     pluginStates,
@@ -212,6 +263,10 @@ function App() {
     logoColors: trayLogoColors,
     style: taskbarStripStyle,
     themeMode,
+    activity: agentActivity,
+    focus: followed,
+    rates: tokenRates,
+    hidden: stripIdle,
   })
 
   useEffect(() => {
@@ -219,6 +274,12 @@ function App() {
       scheduleTrayIconUpdate("probe", TRAY_PROBE_DEBOUNCE_MS)
     }
   }, [scheduleTrayIconUpdate])
+
+  // The tray's hover text carries the live rate: draw it again when a rate changes or the rates go
+  // (the store empties when they're turned off).
+  useEffect(() => {
+    scheduleTrayIconUpdate("settings", TRAY_PROBE_DEBOUNCE_MS)
+  }, [tokenRates, scheduleTrayIconUpdate])
 
   const { detectProviders } = useProviderDetection({
     pluginSettings,
@@ -248,6 +309,8 @@ function App() {
     setPaceWorkdays,
     setTaskbarStrip,
     setTaskbarStripStyle,
+    setNavRight,
+    setDesktopWidgets,
     setResetTimerDisplayMode,
     setTimeFormatMode,
     setGlobalShortcut,
@@ -259,6 +322,7 @@ function App() {
   })
 
   useSettingsTheme(themeMode)
+  useGlass()
 
   const {
     handleThemeModeChange,
@@ -339,6 +403,22 @@ function App() {
     pluginSettings,
     pluginsMeta,
     pluginStates,
+  })
+
+  const todaySpend = useTodaySpend(displayPlugins, desktopWidgets.enabled && desktopWidgets.layout === "edge")
+  useDesktopWidgets({
+    settings: desktopWidgets,
+    pluginsMeta,
+    pluginSettings,
+    pluginStates,
+    displayMode,
+    style: taskbarStripStyle,
+    themeMode,
+    activity: agentActivity,
+    focus: followed,
+    rates: tokenRates,
+    today: todaySpend,
+    onRefresh: handleRefreshAll,
   })
 
   const pluginSettingsRef = useRef(pluginSettings)

@@ -139,6 +139,23 @@ const FIXTURES: [string, PluginErrorKey][] = [
   // zai
   ["API key invalid. Check your Z.ai API key.", "apiKeyInvalid"],
   ["No ZAI_API_KEY found. Set up environment variable first.", "envKeyNotFound"],
+  // ollama
+  ["Ollama not installed. Install Ollama to get started.", "notInstalled"],
+  ["Start Ollama or run `ollama serve` and try again.", "startAppOrRun"],
+  // kimi-api
+  ["No MOONSHOT_API_KEY found. Set up environment variable first.", "envKeyNotFound"],
+  ["API key invalid. Check your Kimi API key.", "apiKeyInvalid"],
+  // codebuff
+  ["Codebuff not logged in. Run `codebuff login`.", "productNotLoggedInRun"],
+  ["Codebuff auth expired. Run `codebuff login` again.", "productAuthExpiredRun"],
+  ["API key invalid. Check your Codebuff API key.", "apiKeyInvalid"],
+  // kilo
+  ["No KILO_API_KEY found. Set up environment variable first.", "envKeyNotFound"],
+  ["API key invalid or expired. Check your Kilo API key.", "apiKeyInvalidOrExpired"],
+  // qwen-code
+  ["Qwen Code not installed. Install Qwen Code to get started.", "notInstalled"],
+  // custom-balance
+  ["No custom balance set up. Add one in Settings.", "customBalanceNotSetUp"],
   // host (runtime.rs, lib.rs) and app (use-probe-*.ts)
   ["Probe crashed", "probeCrashed"],
   ["probe timed out after 15s", "probeTimedOut"],

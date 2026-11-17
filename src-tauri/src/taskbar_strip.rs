@@ -14,6 +14,7 @@
 use std::sync::{Mutex, OnceLock};
 use tauri::AppHandle;
 
+pub mod desktop;
 mod placement;
 #[cfg(windows)]
 mod uia;
@@ -128,10 +129,15 @@ static APP: OnceLock<AppHandle> = OnceLock::new();
 const MAX_STRIP_SIZE: (u32, u32) = (4096, 512);
 
 fn to_pixels(image: StripImage) -> Result<Pixels, String> {
+    to_pixels_within(image, MAX_STRIP_SIZE)
+}
+
+/// An image at most `max` px wide and tall (desktop widgets take taller ones than the strip).
+fn to_pixels_within(image: StripImage, max: (u32, u32)) -> Result<Pixels, String> {
     if !DPI_RANGE.contains(&image.dpi) {
         return Err("strip dpi out of range".into());
     }
-    let mut data = crate::tray::decode_rgba(&image.rgba, image.width, image.height, MAX_STRIP_SIZE)
+    let mut data = crate::tray::decode_rgba(&image.rgba, image.width, image.height, max)
         .map_err(|e| format!("strip {e}"))?;
     for px in data.chunks_exact_mut(4) {
         let alpha = px[3] as u32;
@@ -325,7 +331,7 @@ mod win {
     /// Only a fallback now: the clock's buttons come from UI Automation when it can see them.
     const SECONDARY_CLOCK_WIDTH: i32 = 88;
 
-    fn wide(text: &str) -> Vec<u16> {
+    pub(super) fn wide(text: &str) -> Vec<u16> {
         text.encode_utf16().chain(Some(0)).collect()
     }
 
@@ -392,7 +398,7 @@ mod win {
         }
     }
 
-    fn monitor_dpi(monitor: HMONITOR) -> u32 {
+    pub(super) fn monitor_dpi(monitor: HMONITOR) -> u32 {
         let (mut x, mut y) = (0u32, 0u32);
         let ok = unsafe { GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut x, &mut y) } == 0;
         if ok && super::DPI_RANGE.contains(&x) {
@@ -802,7 +808,7 @@ mod win {
         }
     }
 
-    fn draw(hwnd: HWND, pixels: &super::Pixels) {
+    pub(super) fn draw(hwnd: HWND, pixels: &super::Pixels) {
         unsafe {
             static WARNED: AtomicBool = AtomicBool::new(false);
             let screen = GetDC(null_mut());
@@ -973,7 +979,9 @@ mod tests {
     fn lists_this_pcs_monitors() {
         let monitors = list_taskbar_monitors();
         println!("{monitors:#?}");
-        assert!(monitors.iter().any(|monitor| monitor.primary && monitor.has_taskbar));
+        assert!(monitors
+            .iter()
+            .any(|monitor| monitor.primary && monitor.has_taskbar));
     }
 
     #[test]

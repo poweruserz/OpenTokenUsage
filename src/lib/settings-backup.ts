@@ -3,20 +3,30 @@ import { backupStore, DEFAULT_ALERT_SETTINGS, DEFAULT_TASKBAR_STRIP_STYLE, norma
 
 /**
  * The preferences a settings backup carries (store keys). Left out: accounts and logins (never in
- * this store), the panel's position, sent-notification keys, and update and star-prompt state,
+ * this store), the panel's and desktop widgets' positions, sent-notification keys, and update and star-prompt state,
  * which belong to one machine or one moment. A new preference key belongs here too.
  */
 export const BACKUP_KEYS = [
   "alertSettings",
   "autoUpdateInterval",
+  "capturePrivacy",
+  "cardFeatures",
   "collapsedSections",
   "currency",
+  "desktopWidgets",
+  // Saved with collapsedSections: without it, a restored list looks older than "year" and closes it.
+  "detailSectionsSeen",
   "displayMode",
+  "glass",
   "globalShortcut",
   "language",
+  "lineLayouts",
   "menubarIconStyle",
+  "navRight",
   "paceWorkdays",
   "panelPinned",
+  "panelWidth",
+  "planPrices",
   "plugins",
   "projectBudgets",
   "rememberPanelPosition",
@@ -32,6 +42,7 @@ export const BACKUP_KEYS = [
   "trayPercentColor",
   "trayProvider",
   "usageAlerts",
+  "whatsNewAfterUpdate",
 ] as const
 
 const BACKUP_APP = "OpenTokenUsage"
@@ -122,9 +133,14 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
     case "trayHiddenPlugins":
       return mergeCardList(has ? imported : [], local)
     case "projectBudgets":
+    case "planPrices":
+    case "lineLayouts":
       return mergeCardMap(has ? imported : {}, local)
     case "taskbarStripStyle": {
-      const base = has && Object.keys(asObject(imported)).length > 0 ? asObject(imported) : DEFAULT_TASKBAR_STRIP_STYLE
+      // 0.9.1 and later always save a style (`loadTaskbarStripStyle`): one without came from 0.8.6 or
+      // older, whose default colored by usage.
+      const base =
+        has && Object.keys(asObject(imported)).length > 0 ? asObject(imported) : { ...DEFAULT_TASKBAR_STRIP_STYLE, colorMode: "heat" }
       const localStyle = asObject(local)
       return {
         ...base,
@@ -143,6 +159,21 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
 }
 
 /**
+ * Every preference back to its default (Settings → Reset all settings): restores a backup that holds
+ * only this PC's providers (which cards are on, in what order) and project budgets, so those and
+ * everything a backup never touches (accounts, logins, this PC's sound file) stay.
+ */
+export async function resetAllSettings(): Promise<void> {
+  // The style's default as a new install has it (usage colors off), not an old backup's.
+  const kept: Record<string, unknown> = { taskbarStripStyle: DEFAULT_TASKBAR_STRIP_STYLE }
+  for (const key of ["plugins", "projectBudgets"] as const) {
+    const value = await backupStore.get(key)
+    if (value !== undefined) kept[key] = value
+  }
+  await restore(kept, true)
+}
+
+/**
  * Makes this PC's preferences the backup's: keys the backup has are written (each loader checks
  * its value when the app starts again); keys it lacks were at their default there and are removed
  * here, so they go back to it. Everything is worked out before the first write.
@@ -150,10 +181,20 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
 export async function restoreSettingsBackup(text: string): Promise<RestoreResult> {
   const settings = backupSettings(text)
   if (!settings) return { ok: false, reason: "notBackup" }
+  await restore(settings, false)
+  return { ok: true }
+}
+
+/** `reset`: this PC's extra-account preferences go back to their defaults too, not kept as an import keeps them. */
+async function restore(settings: Record<string, unknown>, reset: boolean): Promise<void> {
   const writes: [string, unknown][] = []
   for (const key of BACKUP_KEYS) {
     const has = Object.prototype.hasOwnProperty.call(settings, key)
-    const value = restoredValue(key, has, settings[key], await backupStore.get(key))
+    let local = await backupStore.get(key)
+    // The providers and budgets a reset keeps are this PC's own already; the sound file stays choosable.
+    if (reset && key === "alertSettings") local = { ...asObject(local), providerLevels: {} }
+    else if (reset && key !== "plugins" && key !== "projectBudgets") local = undefined
+    const value = restoredValue(key, has, settings[key], local)
     if (value !== KEEP) writes.push([key, value])
   }
   for (const [key, value] of writes) {
@@ -163,5 +204,4 @@ export async function restoreSettingsBackup(text: string): Promise<RestoreResult
     if (key === "plugins") await backupStore.delete(PROVIDER_DETECTION_KEY)
   }
   await backupStore.save()
-  return { ok: true }
 }

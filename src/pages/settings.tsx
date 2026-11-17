@@ -15,12 +15,29 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Eye, EyeOff, GripVertical, Play } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  AppWindow,
+  Bell,
+  Blocks,
+  Eye,
+  EyeOff,
+  Gauge,
+  GripVertical,
+  Palette,
+  PanelBottom,
+  Play,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
+import { PrivacySection } from "@/components/privacy-section";
+import { GlassToggle } from "@/components/glass-toggle";
+import { ProxySection } from "@/components/proxy-section";
 import { TaskbarStripSection } from "@/components/taskbar-strip-section";
 import { SegmentedControl, SettingsSection } from "@/components/settings-section";
 import { audioFileToWav, CUSTOM_SOUND_MAX_MB, CUSTOM_SOUND_MAX_SECONDS, SoundFileTooLargeError } from "@/lib/alert-sound";
@@ -28,8 +45,16 @@ import { getBarFillLayout, getTrayIconSizePx } from "@/lib/tray-bars-icon";
 import { bytesToBase64 } from "@/lib/tray-provider-icons";
 import { TRAY_PACE_COLOR } from "@/lib/tray-primary-progress";
 import { CURRENCIES, normalizeCurrency, type CurrencySetting } from "@/lib/currency";
+import { parseAmount } from "@/lib/project-budgets";
 import {
   ALERT_SOUNDS,
+  REFILL_POINTS,
+  refillAlertPoints,
+  saveCardFeatures,
+  savePlanPrices,
+  SPEND_TOOLS,
+  type CardFeatures,
+  type PlanPrices,
   AUTO_UPDATE_OPTIONS,
   DEFAULT_TRAY_PERCENT_COLOR,
   DISPLAY_MODE_OPTIONS,
@@ -41,6 +66,9 @@ import {
   saveLanguage,
   savePaceWorkdays,
   saveRememberPanelPosition,
+  saveNavRight,
+  loadWhatsNew,
+  saveWhatsNew,
   saveTrayHiddenPlugins,
   saveTrayLogoColors,
   saveTaskbarStrip,
@@ -55,6 +83,7 @@ import {
   type GlobalShortcut,
   type MenubarIconStyle,
   type ResetTimerDisplayMode,
+  type SettingOption,
   type ThemeMode,
   type TimeFormatMode,
 } from "@/lib/settings";
@@ -66,6 +95,7 @@ import { cn } from "@/lib/utils";
 import type { AccountsChange } from "@/lib/accounts";
 import { AccountsSection } from "@/components/accounts-section";
 import { ClaudeCodeSection } from "@/components/claude-code-section";
+import { CustomBalancesSection } from "@/components/custom-balances-section";
 import { useAppPreferencesStore } from "@/stores/app-preferences-store";
 
 interface PluginConfig {
@@ -80,6 +110,24 @@ const PREVIEW_BAR_TRACK_PX = 20;
 
 // Sample time for the time-format and absolute-reset examples.
 const EXAMPLE_TIME = new Date(2026, 1, 2, 11, 4);
+
+/** Settings in groups, like Windows Settings: one list on the left, the chosen group's cards on the right. */
+const SETTINGS_CATEGORIES = [
+  { id: "usage", labelKey: "settings.category.usage", Icon: Gauge },
+  { id: "providers", labelKey: "settings.plugins.title", Icon: Blocks },
+  { id: "notifications", labelKey: "settings.alerts.title", Icon: Bell },
+  { id: "taskbar", labelKey: "settings.category.taskbar", Icon: PanelBottom },
+  { id: "appearance", labelKey: "settings.category.appearance", Icon: Palette },
+  { id: "app", labelKey: "settings.category.app", Icon: AppWindow },
+] as const satisfies readonly { id: string; labelKey: string; Icon: LucideIcon }[];
+
+/** A WinUI NavigationView item, as in the side nav: accent pill and fill on the chosen one. */
+const CATEGORY_TAB = cn(
+  "relative flex min-h-9 w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-left text-[13px] leading-4 outline-none transition-colors",
+  "text-muted-foreground hover:bg-accent active:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
+  "data-active:bg-accent data-active:text-foreground data-active:before:absolute data-active:before:left-0 data-active:before:top-1/2",
+  "data-active:before:h-4 data-active:before:w-[3px] data-active:before:-translate-y-1/2 data-active:before:rounded-full data-active:before:bg-primary"
+);
 
 function getPreviewBarLayout(fraction: number): { fillPercent: number; remainderPercent: number } {
   const { fillW, remainderDrawW } = getBarFillLayout(PREVIEW_BAR_TRACK_PX, fraction);
@@ -507,6 +555,33 @@ function AlertOptions({ plugins }: { plugins: PluginConfig[] }) {
       </label>
 
       <div>
+        <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+          <Checkbox
+            className="mt-0.5"
+            checked={settings.refills !== false}
+            onCheckedChange={(checked) => update({ ...settings, refills: checked === true })}
+          />
+          {t("settings.alerts.refills")}
+        </label>
+        {settings.refills !== false && (
+          <label className="ml-6 mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            {t("settings.alerts.refillPoints")}
+            <select
+              value={refillAlertPoints(settings) ?? REFILL_POINTS[1]}
+              onChange={(e) => update({ ...settings, refillPoints: Number(e.target.value) })}
+              className="fluent-control w-28"
+            >
+              {REFILL_POINTS.map((points) => (
+                <option key={points} value={points}>
+                  {t("settings.alerts.points", { points })}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
+      <div>
         <label className="mb-1 block text-xs text-muted-foreground" htmlFor="alert-sound">
           {t("settings.alerts.sound")}
         </label>
@@ -564,9 +639,20 @@ function AlertOptions({ plugins }: { plugins: PluginConfig[] }) {
   );
 }
 
+const NAV_SIDE_OPTIONS: SettingOption<"left" | "right">[] = [
+  { value: "left", labelKey: "settings.panel.navLeft" },
+  { value: "right", labelKey: "settings.panel.navRight" },
+];
+
 function PanelSection() {
   const remember = useAppPreferencesStore((state) => state.rememberPanelPosition);
   const setRemember = useAppPreferencesStore((state) => state.setRememberPanelPosition);
+  const navRight = useAppPreferencesStore((state) => state.navRight);
+  const setNavRight = useAppPreferencesStore((state) => state.setNavRight);
+  const setNavSide = (side: "left" | "right") => {
+    setNavRight(side === "right");
+    void saveNavRight(side === "right").catch((error) => console.error("Failed to save the nav side:", error));
+  };
   const toggle = async (next: boolean) => {
     setRemember(next);
     try {
@@ -591,6 +677,257 @@ function PanelSection() {
           <span className="block text-xs text-muted-foreground">{t("settings.panel.rememberHint")}</span>
         </span>
       </label>
+      <div className="mt-3">
+        <div className="text-xs text-muted-foreground mb-1">{t("settings.panel.navSide")}</div>
+        <SegmentedControl
+          options={NAV_SIDE_OPTIONS}
+          value={navRight ? "right" : "left"}
+          onChange={setNavSide}
+          ariaLabel={t("settings.panel.navSide")}
+        />
+      </div>
+    </SettingsSection>
+  );
+}
+
+/** Live sessions on the Claude/Codex cards, and the spend summary under the cards with the other tools it counts. */
+function CardFeaturesSection() {
+  const features = useAppPreferencesStore((state) => state.cardFeatures);
+  const setFeatures = useAppPreferencesStore((state) => state.setCardFeatures);
+  const update = (patch: Partial<CardFeatures>) => {
+    const next = { ...features, ...patch };
+    setFeatures(next);
+    void saveCardFeatures(next).catch((error) => console.error("Failed to save card features:", error));
+  };
+  const toggleTool = (id: string, on: boolean) =>
+    update({ spendToolsOff: on ? features.spendToolsOff.filter((off) => off !== id) : [...features.spendToolsOff, id] });
+  return (
+    <SettingsSection title={t("settings.cards.title")} description={t("settings.cards.desc")}>
+      <div className="space-y-2">
+        <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+          <Checkbox
+            key={`live-sessions-${features.liveSessions}`}
+            checked={features.liveSessions}
+            className="mt-0.5"
+            onCheckedChange={(checked) => update({ liveSessions: checked === true })}
+          />
+          {t("settings.cards.liveSessions")}
+        </label>
+        {features.liveSessions && (
+          <div className="ml-6 space-y-1.5">
+            <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+              <Checkbox
+                key={`cache-timer-${features.cacheTimer}`}
+                checked={features.cacheTimer}
+                className="mt-0.5"
+                onCheckedChange={(checked) => update({ cacheTimer: checked === true })}
+              />
+              {t("settings.cards.cacheTimer")}
+            </label>
+            <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+              <Checkbox
+                key={`context-fill-${features.contextFill}`}
+                checked={features.contextFill}
+                className="mt-0.5"
+                onCheckedChange={(checked) => update({ contextFill: checked === true })}
+              />
+              {t("settings.cards.contextFill")}
+            </label>
+          </div>
+        )}
+        <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+          <Checkbox
+            key={`spend-${features.spend}`}
+            checked={features.spend}
+            className="mt-0.5"
+            onCheckedChange={(checked) => update({ spend: checked === true })}
+          />
+          {t("settings.cards.spend")}
+        </label>
+        {features.spend && (
+          <div className="ml-6">
+            <div className="mb-1 text-xs text-muted-foreground">{t("settings.cards.spendTools")}</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              {SPEND_TOOLS.map((tool) => {
+                const on = !features.spendToolsOff.includes(tool.id);
+                return (
+                  <label key={tool.id} className="flex items-center gap-2 text-[13px] select-none text-foreground">
+                    <Checkbox key={`${tool.id}-${on}`} checked={on} onCheckedChange={(checked) => toggleTool(tool.id, checked === true)} />
+                    {tool.name}
+                  </label>
+                );
+              })}
+            </div>
+            <label className="mt-1.5 flex items-start gap-2 text-[13px] select-none text-foreground">
+              <Checkbox
+                key={`tokscale-${features.tokscale}`}
+                checked={features.tokscale}
+                className="mt-0.5"
+                onCheckedChange={(checked) => update({ tokscale: checked === true })}
+              />
+              <span>
+                {t("settings.cards.tokscale")}
+                <span className="block text-xs text-muted-foreground">{t("settings.cards.tokscaleHint")}</span>
+              </span>
+            </label>
+          </div>
+        )}
+        <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+          <Checkbox
+            key={`year-${features.yearHeatmap}`}
+            checked={features.yearHeatmap}
+            className="mt-0.5"
+            onCheckedChange={(checked) => update({ yearHeatmap: checked === true })}
+          />
+          {t("settings.cards.yearHeatmap")}
+        </label>
+        <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+          <Checkbox
+            key={`keep-usage-${features.keepUsage}`}
+            checked={features.keepUsage}
+            className="mt-0.5"
+            onCheckedChange={(checked) => update({ keepUsage: checked === true })}
+          />
+          <span>
+            {t("settings.cards.keepUsage")}
+            <span className="block text-xs text-muted-foreground">{t("settings.cards.keepUsageHint")}</span>
+          </span>
+        </label>
+      </div>
+    </SettingsSection>
+  );
+}
+
+/** What's new after an update (`use-whats-new.ts`), read once at start, so its state lives here. */
+function WhatsNewSection() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    loadWhatsNew().then(setOn, () => setOn(true));
+  }, []);
+  if (on === null) return null;
+  return (
+    <SettingsSection title={t("settings.whatsNew.title")}>
+      <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+        <Checkbox
+          key={String(on)}
+          checked={on}
+          className="mt-0.5"
+          onCheckedChange={(checked) => {
+            setOn(checked === true);
+            void saveWhatsNew(checked === true).catch((error) => console.error("Failed to save what's new:", error));
+          }}
+        />
+        <span>
+          {t("settings.whatsNew.label")}
+          <span className="block text-xs text-muted-foreground">{t("settings.whatsNew.hint")}</span>
+        </span>
+      </label>
+    </SettingsSection>
+  );
+}
+
+/** Usage as CSV + JSON in Downloads (`usage_export.rs`): now, or quietly once a day. */
+function UsageExportSection() {
+  const features = useAppPreferencesStore((state) => state.cardFeatures);
+  const setFeatures = useAppPreferencesStore((state) => state.setCardFeatures);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const exportNow = async () => {
+    setBusy(true);
+    try {
+      const path = await invoke<string>("export_usage", {
+        utcOffsetMinutes: -new Date().getTimezoneOffset(),
+        keep: features.keepUsage,
+        reveal: true,
+      });
+      setResult({ ok: true, text: t("settings.export.done", { path }) });
+    } catch (error) {
+      console.error("Failed to export usage:", error);
+      setResult({ ok: false, text: t("settings.export.failed") });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <SettingsSection title={t("settings.export.title")} description={t("settings.export.desc")}>
+      <button type="button" disabled={busy} onClick={() => void exportNow()} className="fluent-control px-3 disabled:opacity-50">
+        {t("settings.export.now")}
+      </button>
+      {result && <p className={cn("mt-1.5 break-all text-xs", result.ok ? "text-muted-foreground" : "text-destructive")}>{result.text}</p>}
+      <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
+        <Checkbox
+          key={`auto-export-${features.autoExport}`}
+          checked={features.autoExport}
+          className="mt-0.5"
+          onCheckedChange={(checked) => {
+            const next = { ...features, autoExport: checked === true };
+            setFeatures(next);
+            void saveCardFeatures(next).catch((error) => console.error("Failed to save card features:", error));
+          }}
+        />
+        {t("settings.export.daily")}
+      </label>
+    </SettingsSection>
+  );
+}
+
+/** What each enabled card's plan costs a month, typed in the app's currency and kept in US dollars. */
+function SubscriptionsSection({ plugins }: { plugins: PluginConfig[] }) {
+  const prices = useAppPreferencesStore((state) => state.planPrices);
+  const setPrices = useAppPreferencesStore((state) => state.setPlanPrices);
+  const features = useAppPreferencesStore((state) => state.cardFeatures);
+  const setFeatures = useAppPreferencesStore((state) => state.setCardFeatures);
+  const currency = useAppPreferencesStore((state) => state.currency);
+  const locale = useLocaleStore((state) => state.locale);
+  const save = (next: PlanPrices) => {
+    setPrices(next);
+    void savePlanPrices(next).catch((error) => console.error("Failed to save plan prices:", error));
+  };
+  const commit = (id: string, text: string) => {
+    const amount = parseAmount(text, locale);
+    const { [id]: _old, ...rest } = prices;
+    save(amount && amount > 0 ? { ...rest, [id]: amount / currency.rate } : rest);
+  };
+  const shown = (usd: number | undefined) =>
+    usd == null ? "" : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(usd * currency.rate);
+  return (
+    <SettingsSection title={t("settings.plans.title")} description={t("settings.plans.desc")}>
+      <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+        <Checkbox
+          key={`plan-multiple-${features.planMultiple}`}
+          checked={features.planMultiple}
+          className="mt-0.5"
+          onCheckedChange={(checked) => {
+            const next = { ...features, planMultiple: checked === true };
+            setFeatures(next);
+            void saveCardFeatures(next).catch((error) => console.error("Failed to save card features:", error));
+          }}
+        />
+        {t("settings.plans.multiple")}
+      </label>
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+        {plugins
+          .filter((plugin) => plugin.enabled)
+          .map((plugin) => (
+            <label key={plugin.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate text-foreground">{plugin.name}</span>
+              <input
+                // Keyed by the stored value, so a currency or language change shows the new number.
+                key={`${plugin.id}-${prices[plugin.id] ?? ""}-${currency.code}-${currency.rate}-${locale}`}
+                defaultValue={shown(prices[plugin.id])}
+                inputMode="decimal"
+                placeholder="—"
+                aria-label={t("settings.plans.price", { name: plugin.name })}
+                onBlur={(e) => commit(plugin.id, e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                className="fluent-control w-20 text-right tabular-nums"
+              />
+              <span className="w-8 shrink-0">{currency.code}</span>
+            </label>
+          ))}
+      </div>
     </SettingsSection>
   );
 }
@@ -716,6 +1053,7 @@ export function SettingsPage({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   // Enabled providers first (stable sort keeps the user's order inside each group); dragging works
   // on this list, so a reorder saves the grouped order.
@@ -732,211 +1070,255 @@ export function SettingsPage({
   };
 
   return (
-    <div className="py-2 space-y-1">
-      <SettingsSection title={t("settings.autoRefresh.title")} description={t("settings.autoRefresh.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.autoRefresh.title")}
-          options={AUTO_UPDATE_OPTIONS}
-          value={autoUpdateInterval}
-          onChange={onAutoUpdateIntervalChange}
-        />
-        {autoUpdateInterval === "smart" && (
-          <p className="mt-2 text-xs text-muted-foreground">{t("settings.autoRefresh.smartHint")}</p>
-        )}
-      </SettingsSection>
+    // The wider settings view (SETTINGS_PANEL_WIDTH): the groups on the left, the chosen one's cards in a column.
+    <Tabs
+      ref={tabsRef}
+      orientation="vertical"
+      defaultValue="usage"
+      // A long group may have been scrolled: start the next one at its top.
+      onValueChange={() => tabsRef.current?.scrollIntoView?.({ block: "start" })}
+      className="items-start py-2"
+    >
+      <TabsPrimitive.List aria-label={t("settings.categories")} className="sticky top-2 flex w-44 shrink-0 flex-col gap-0.5">
+        {SETTINGS_CATEGORIES.map(({ id, labelKey, Icon }) => (
+          <TabsPrimitive.Tab key={id} value={id} className={CATEGORY_TAB}>
+            <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+            {t(labelKey)}
+          </TabsPrimitive.Tab>
+        ))}
+      </TabsPrimitive.List>
 
-      <SettingsSection title={t("settings.usageMode.title")} description={t("settings.usageMode.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.usageMode.title")}
-          options={DISPLAY_MODE_OPTIONS}
-          value={displayMode}
-          onChange={onDisplayModeChange}
-        />
-        <PaceWorkdaysToggle />
-      </SettingsSection>
-
-      <CurrencySection />
-
-      <SettingsSection title={t("settings.resetTimers.title")} description={t("settings.resetTimers.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.resetTimers.title")}
-          options={RESET_TIMER_DISPLAY_OPTIONS}
-          value={resetTimerDisplayMode}
-          onChange={onResetTimerDisplayModeChange}
-          itemClassName="h-auto py-1"
-          renderOption={(option, isActive) => (
-            <OptionWithExample
-              label={t(option.labelKey)}
-              isActive={isActive}
-              example={
-                option.value === "relative"
-                  ? t("duration.hm", { h: 5, m: 12 })
-                  : t("settings.resetTimers.todayAt", { time: getTimeFormatter(timeFormatMode).format(EXAMPLE_TIME) })
-              }
-            />
-          )}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.timeFormat.title")} description={t("settings.timeFormat.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.timeFormat.title")}
-          options={TIME_FORMAT_OPTIONS}
-          value={timeFormatMode}
-          onChange={onTimeFormatModeChange}
-          itemClassName="h-auto py-1"
-          renderOption={(option, isActive) => (
-            <OptionWithExample
-              label={t(option.labelKey)}
-              isActive={isActive}
-              example={getTimeFormatter(option.value).format(EXAMPLE_TIME)}
-            />
-          )}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.tray.title")} description={t("settings.tray.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.tray.title")}
-          options={MENUBAR_ICON_STYLE_OPTIONS}
-          value={menubarIconStyle}
-          onChange={handleMenubarIconStyleChange}
-          itemClassName="h-9 flex items-center justify-center"
-          renderOption={(option) => (
-            <TrayIconStylePreview style={option.value} traySettingsPreview={traySettingsPreview} />
-          )}
-        />
-        {menubarIconStyle !== "icon" && (
-          <div className="flex gap-2 mt-2">
-            {!isPerProviderTrayStyle(menubarIconStyle) && (
-            <label className="flex-1 text-xs text-muted-foreground">
-              <span className="mb-1 block">{t("settings.tray.provider")}</span>
-              <select
-                aria-label={t("settings.tray.provider")}
-                value={trayProvider}
-                onChange={(e) => onTrayProviderChange(e.target.value)}
-                className="fluent-control w-full"
-              >
-                <option value="auto">{t("settings.tray.auto")}</option>
-                <option value="tightest">{t("settings.tray.tightest")}</option>
-                {plugins.filter((p) => p.enabled).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </label>
-            )}
-            <label className="flex-1 text-xs text-muted-foreground">
-              <span className="mb-1 block">{t("settings.tray.metric")}</span>
-              <select
-                aria-label={t("settings.tray.metric")}
-                value={trayMetric}
-                onChange={(e) => onTrayMetricChange(e.target.value)}
-                className="fluent-control w-full"
-              >
-                <option value="auto">{t("settings.tray.auto")}</option>
-                <option value="Session">{t("label.Session")}</option>
-                <option value="Weekly">{t("label.Weekly")}</option>
-              </select>
-            </label>
-            {menubarIconStyle === "percent" && trayPercentColor !== TRAY_PACE_COLOR && (
-              <label className="w-14 text-xs text-muted-foreground">
-                <span className="mb-1 block">{t("settings.tray.color")}</span>
-                <input
-                  type="color"
-                  value={trayPercentColor}
-                  onChange={(e) => onTrayPercentColorChange(e.target.value)}
-                  className="fluent-control w-full cursor-pointer px-1"
-                  title={t("settings.tray.colorTitle")}
-                />
-              </label>
-            )}
-          </div>
-        )}
-        {menubarIconStyle === "percent" && (
-          <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
-            <Checkbox
-              key={`tray-pace-color-${trayPercentColor === TRAY_PACE_COLOR}`}
-              checked={trayPercentColor === TRAY_PACE_COLOR}
-              className="mt-0.5"
-              onCheckedChange={(checked) =>
-                onTrayPercentColorChange(checked === true ? TRAY_PACE_COLOR : DEFAULT_TRAY_PERCENT_COLOR)
-              }
-            />
-            <span>
-              {t("settings.tray.paceColor")}
-              <span className="block text-xs text-muted-foreground">{t("settings.tray.paceColorHint")}</span>
-            </span>
-          </label>
-        )}
-        {menubarIconStyle === "logos" && <TrayLogoColorsToggle />}
-        {isPerProviderTrayStyle(menubarIconStyle) && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t("settings.tray.perProviderHint")}{" "}
-            <button
-              type="button"
-              className="text-primary underline-offset-2 hover:underline"
-              onClick={() => invoke("open_taskbar_settings").catch((e) => console.error("open_taskbar_settings failed:", e))}
-            >
-              {t("settings.tray.openTaskbarSettings")}
-            </button>
-          </p>
-        )}
-      </SettingsSection>
-
-      <TaskbarStripSection onMenubarIconStyleChange={onMenubarIconStyleChange} />
-
-      <SettingsSection title={t("settings.theme.title")} description={t("settings.theme.desc")}>
-        <SegmentedControl
-          ariaLabel={t("settings.theme.title")}
-          options={THEME_OPTIONS}
-          value={themeMode}
-          onChange={onThemeModeChange}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t("settings.plugins.title")} description={t("settings.plugins.desc")}>
-        <div className="-mx-1">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={sortedPlugins.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-              {sortedPlugins.map((plugin) => (
-                <SortablePluginItem
-                  key={plugin.id}
-                  plugin={plugin}
-                  onToggle={onToggle}
-                  inTray={!trayHiddenPlugins.includes(plugin.id)}
-                  onToggleTray={handleToggleTray}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-      </SettingsSection>
-
-      <AccountsSection onAccountsChanged={onAccountsChanged} />
-
-      <ClaudeCodeSection />
-
-      <LanguageSection />
-
-      <GlobalShortcutSection globalShortcut={globalShortcut} onGlobalShortcutChange={onGlobalShortcutChange} />
-
-      <PanelSection />
-
-      <NotificationsSection plugins={plugins} />
-
-      <SettingsSection title={t("settings.startOnLogin.title")} description={t("settings.startOnLogin.desc")}>
-        <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
-          <Checkbox
-            key={`start-on-login-${startOnLogin}`}
-            checked={startOnLogin}
-            onCheckedChange={(checked) => onStartOnLoginChange(checked === true)}
+      <TabsContent value="usage" className="min-w-0 space-y-1">
+        <SettingsSection title={t("settings.autoRefresh.title")} description={t("settings.autoRefresh.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.autoRefresh.title")}
+            options={AUTO_UPDATE_OPTIONS}
+            value={autoUpdateInterval}
+            onChange={onAutoUpdateIntervalChange}
           />
-          {t("settings.startOnLogin.label")}
-        </label>
-      </SettingsSection>
+          {autoUpdateInterval === "smart" && (
+            <p className="mt-2 text-xs text-muted-foreground">{t("settings.autoRefresh.smartHint")}</p>
+          )}
+        </SettingsSection>
 
-      <SettingsBackupSection />
-    </div>
+        <SettingsSection title={t("settings.usageMode.title")} description={t("settings.usageMode.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.usageMode.title")}
+            options={DISPLAY_MODE_OPTIONS}
+            value={displayMode}
+            onChange={onDisplayModeChange}
+          />
+          <PaceWorkdaysToggle />
+        </SettingsSection>
+
+        <CurrencySection />
+
+        <CardFeaturesSection />
+
+        <SubscriptionsSection plugins={plugins} />
+
+        <SettingsSection title={t("settings.resetTimers.title")} description={t("settings.resetTimers.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.resetTimers.title")}
+            options={RESET_TIMER_DISPLAY_OPTIONS}
+            value={resetTimerDisplayMode}
+            onChange={onResetTimerDisplayModeChange}
+            itemClassName="h-auto py-1"
+            renderOption={(option, isActive) => (
+              <OptionWithExample
+                label={t(option.labelKey)}
+                isActive={isActive}
+                example={
+                  option.value === "relative"
+                    ? t("duration.hm", { h: 5, m: 12 })
+                    : t("settings.resetTimers.todayAt", { time: getTimeFormatter(timeFormatMode).format(EXAMPLE_TIME) })
+                }
+              />
+            )}
+          />
+        </SettingsSection>
+
+        <SettingsSection title={t("settings.timeFormat.title")} description={t("settings.timeFormat.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.timeFormat.title")}
+            options={TIME_FORMAT_OPTIONS}
+            value={timeFormatMode}
+            onChange={onTimeFormatModeChange}
+            itemClassName="h-auto py-1"
+            renderOption={(option, isActive) => (
+              <OptionWithExample
+                label={t(option.labelKey)}
+                isActive={isActive}
+                example={getTimeFormatter(option.value).format(EXAMPLE_TIME)}
+              />
+            )}
+          />
+        </SettingsSection>
+      </TabsContent>
+
+      <TabsContent value="taskbar" className="min-w-0 space-y-1">
+        <SettingsSection title={t("settings.tray.title")} description={t("settings.tray.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.tray.title")}
+            options={MENUBAR_ICON_STYLE_OPTIONS}
+            value={menubarIconStyle}
+            onChange={handleMenubarIconStyleChange}
+            itemClassName="h-9 flex items-center justify-center"
+            renderOption={(option) => (
+              <TrayIconStylePreview style={option.value} traySettingsPreview={traySettingsPreview} />
+            )}
+          />
+          {menubarIconStyle !== "icon" && (
+            <div className="flex gap-2 mt-2">
+              {!isPerProviderTrayStyle(menubarIconStyle) && (
+              <label className="flex-1 text-xs text-muted-foreground">
+                <span className="mb-1 block">{t("settings.tray.provider")}</span>
+                <select
+                  aria-label={t("settings.tray.provider")}
+                  value={trayProvider}
+                  onChange={(e) => onTrayProviderChange(e.target.value)}
+                  className="fluent-control w-full"
+                >
+                  <option value="auto">{t("settings.tray.auto")}</option>
+                  <option value="tightest">{t("settings.tray.tightest")}</option>
+                  {plugins.filter((p) => p.enabled).map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </label>
+              )}
+              <label className="flex-1 text-xs text-muted-foreground">
+                <span className="mb-1 block">{t("settings.tray.metric")}</span>
+                <select
+                  aria-label={t("settings.tray.metric")}
+                  value={trayMetric}
+                  onChange={(e) => onTrayMetricChange(e.target.value)}
+                  className="fluent-control w-full"
+                >
+                  <option value="auto">{t("settings.tray.auto")}</option>
+                  <option value="Session">{t("label.Session")}</option>
+                  <option value="Weekly">{t("label.Weekly")}</option>
+                </select>
+              </label>
+              {menubarIconStyle === "percent" && trayPercentColor !== TRAY_PACE_COLOR && (
+                <label className="w-14 text-xs text-muted-foreground">
+                  <span className="mb-1 block">{t("settings.tray.color")}</span>
+                  <input
+                    type="color"
+                    value={trayPercentColor}
+                    onChange={(e) => onTrayPercentColorChange(e.target.value)}
+                    className="fluent-control w-full cursor-pointer px-1"
+                    title={t("settings.tray.colorTitle")}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+          {menubarIconStyle === "percent" && (
+            <label className="mt-2 flex items-start gap-2 text-[13px] select-none text-foreground">
+              <Checkbox
+                key={`tray-pace-color-${trayPercentColor === TRAY_PACE_COLOR}`}
+                checked={trayPercentColor === TRAY_PACE_COLOR}
+                className="mt-0.5"
+                onCheckedChange={(checked) =>
+                  onTrayPercentColorChange(checked === true ? TRAY_PACE_COLOR : DEFAULT_TRAY_PERCENT_COLOR)
+                }
+              />
+              <span>
+                {t("settings.tray.paceColor")}
+                <span className="block text-xs text-muted-foreground">{t("settings.tray.paceColorHint")}</span>
+              </span>
+            </label>
+          )}
+          {menubarIconStyle === "logos" && <TrayLogoColorsToggle />}
+          {isPerProviderTrayStyle(menubarIconStyle) && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("settings.tray.perProviderHint")}{" "}
+              <button
+                type="button"
+                className="text-primary underline-offset-2 hover:underline"
+                onClick={() => invoke("open_taskbar_settings").catch((e) => console.error("open_taskbar_settings failed:", e))}
+              >
+                {t("settings.tray.openTaskbarSettings")}
+              </button>
+            </p>
+          )}
+        </SettingsSection>
+
+        <TaskbarStripSection onMenubarIconStyleChange={onMenubarIconStyleChange} />
+      </TabsContent>
+
+      <TabsContent value="appearance" className="min-w-0 space-y-1">
+        <SettingsSection title={t("settings.theme.title")} description={t("settings.theme.desc")}>
+          <SegmentedControl
+            ariaLabel={t("settings.theme.title")}
+            options={THEME_OPTIONS}
+            value={themeMode}
+            onChange={onThemeModeChange}
+          />
+          <GlassToggle />
+        </SettingsSection>
+
+        <PanelSection />
+      </TabsContent>
+
+      <TabsContent value="providers" className="min-w-0 space-y-1">
+        <SettingsSection title={t("settings.plugins.title")} description={t("settings.plugins.desc")}>
+          <div className="-mx-1">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sortedPlugins.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                {sortedPlugins.map((plugin) => (
+                  <SortablePluginItem
+                    key={plugin.id}
+                    plugin={plugin}
+                    onToggle={onToggle}
+                    inTray={!trayHiddenPlugins.includes(plugin.id)}
+                    onToggleTray={handleToggleTray}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+        </SettingsSection>
+
+        <AccountsSection onAccountsChanged={onAccountsChanged} />
+
+        <CustomBalancesSection />
+
+        <ClaudeCodeSection />
+      </TabsContent>
+
+      <TabsContent value="notifications" className="min-w-0 space-y-1">
+        <NotificationsSection plugins={plugins} />
+      </TabsContent>
+
+      <TabsContent value="app" className="min-w-0 space-y-1">
+        <LanguageSection />
+
+        <GlobalShortcutSection globalShortcut={globalShortcut} onGlobalShortcutChange={onGlobalShortcutChange} />
+
+        <ProxySection />
+
+        <PrivacySection />
+
+        <SettingsSection title={t("settings.startOnLogin.title")} description={t("settings.startOnLogin.desc")}>
+          <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
+            <Checkbox
+              key={`start-on-login-${startOnLogin}`}
+              checked={startOnLogin}
+              onCheckedChange={(checked) => onStartOnLoginChange(checked === true)}
+            />
+            {t("settings.startOnLogin.label")}
+          </label>
+        </SettingsSection>
+
+        <WhatsNewSection />
+
+        <UsageExportSection />
+
+        <SettingsBackupSection />
+      </TabsContent>
+    </Tabs>
   );
 }
 

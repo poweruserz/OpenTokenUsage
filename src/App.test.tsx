@@ -274,12 +274,16 @@ import { App } from "@/App"
 
 /** Checkbox of the last provider row in Settings > Providers. */
 async function lastProviderCheckbox() {
-  const section = (await screen.findByText("Providers")).closest("section")!
+  // The card's heading, not the settings group (tab) of the same name.
+  const section = (await screen.findByRole("heading", { name: "Providers" })).closest("section")!
   return within(section).getAllByRole("checkbox").at(-1)!
 }
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 import { useAppUiStore } from "@/stores/app-ui-store"
+
+/** Settings come in groups, one shown at a time: open the one a test needs. */
+const openSettingsCategory = async (name: string) => userEvent.click(await screen.findByRole("tab", { name }))
 
 describe("App", () => {
   beforeEach(() => {
@@ -421,6 +425,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Appearance")
 
     // Light
     await userEvent.click(await screen.findByRole("radio", { name: "Light" }))
@@ -750,6 +755,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Taskbar & desktop")
 
     expect(screen.getByText("Tray icon")).toBeVisible()
     const barsRadio = await screen.findByRole("radio", { name: "Bars" })
@@ -767,6 +773,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Taskbar & desktop")
 
     expect(screen.getByText("Tray icon")).toBeVisible()
     const percentRadio = await screen.findByRole("radio", { name: "Percent" })
@@ -857,6 +864,7 @@ describe("App", () => {
 
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Taskbar & desktop")
 
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Metric" }), "Weekly")
     expect(state.saveTrayMetricMock).toHaveBeenCalledWith("Weekly")
@@ -919,6 +927,7 @@ describe("App", () => {
 
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Taskbar & desktop")
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Metric" }), "Weekly")
 
     // Cursor has no weekly line -> falls back to its primary, so the list is mixed
@@ -948,6 +957,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Taskbar & desktop")
     expect(screen.queryByText("Bar Icon")).not.toBeInTheDocument()
     expect(screen.queryByText("Show percentage")).not.toBeInTheDocument()
   })
@@ -981,6 +991,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Providers")
     // Re-query before each click: the Checkbox remounts on each toggle because
     // its key includes plugin.enabled, so the reference goes stale after click 1.
     await userEvent.click(await lastProviderCheckbox())
@@ -1012,6 +1023,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
     await userEvent.click(await screen.findByText("Start on login"))
     expect(state.saveStartOnLoginMock).toHaveBeenCalledWith(true)
   })
@@ -1033,6 +1045,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
     await userEvent.click(await screen.findByText("Start on login"))
 
     await waitFor(() =>
@@ -1064,6 +1077,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
     await userEvent.click(await screen.findByText("Start on login"))
 
     await waitFor(() =>
@@ -1113,6 +1127,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Appearance")
     await userEvent.click(await screen.findByRole("radio", { name: "Light" }))
     await waitFor(() => expect(errorSpy).toHaveBeenCalled())
     errorSpy.mockRestore()
@@ -1125,6 +1140,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Taskbar & desktop")
     await userEvent.click(await screen.findByRole("radio", { name: "Bars" }))
 
     await waitFor(() =>
@@ -1330,6 +1346,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Providers")
     await userEvent.click(await lastProviderCheckbox())
     await waitFor(() => expect(state.startBatchMock).toHaveBeenCalled())
     expect(errorSpy).toHaveBeenCalled()
@@ -1341,6 +1358,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Providers")
     await userEvent.click(await lastProviderCheckbox())
     await waitFor(() => expect(state.startBatchMock).toHaveBeenCalledWith(["b"]))
   })
@@ -1392,6 +1410,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Providers")
     dndState.latestOnDragEnd?.({ active: { id: "a" }, over: { id: "b" } })
     await waitFor(() => expect(errorSpy).toHaveBeenCalled())
     errorSpy.mockRestore()
@@ -1401,6 +1420,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Providers")
     dndState.latestOnDragEnd?.({ active: { id: "a" }, over: { id: "b" } })
     expect(state.savePluginSettingsMock).toHaveBeenCalled()
   })
@@ -1490,6 +1510,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("Providers")
 
     // Toggle then reorder quickly (within debounce window) to force timer replacement.
     const checkboxes = await screen.findAllByRole("checkbox")
@@ -1845,6 +1866,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
 
     // The shortcut should be displayed
     await screen.findByText(/Ctrl \+ Shift \+ U/i)
@@ -1868,6 +1890,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
 
     // The shortcut should be displayed (formatted version)
     await screen.findByText(/Ctrl \+ Shift \+ O/i)
@@ -1879,6 +1902,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
 
     // Should show the placeholder text (appears twice: as main text and as hint)
     const placeholders = await screen.findAllByText(/Click to set/i)
@@ -1906,6 +1930,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
 
     // Clear the shortcut to trigger save
     const clearButton = await screen.findByRole("button", { name: /clear shortcut/i })
@@ -1937,6 +1962,7 @@ describe("App", () => {
     render(<App />)
     const settingsButtons = await screen.findAllByRole("button", { name: "Settings" })
     await userEvent.click(settingsButtons[0])
+    await openSettingsCategory("App")
 
     // Clear the shortcut to trigger invoke
     const clearButton = await screen.findByRole("button", { name: /clear shortcut/i })

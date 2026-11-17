@@ -1,23 +1,32 @@
 mod accounts;
 mod alert_sound;
 mod autostart;
+mod capture_privacy;
 mod claude_sessions;
 mod claude_statusline;
+mod clipboard_image;
 mod config;
 mod data_dirs;
+mod foreground;
 mod local_http_api;
+mod local_spend;
 mod log_path;
 mod login_stamp;
 mod panel;
 mod plugin_engine;
+mod processes;
 mod provider_status;
 mod settings_backup;
 mod setup_actions;
 mod taskbar_strip;
+mod tokscale;
 mod tray;
+mod usage_archive;
+mod usage_export;
 mod usage_heatmap;
 mod usage_projects;
 mod usage_spikes;
+mod whats_new;
 mod window_style;
 mod wsl;
 
@@ -183,6 +192,26 @@ fn reanchor_window(app_handle: tauri::AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         tray::anchor_panel(&window);
     }
+}
+
+/// The panel from `from_width` to `width` logical px: an edge drag (`ResizeEdge`, `keep_right` set) within the
+/// bounds `normalizePanelWidth` keeps, or into or out of the settings view (760 px, `SETTINGS_PANEL_WIDTH`).
+#[tauri::command]
+fn resize_panel(
+    app_handle: tauri::AppHandle,
+    from_width: f64,
+    width: f64,
+    keep_right: Option<bool>,
+) -> Result<(), String> {
+    use tauri::Manager;
+    let bounds = 400.0..=760.0;
+    if !bounds.contains(&width) || !bounds.contains(&from_width) {
+        return Err("invalid width".into());
+    }
+    if let Some(window) = app_handle.get_webview_window("main") {
+        tray::resize_panel(&window, from_width, width, keep_right);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -591,6 +620,7 @@ pub fn run() {
             show_panel,
             hide_panel,
             reanchor_window,
+            resize_panel,
             open_devtools,
             start_probe_batch,
             list_plugins,
@@ -598,6 +628,7 @@ pub fn run() {
             get_log_path,
             update_global_shortcut,
             window_style::get_window_backdrop,
+            window_style::set_window_glass,
             window_style::get_accent_color,
             window_style::get_taskbar_is_light,
             tray::set_tray_menu_labels,
@@ -606,6 +637,16 @@ pub fn run() {
             setup_actions::open_env_editor,
             setup_actions::open_taskbar_settings,
             taskbar_strip::set_taskbar_strip,
+            taskbar_strip::desktop::set_desktop_widgets,
+            config::get_proxy_setting,
+            config::set_proxy_setting,
+            config::get_custom_balances,
+            config::set_custom_balances,
+            tokscale::tokscale_spend,
+            whats_new::whats_new_video,
+            whats_new::forget_whats_new_video,
+            capture_privacy::set_capture_privacy,
+            clipboard_image::copy_image_to_clipboard,
             taskbar_strip::list_taskbar_monitors,
             taskbar_strip::taskbar_icons_left,
             autostart::autostart_stale,
@@ -616,8 +657,17 @@ pub fn run() {
             login_stamp::login_file_stamp,
             claude_statusline::claude_statusline_state,
             claude_statusline::set_claude_statusline,
-            claude_sessions::claude_sessions,
+            claude_statusline::claude_log_retention,
+            claude_statusline::set_claude_log_retention,
+            claude_sessions::live_sessions,
+            claude_sessions::agent_activity,
+            foreground::set_follow_foreground,
+            foreground::running_ai_tools,
+            local_spend::local_spend,
             usage_heatmap::usage_heatmap,
+            usage_archive::usage_year,
+            usage_archive::token_rates,
+            usage_export::export_usage,
             usage_projects::usage_projects,
             usage_projects::export_projects_csv,
             usage_projects::usage_by_day,
@@ -648,8 +698,8 @@ pub fn run() {
                 log::info!("data folder migration: {line}");
             }
 
-            // Load config early (lazy init via OnceLock, zero-cost after)
-            let _proxy = config::get_resolved_proxy();
+            // Read the proxy now, so its log line lands at startup.
+            let _proxy = config::resolved_proxy();
 
             let app_data_dir = app.path().app_data_dir().expect("no app data dir");
             plugin_engine::http_gate::init(&app_data_dir);

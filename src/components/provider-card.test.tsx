@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { ProviderCard } from "@/components/provider-card"
 import { groupLinesByType } from "@/lib/group-lines-by-type"
+import type { MetricLine } from "@/lib/plugin-types"
 import { formatResetTooltipText } from "@/lib/reset-tooltip"
 import { DEFAULT_ALERT_SETTINGS, REFRESH_COOLDOWN_MS } from "@/lib/settings"
 import { useAppPreferencesStore } from "@/stores/app-preferences-store"
@@ -487,6 +488,52 @@ describe("ProviderCard", () => {
     fireEvent.click(resetButton)
     expect(onToggle).toHaveBeenCalledTimes(1)
     vi.useRealTimers()
+  })
+
+  it("hides a row in Customize, steps back with Ctrl+Z, and keeps the layout after Done", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    useAppPreferencesStore.setState({ lineLayouts: {} })
+    const lines: MetricLine[] = [
+      { type: "progress", label: "Session", used: 40, limit: 100, format: { kind: "percent" } },
+      { type: "progress", label: "Weekly", used: 10, limit: 100, format: { kind: "percent" } },
+    ]
+    render(
+      <ProviderCard
+        name="Custom"
+        pluginId="claude"
+        displayMode="used"
+        scopeFilter="overview"
+        skeletonLines={[
+          { type: "progress", label: "Session", scope: "overview" },
+          { type: "progress", label: "Weekly", scope: "overview" },
+        ]}
+        lines={lines}
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: "Customize rows" }))
+    fireEvent.click(screen.getByRole("button", { name: "Hide Weekly" }))
+    expect(useAppPreferencesStore.getState().lineLayouts).toEqual({ claude: { order: ["Session", "Weekly"], hidden: ["Weekly"] } })
+    fireEvent.keyDown(screen.getByRole("group", { name: "Customize rows" }), { key: "z", ctrlKey: true })
+    expect(useAppPreferencesStore.getState().lineLayouts).toEqual({})
+    fireEvent.click(screen.getByRole("button", { name: "Hide Weekly" }))
+    fireEvent.click(screen.getByRole("button", { name: "Done" }))
+    expect(screen.getByText("Session")).toBeInTheDocument()
+    expect(screen.queryByText("Weekly")).not.toBeInTheDocument()
+    useAppPreferencesStore.setState({ lineLayouts: {} })
+  })
+
+  it("flips used ⇄ left from a bar's value", () => {
+    const onDisplayModeToggle = vi.fn()
+    render(
+      <ProviderCard
+        name="Flip"
+        displayMode="used"
+        onDisplayModeToggle={onDisplayModeToggle}
+        lines={[{ type: "progress", label: "Session", used: 40, limit: 100, format: { kind: "percent" } }]}
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: "40%" }))
+    expect(onDisplayModeToggle).toHaveBeenCalledTimes(1)
   })
 
   it("shows tomorrow context for absolute reset labels", () => {

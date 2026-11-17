@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "kimi-api",
+  "name": "Kimi API",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#000000",
+  "statusPageUrl": "https://status.moonshot.cn",
+  "links": [
+    { "label": "API keys", "url": "https://platform.moonshot.ai/console/api-keys" },
+    { "label": "Usage dashboard", "url": "https://platform.moonshot.ai/console/account" }
+  ],
+  "lines": [
+    { "type": "text", "label": "Balance", "scope": "overview" },
+    { "type": "text", "label": "Vouchers", "scope": "detail" },
+    { "type": "text", "label": "Cash", "scope": "detail" }
+  ]
+}

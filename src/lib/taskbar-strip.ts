@@ -7,18 +7,66 @@ import {
   type PluginSettings,
   type TaskbarStripStyle,
 } from "@/lib/settings"
-import type { TrayPrimaryBar } from "@/lib/tray-primary-progress"
+import { PACE_COLORS, type TrayPrimaryBar } from "@/lib/tray-primary-progress"
+import { tLabel } from "@/lib/i18n"
+import { formatCompactDuration } from "@/lib/pace-tooltip"
 import { formatTrayPercentText } from "@/lib/tray-tooltip"
 import { escapeXmlText } from "@/lib/tray-bars-icon"
 import { readableBrandColor } from "@/lib/tray-provider-icons"
+import { isWslId } from "@/lib/accounts"
 
-export type TaskbarStripLine = { text: string; color: string }
+/**
+ * `used`: the share of the limit used (0-1), whichever way the text shows it; `fill`: the share the
+ * text shows (used, or left); `label`: the line it comes from ("Session", "Weekly"). All absent for
+ * a text value.
+ */
+export type TaskbarStripLine = {
+  text: string
+  color: string
+  used?: number
+  fill?: number
+  label?: string
+  /** The number alone, when `text` also names the line and its reset (the followed card). */
+  value?: string
+}
 
 export type TaskbarStripItem = {
+  /** The provider (card) id. */
+  id: string
   iconUrl: string
   logoColor: string
   /** Primary (session-like) value first, then weekly when the provider has a separate one. */
   lines: TaskbarStripLine[]
+  /** A dot on the logo's corner while its agent sessions work or wait for the user. */
+  dot?: string
+}
+
+/** What a card's live sessions do (`agent_activity`): one waits for the user, or one works. */
+export type AgentActivity = "busy" | "waiting"
+
+/** Windows' own blue and caution yellow, each as it reads on a light or a dark taskbar. */
+const ACTIVITY_COLORS: Record<AgentActivity, { light: string; dark: string }> = {
+  busy: { light: "#0078D4", dark: "#4CC2FF" },
+  waiting: { light: "#9D5D00", dark: "#FCE100" },
+}
+
+/**
+ * The card a focused tool's provider (`foreground:provider`, a base plugin id) stands for: the one
+ * the strip already shows, else the first enabled one (the usual login before an extra account).
+ */
+export function followedCard(baseId: string | null, shown: string[], enabled: string[]): string | null {
+  if (!baseId) return null
+  // An extra account is `<id>-<8 hex>`; another provider can share the prefix (kimi, kimi-api).
+  const isCard = (id: string) => id === baseId || (id.startsWith(`${baseId}-`) && /^-[0-9a-f]{8}$/.test(id.slice(baseId.length)))
+  return shown.find(isCard) ?? enabled.find(isCard) ?? null
+}
+
+/**
+ * Whether an AI tool (`running_ai_tools`: base plugin ids) runs behind one of the strip's cards. A WSL
+ * card always counts: its CLI runs inside WSL, out of sight of Windows' process list.
+ */
+export function stripToolRunning(running: string[], shown: string[]): boolean {
+  return shown.some(isWslId) || running.some((baseId) => followedCard(baseId, shown, []) !== null)
 }
 
 /** Logical px; the Windows 11 taskbar is 48 px tall. */
@@ -26,6 +74,13 @@ const HEIGHT = 40
 const LOGO = 22
 const LOGO_GAP = 5
 const ITEM_GAP = 12
+const PLATE_PAD = 10
+const PLATE_RADIUS = 8
+/** Desktop widgets' bar under a percent, and its gap to the digits. */
+const BAR = 2
+const BAR_GAP = 1
+/** The agent activity dot on a logo's lower right corner. */
+const DOT_RADIUS = 3.5
 
 export type MeasureText = (text: string, fontSizePx: number, fontCss: string, weight: number) => number
 
@@ -47,10 +102,17 @@ export function fontCssOf(style: TaskbarStripStyle): string {
  * The providers the strip shows, as plugin settings for `getTrayPrimaryBars`: the user's own strip
  * list (independent of the nav order) or the first enabled providers, never a disabled one.
  */
-export function stripPluginSettings(selected: string[] | null, settings: PluginSettings): PluginSettings {
+export function stripPluginSettings(
+  selected: string[] | null,
+  settings: PluginSettings,
+  /** Follow the active app: the focused tool's base plugin id, put first. */
+  focus: string | null = null
+): PluginSettings & { focusId: string | null } {
   const enabled = settings.order.filter((id) => !settings.disabled.includes(id))
   const ids = (selected ?? enabled).filter((id) => enabled.includes(id))
-  return { order: ids.slice(0, MAX_TASKBAR_STRIP_PROVIDERS), disabled: [] }
+  const focusId = followedCard(focus, ids, enabled)
+  const order = focusId ? [focusId, ...ids.filter((id) => id !== focusId)] : ids
+  return { order: order.slice(0, MAX_TASKBAR_STRIP_PROVIDERS), disabled: [], focusId }
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -100,6 +162,9 @@ function lineColor(
   if (style.colorMode === "off" || typeof fraction !== "number") return base
   const usedPercent = (displayMode === "left" ? 1 - fraction : fraction) * 100
   const readable = (color: string) => readableOnTaskbar(color, onLightTaskbar)
+  if (style.colorMode === "pace") {
+    return bar?.pace ? readable(PACE_COLORS[onLightTaskbar ? "light" : "dark"][bar.pace]) : base
+  }
   if (style.colorMode === "thresholds") {
     if (usedPercent >= style.criticalAt) return readable(style.criticalColor)
     if (usedPercent >= style.warnAt) return readable(style.warnColor)
@@ -138,8 +203,16 @@ export function buildTaskbarStripItems(args: {
   style: TaskbarStripStyle
   /** Plugin text as the card shows it (dollars in the chosen currency). */
   moneyText?: (text: string) => string
+  /** Cards whose agent sessions work or wait (`agent_activity`). */
+  activity?: Record<string, AgentActivity>
+  /** The followed card: both its lines, whatever its line mode, each with its name and time to reset. */
+  focusId?: string | null
+  nowMs?: number
+  /** Live token rates, already written ("1.2M/min"), added after a card's first number. */
+  rates?: Record<string, string>
 }): TaskbarStripItem[] {
   const { order, primaryBars, weeklyBars, pluginsMeta, pluginStates, onLightTaskbar, logoColors, displayMode, style } = args
+  const activity = args.activity ?? {}
   const moneyText = args.moneyText ?? ((value: string) => value)
   const taskbarColor = onLightTaskbar ? "black" : "white"
   const base = style.textColor ?? (onLightTaskbar ? "#000000" : "#ffffff")
@@ -151,13 +224,31 @@ export function buildTaskbarStripItems(args: {
     if (percent === "--%") return "--"
     return style.showPercentSign ? percent : percent.replace(/%$/, "")
   }
+  const nowMs = args.nowMs ?? Date.now()
+  // The followed card in detail: "Weekly 41% · 3d 4h", as TaskbarQuota's active tile reads.
+  const detailText = (id: string, bar: TrayPrimaryBar | undefined) => {
+    const line = pluginStates[id]?.data?.lines.find((entry) => entry.type === "progress" && entry.label === bar?.label)
+    const resetsAtMs = line?.type === "progress" && line.resetsAt ? Date.parse(line.resetsAt) : Number.NaN
+    const left = Number.isFinite(resetsAtMs) ? formatCompactDuration(resetsAtMs - nowMs) : null
+    const shown = bar?.label ? `${tLabel(bar.label)} ${text(bar)}` : text(bar)
+    return left ? `${shown} · ${left}` : shown
+  }
   const percentLines = (primary: TrayPrimaryBar) => {
     const weekly = weeklyById.get(primary.id)
     const hasWeekly = weekly?.weekly === true && weekly.label !== primary.label
-    const mode = style.lineModes[primary.id] ?? "both"
+    // Followed, and Settings wants it in detail (else it only goes first).
+    const focused = primary.id === args.focusId && style.followDetail
+    const mode = focused ? "both" : (style.lineModes[primary.id] ?? "both")
     // A provider with one line shows it whatever the mode (e.g. a weekly-only plan).
     const bars = !hasWeekly ? [primary] : mode === "session" ? [primary] : mode === "weekly" ? [weekly] : [primary, weekly]
-    return bars.map((bar) => ({ text: text(bar), color: lineColor(bar, base, style, displayMode, onLightTaskbar) }))
+    return bars.map((bar) => ({
+      text: focused ? detailText(primary.id, bar) : text(bar),
+      ...(focused ? { value: text(bar) } : {}),
+      color: lineColor(bar, base, style, displayMode, onLightTaskbar),
+      used: typeof bar?.fraction === "number" ? (displayMode === "left" ? 1 - bar.fraction : bar.fraction) : undefined,
+      fill: bar?.fraction,
+      label: bar?.label,
+    }))
   }
   // No share used to color by: a text value keeps the text color.
   const textLines = (meta: PluginMeta) => {
@@ -170,13 +261,18 @@ export function buildTaskbarStripItems(args: {
     const meta = metaById.get(id)
     if (!meta) return []
     const primary = primaryById.get(id)
-    const lines = primary ? percentLines(primary) : textLines(meta)
-    if (!lines) return []
+    const shown = primary ? percentLines(primary) : textLines(meta)
+    if (!shown) return []
+    const rate = args.rates?.[id]
+    const lines = rate ? shown.map((line, i) => (i === 0 ? { ...line, text: `${line.text} · ${rate}` } : line)) : shown
+    const state = activity[id]
     return [
       {
+        id,
         iconUrl: meta.iconUrl,
         logoColor: (logoColors && readableBrandColor(meta.brandColor, onLightTaskbar)) || taskbarColor,
         lines,
+        ...(state ? { dot: ACTIVITY_COLORS[state][onLightTaskbar ? "light" : "dark"] } : {}),
       },
     ]
   })
@@ -188,41 +284,77 @@ export function makeTaskbarStripSvg(args: {
   style: TaskbarStripStyle
   scale: number
   measure?: MeasureText
+  /** Desktop widgets: a rounded plate behind the items, `opacity` 0-1. */
+  plate?: { color: string; opacity: number }
+  /** Desktop widgets: the items stacked in a column instead of side by side. */
+  column?: boolean
+  /** Desktop widgets: a thin bar under each percent, filled as far as the number says. */
+  bars?: boolean
 }): { svg: string; width: number; height: number } {
-  const { items, style, scale, measure = estimateTextWidth } = args
+  const { items, style, scale, measure = estimateTextWidth, plate, column = false, bars = false } = args
   const px = (value: number) => Math.round(value * scale)
-  const height = px(HEIGHT)
   const fontSize = style.fontSize * scale
   const fontCss = fontCssOf(style)
   const weight = style.bold ? 600 : 400
   const logo = px(LOGO)
+  const bar = bars ? px(BAR) : 0
+  const barGap = bars ? px(BAR_GAP) : 0
+  const lineHeight = fontSize * 1.2 + bar + barGap
+  const mostLines = Math.max(1, ...items.map((item) => item.lines.length))
+  // The taskbar's height; widgets grow when their bars need the room.
+  const rowHeight = bars ? Math.max(px(HEIGHT), Math.ceil(mostLines * lineHeight) + px(4)) : px(HEIGHT)
   const parts: string[] = []
-  let x = 0
+  const pad = plate ? px(PLATE_PAD) : 0
+  let x = pad
+  let widest = 0
   items.forEach((item, index) => {
-    if (index > 0) x += px(ITEM_GAP)
-    const logoY = Math.round((height - logo) / 2)
+    if (index > 0 && !column) x += px(ITEM_GAP)
+    const left = column ? pad : x
+    const top = column ? index * rowHeight : 0
+    const logoY = top + Math.round((rowHeight - logo) / 2)
     parts.push(
-      `<mask id="logo${index}" style="mask-type:alpha"><image href="${item.iconUrl}" x="${x}" y="${logoY}" width="${logo}" height="${logo}"/></mask>`,
-      `<rect x="${x}" y="${logoY}" width="${logo}" height="${logo}" fill="${item.logoColor}" mask="url(#logo${index})"/>`
+      `<mask id="logo${index}" style="mask-type:alpha"><image href="${item.iconUrl}" x="${left}" y="${logoY}" width="${logo}" height="${logo}"/></mask>`,
+      `<rect x="${left}" y="${logoY}" width="${logo}" height="${logo}" fill="${item.logoColor}" mask="url(#logo${index})"/>`
     )
-    x += logo + px(LOGO_GAP)
-    const lineHeight = fontSize * 1.2
-    const firstCenter = height / 2 - ((item.lines.length - 1) * lineHeight) / 2
-    item.lines.forEach((line, i) => {
-      parts.push(
-        `<text x="${x}" y="${firstCenter + i * lineHeight}" dominant-baseline="central" fill="${line.color}" font-family='${fontCss}' font-size="${fontSize}" font-weight="${weight}" style="font-variant-numeric:tabular-nums">${escapeXmlText(line.text)}</text>`
-      )
-    })
+    if (item.dot) {
+      const r = Math.max(2, px(DOT_RADIUS))
+      parts.push(`<circle cx="${left + logo - r}" cy="${logoY + logo - r}" r="${r}" fill="${item.dot}"/>`)
+    }
+    const textX = left + logo + px(LOGO_GAP)
     // Digits are drawn tabular (all as wide as "0"), which the canvas can't measure: measure zeros.
-    const textWidth = Math.max(0, ...item.lines.map((line) => measure(line.text.replace(/\d/g, "0"), fontSize, fontCss, weight)))
-    x += Math.ceil(textWidth) + px(1)
+    const textWidth = Math.ceil(
+      Math.max(0, ...item.lines.map((line) => measure(line.text.replace(/\d/g, "0"), fontSize, fontCss, weight)))
+    )
+    // Centered with its bar, if any, below it.
+    const firstCenter = top + rowHeight / 2 - ((item.lines.length - 1) * lineHeight) / 2 - (bar + barGap) / 2
+    item.lines.forEach((line, i) => {
+      const center = firstCenter + i * lineHeight
+      parts.push(
+        `<text x="${textX}" y="${center}" dominant-baseline="central" fill="${line.color}" font-family='${fontCss}' font-size="${fontSize}" font-weight="${weight}" style="font-variant-numeric:tabular-nums">${escapeXmlText(line.text)}</text>`
+      )
+      if (bars && typeof line.fill === "number" && textWidth > 0) {
+        const barY = Math.round(center + fontSize * 0.55 + barGap)
+        const filled = Math.round(textWidth * Math.min(1, Math.max(0, line.fill)))
+        const rect = (w: number, opacity: string) =>
+          `<rect x="${textX}" y="${barY}" width="${w}" height="${bar}" rx="${bar / 2}" fill="${line.color}"${opacity}/>`
+        parts.push(rect(textWidth, ` fill-opacity="0.25"`))
+        if (filled > 0) parts.push(rect(filled, ""))
+      }
+    })
+    const right = textX + textWidth + px(1)
+    if (column) widest = Math.max(widest, right)
+    else x = right
   })
-  const width = Math.max(1, x)
-  // Alpha 1/255 everywhere: invisible, but makes the whole strip clickable (Windows lets clicks
+  const width = Math.max(1, (column ? widest : x) + pad)
+  const height = column ? Math.max(1, items.length) * rowHeight : rowHeight
+  // Alpha 1/255 at least: invisible, but makes the whole strip clickable (Windows lets clicks
   // through fully transparent pixels of a layered window).
+  const background = plate
+    ? `<rect width="${width}" height="${height}" rx="${px(PLATE_RADIUS)}" fill="${plate.color}" fill-opacity="${Math.max(0.004, plate.opacity)}"/>`
+    : `<rect width="${width}" height="${height}" fill="black" fill-opacity="0.004"/>`
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `<rect width="${width}" height="${height}" fill="black" fill-opacity="0.004"/>`,
+    background,
     ...parts,
     `</svg>`,
   ].join("")

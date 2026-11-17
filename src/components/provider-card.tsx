@@ -1,9 +1,11 @@
 import { resetCount, ResetCreditRows, ResetCredits } from "@/components/reset-credits"
-import { ClaudeSessions, isClaudeLogin } from "@/components/claude-sessions"
+import { ClaudeSessions, hasLiveSessions } from "@/components/claude-sessions"
 import { DetailSection } from "@/components/detail-section"
 import { detailLines } from "@/lib/detail-sections"
-import { Fragment, useMemo } from "react"
-import { AlertCircle, Clock, ExternalLink, Hourglass, RefreshCw } from "lucide-react"
+import { Fragment, useMemo, useState } from "react"
+import { AlertCircle, Clock, ExternalLink, Hourglass, RefreshCw, SlidersHorizontal } from "lucide-react"
+import { LineLayoutEditor } from "@/components/line-layout-editor"
+import { applyLineLayout } from "@/lib/line-layout"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,6 +16,7 @@ import { SkeletonLines } from "@/components/skeleton-lines"
 import { UsageSparkline } from "@/components/usage-sparkline"
 import { PluginError } from "@/components/plugin-error"
 import { ProviderStatusBadge } from "@/components/provider-status-badge"
+import { ShareCardButton } from "@/components/share-card-button"
 import { useNowTicker } from "@/hooks/use-now-ticker"
 import { useUnseenUsage } from "@/hooks/use-unseen-usage"
 import { alertLevelsFor, REFRESH_COOLDOWN_MS, type DisplayMode, type ResetTimerDisplayMode, type TimeFormatMode } from "@/lib/settings"
@@ -52,6 +55,8 @@ interface ProviderCardProps {
   resetTimerDisplayMode?: ResetTimerDisplayMode
   timeFormatMode?: TimeFormatMode
   onResetTimerDisplayModeToggle?: () => void
+  /** A click on a bar's value flips used ⇄ left. */
+  onDisplayModeToggle?: () => void
 }
 
 const PACE_VISUALS: Record<PaceStatus, { dotClass: string }> = {
@@ -130,6 +135,7 @@ export function ProviderCard({
   resetTimerDisplayMode = "relative",
   timeFormatMode = "auto",
   onResetTimerDisplayModeToggle,
+  onDisplayModeToggle,
 }: ProviderCardProps) {
   const cooldownRemainingMs = useMemo(() => {
     if (!lastManualRefreshAt) return 0
@@ -146,9 +152,12 @@ export function ProviderCard({
   const filteredSkeletonLines = scopeFilter === "all"
     ? skeletonLines
     : skeletonLines.filter(line => line.scope === "overview")
-  const filteredLines = scopeFilter === "all"
-    ? lines
-    : lines.filter(line => overviewLabels.has(line.label))
+  const overviewLines = scopeFilter === "all" ? lines : lines.filter((line) => overviewLabels.has(line.label))
+  // The overview card follows its Customize layout; the detail page shows every line.
+  const lineLayout = useAppPreferencesStore((state) => (pluginId ? state.lineLayouts[pluginId] : undefined))
+  const filteredLines = scopeFilter === "all" ? overviewLines : applyLineLayout(overviewLines, lineLayout)
+  const [customizing, setCustomizing] = useState(false)
+  const canCustomize = scopeFilter === "overview" && pluginId !== undefined && overviewLines.length > 0
 
   // The usage levels that notify for this provider, marked on its bars.
   const usageAlerts = useAppPreferencesStore((state) => state.usageAlerts)
@@ -216,6 +225,7 @@ export function ProviderCard({
           resetTimerDisplayMode={resetTimerDisplayMode}
           timeFormatMode={timeFormatMode}
           onResetTimerDisplayModeToggle={onResetTimerDisplayModeToggle}
+          onDisplayModeToggle={onDisplayModeToggle}
           now={now}
           refreshing={isRefreshingWithData}
           pluginId={pluginId}
@@ -234,7 +244,7 @@ export function ProviderCard({
   const sections = scopeFilter === "all" ? detailLines(filteredLines) : null
 
   return (
-    <div>
+    <div className="group">
       {/* Sections bring their own space above: the detail page closes the gap under its last one. */}
       <div className={sections ? "pt-3" : "py-3"}>
         <div className="flex items-center justify-between mb-2">
@@ -303,6 +313,21 @@ export function ProviderCard({
               )
             )}
             {pluginId && <ProviderStatusBadge pluginId={pluginId} statusPageUrl={statusPageUrl} />}
+            {filteredLines.length > 0 && (
+              <ShareCardButton name={name} plan={plan} lines={filteredLines} displayMode={displayMode} now={now} />
+            )}
+            {canCustomize && !customizing && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={t("card.customize")}
+                title={t("card.customize")}
+                onClick={() => setCustomizing(true)}
+                className="ml-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              >
+                <SlidersHorizontal className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           {plan && (
             <Badge
@@ -389,11 +414,17 @@ export function ProviderCard({
                 </DetailSection>
               )}
             </>
+          ) : customizing && canCustomize ? (
+            <LineLayoutEditor
+              pluginId={pluginId}
+              labels={overviewLines.map((line) => line.label)}
+              onDone={() => setCustomizing(false)}
+            />
           ) : (
             <div className="space-y-4">{renderLines(filteredLines)}</div>
           ))}
 
-        {pluginId && isClaudeLogin(pluginId) && <ClaudeSessions pluginId={pluginId} section={sections !== null} />}
+        {pluginId && hasLiveSessions(pluginId) && <ClaudeSessions pluginId={pluginId} section={sections !== null} />}
       </div>
       {showSeparator && <Separator />}
     </div>
@@ -407,6 +438,7 @@ function MetricLineRenderer({
   resetTimerDisplayMode,
   timeFormatMode,
   onResetTimerDisplayModeToggle,
+  onDisplayModeToggle,
   now,
   refreshing,
   pluginId,
@@ -418,6 +450,7 @@ function MetricLineRenderer({
   resetTimerDisplayMode: ResetTimerDisplayMode
   timeFormatMode: TimeFormatMode
   onResetTimerDisplayModeToggle?: () => void
+  onDisplayModeToggle?: () => void
   now: number
   refreshing?: boolean
   pluginId?: string
@@ -614,9 +647,18 @@ function MetricLineRenderer({
           />
         )}
         <div className="flex justify-between items-center mt-1.5">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {primaryText}
-          </span>
+          {onDisplayModeToggle ? (
+            <button
+              type="button"
+              onClick={onDisplayModeToggle}
+              title={t(displayMode === "left" ? "card.showUsed" : "card.showLeft")}
+              className="text-xs text-muted-foreground tabular-nums hover:text-foreground transition-colors"
+            >
+              {primaryText}
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground tabular-nums">{primaryText}</span>
+          )}
           {secondaryText && (
             resetTooltipText ? (
               <Tooltip>

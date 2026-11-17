@@ -91,6 +91,8 @@ vi.mock("@/lib/settings", () => ({
   loadUsageAlerts: vi.fn(async () => true),
   loadTrayLogoColors: vi.fn(async () => true),
   loadPaceWorkdays: vi.fn(async () => true),
+  loadNavRight: vi.fn(async () => true),
+  loadDesktopWidgets: vi.fn(async () => ({ enabled: true })),
   loadCurrency: vi.fn(async () => ({ code: "TRY", rate: 40 })),
   loadTaskbarStrip: vi.fn(async () => false),
   loadTaskbarStripStyle: vi.fn(async () => ({})),
@@ -132,6 +134,8 @@ function createArgs() {
     setCurrency: vi.fn(),
     setTaskbarStrip: vi.fn(),
     setTaskbarStripStyle: vi.fn(),
+    setNavRight: vi.fn(),
+    setDesktopWidgets: vi.fn(),
     setLoadingForPlugins: vi.fn(),
     setErrorForPlugins: vi.fn(),
     startBatch: vi.fn().mockResolvedValue(undefined),
@@ -244,6 +248,13 @@ describe("useSettingsBootstrap", () => {
     const args = createArgs()
     renderHook(() => useSettingsBootstrap(args))
     await waitFor(() => expect(args.setPaceWorkdays).toHaveBeenCalledWith(true))
+  })
+
+  it("loads the nav side and desktop widget settings", async () => {
+    const args = createArgs()
+    renderHook(() => useSettingsBootstrap(args))
+    await waitFor(() => expect(args.setNavRight).toHaveBeenCalledWith(true))
+    expect(args.setDesktopWidgets).toHaveBeenCalledWith({ enabled: true })
   })
 
   it("loads the currency setting", async () => {

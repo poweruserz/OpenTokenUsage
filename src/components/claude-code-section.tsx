@@ -49,6 +49,56 @@ export function ClaudeCodeSection() {
       {(state === "off" || state === "on") && (
         <p className="mt-1.5 text-xs text-muted-foreground">{t("settings.claudeCode.hint")}</p>
       )}
+      <LogRetention />
     </SettingsSection>
+  )
+}
+
+/** Days Claude Code keeps transcripts before deleting them (`cleanupPeriodDays`, 30 when unset). */
+const RETENTION_DAYS = [30, 90, 370] as const
+
+/**
+ * How long Claude Code keeps its transcripts: the hour grid, projects and spend are read from them, so
+ * past that many days the history is gone.
+ */
+function LogRetention() {
+  const [days, setDays] = useState<number | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    invoke<number | null>("claude_log_retention")
+      .then((value) => setDays(typeof value === "number" ? value : null))
+      .catch((error) => console.error("Failed to read Claude Code's log retention:", error))
+  }, [])
+
+  const choose = async (next: number) => {
+    setFailed(false)
+    try {
+      setDays(await invoke<number>("set_claude_log_retention", { days: next }))
+    } catch (error) {
+      console.error("Failed to set Claude Code's log retention:", error)
+      setFailed(true)
+    }
+  }
+
+  if (days === null) return null
+  // A value of the user's own stays listed as it is.
+  const options: number[] = RETENTION_DAYS.includes(days as (typeof RETENTION_DAYS)[number]) ? [...RETENTION_DAYS] : [days, ...RETENTION_DAYS]
+  return (
+    <div className="mt-3">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        {t("settings.claudeCode.retention")}
+        <select value={days} onChange={(e) => void choose(Number(e.target.value))} className="fluent-control w-28">
+          {options.map((value) => (
+            <option key={value} value={value}>
+              {t("settings.claudeCode.retentionDays", { days: value })}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className={failed ? "mt-1 text-xs text-destructive" : "mt-1 text-xs text-muted-foreground"}>
+        {failed ? t("settings.claudeCode.unreadable") : t("settings.claudeCode.retentionHint")}
+      </p>
+    </div>
   )
 }

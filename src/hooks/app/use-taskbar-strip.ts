@@ -4,6 +4,8 @@ import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 import type { PluginState } from "@/hooks/app/types"
 import { useTaskbarIsLight } from "@/hooks/app/use-provider-tray-icons"
+import { useNowTicker } from "@/hooks/use-now-ticker"
+import { formatTokenRate } from "@/hooks/app/use-agent-activity"
 import { convertUsdText } from "@/lib/currency"
 import { useLocaleStore } from "@/lib/i18n"
 import type { PluginMeta } from "@/lib/plugin-types"
@@ -13,6 +15,7 @@ import {
   makeTaskbarStripSvg,
   measureTextWithCanvas,
   stripPluginSettings,
+  type AgentActivity,
 } from "@/lib/taskbar-strip"
 import { rasterizeSvgToRgba } from "@/lib/tray-bars-icon"
 import { getTrayPrimaryBars } from "@/lib/tray-primary-progress"
@@ -52,13 +55,24 @@ export function useTaskbarStrip(args: {
   logoColors: boolean
   style: TaskbarStripStyle
   themeMode: string
+  /** Cards whose agent sessions work or wait: a dot on their logo. */
+  activity: Record<string, AgentActivity>
+  /** Follow the active app: the focused tool's base plugin id. */
+  focus: string | null
+  /** Live tokens per minute by card (`token_rates`). */
+  rates: Record<string, number>
+  /** Taken off the taskbar (no AI tool runs), still drawn for the Settings preview. */
+  hidden: boolean
 }) {
-  const { enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, themeMode } = args
+  const { enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, themeMode, activity, focus, rates, hidden } = args
   const taskbarIsLight = useTaskbarIsLight(themeMode)
   const currency = useAppPreferencesStore((state) => state.currency)
+  const workdays = useAppPreferencesStore((state) => state.paceWorkdays)
   // Money is written in the app language's style: a language change redraws it.
   const locale = useLocaleStore((state) => state.locale)
   const showingRef = useRef(false)
+  // A followed card shows its time to reset: draw again every minute while one does.
+  const now = useNowTicker({ enabled: enabled && focus !== null, intervalMs: 60_000, pauseWhenHidden: false })
   // Start with this window's scale; the host asks for the taskbars' own ones.
   const [dpis, setDpis] = useState<number[]>(() => [Math.round((window.devicePixelRatio || 1) * 96)])
 
@@ -81,8 +95,15 @@ export function useTaskbarStrip(args: {
   useEffect(() => {
     if (!enabled && !showingRef.current) return
     const timer = window.setTimeout(() => {
-      const settings = enabled && pluginSettings ? stripPluginSettings(style.providers, pluginSettings) : null
-      const barArgs = { pluginsMeta, pluginSettings: settings, pluginStates, maxBars: settings?.order.length ?? 0, displayMode }
+      const settings = enabled && pluginSettings ? stripPluginSettings(style.providers, pluginSettings, focus) : null
+      const barArgs = {
+        pluginsMeta,
+        pluginSettings: settings,
+        pluginStates,
+        maxBars: settings?.order.length ?? 0,
+        displayMode,
+        workdays,
+      }
       const items = settings
         ? buildTaskbarStripItems({
             order: settings.order,
@@ -95,6 +116,10 @@ export function useTaskbarStrip(args: {
             displayMode,
             style,
             moneyText: (text) => convertUsdText(text, currency, locale),
+            activity,
+            focusId: settings.focusId,
+            nowMs: now,
+            rates: Object.fromEntries(Object.entries(rates).map(([id, rate]) => [id, formatTokenRate(rate, locale)])),
           })
         : []
       const draw = (scale: number) => makeTaskbarStripSvg({ items, style, scale, measure: measureTextWithCanvas })
@@ -102,7 +127,7 @@ export function useTaskbarStrip(args: {
       const preview = items.length > 0 ? draw(previewScale) : null
       useTaskbarStripPreview.setState({ preview: preview && { ...preview, scale: previewScale, onLightTaskbar: taskbarIsLight } })
       const render = async () =>
-        items.length === 0
+        items.length === 0 || hidden
           ? null
           : Promise.all(
               dpis.map(async (dpi) => {
@@ -128,5 +153,5 @@ export function useTaskbarStrip(args: {
         .catch((error) => console.error("Failed to update the taskbar strip:", error))
     }, UPDATE_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
-  }, [enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, taskbarIsLight, dpis, currency, locale])
+  }, [enabled, pluginsMeta, pluginSettings, pluginStates, displayMode, logoColors, style, taskbarIsLight, dpis, currency, locale, workdays, activity, focus, now, rates, hidden])
 }

@@ -359,10 +359,13 @@ describe("useAppUpdate", () => {
     loadRelaunchMock.mockResolvedValue("1.2.3")
     getVersionMock.mockResolvedValue("1.2.3")
 
-    renderHook(() => useAppUpdate())
+    const { result } = renderHook(() => useAppUpdate())
+    expect(result.current.afterUpdate).toBeNull()
 
     await vi.waitFor(() => expect(invokeMock).toHaveBeenCalledWith("show_panel"))
     expect(saveRelaunchMock).toHaveBeenCalledWith(null)
+    // What's new follows it (`use-whats-new.ts`).
+    await vi.waitFor(() => expect(result.current.afterUpdate).toBe(true))
   })
 
   it("only clears the mark when started as another version (the install failed)", async () => {
@@ -375,18 +378,21 @@ describe("useAppUpdate", () => {
     await vi.waitFor(() => expect(getVersionMock).toHaveBeenCalled())
     await act(() => Promise.resolve())
     expect(saveRelaunchMock).toHaveBeenCalledWith(null)
-    expect(invokeMock).not.toHaveBeenCalled()
+    // The update check reads the proxy setting; only the panel must stay shut.
+    expect(invokeMock).not.toHaveBeenCalledWith("show_panel")
   })
 
   it("opens nothing without a relaunch mark", async () => {
     checkMock.mockReturnValue(new Promise(() => {}))
 
-    renderHook(() => useAppUpdate())
+    const { result } = renderHook(() => useAppUpdate())
 
     await vi.waitFor(() => expect(loadRelaunchMock).toHaveBeenCalled())
     await act(() => Promise.resolve())
+    expect(result.current.afterUpdate).toBe(false)
     expect(saveRelaunchMock).not.toHaveBeenCalled()
-    expect(invokeMock).not.toHaveBeenCalled()
+    // The update check reads the proxy setting; only the panel must stay shut.
+    expect(invokeMock).not.toHaveBeenCalledWith("show_panel")
   })
 
   it("transitions to error on install failure", async () => {

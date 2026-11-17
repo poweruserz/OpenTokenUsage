@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "custom-balance",
+  "name": "Custom balances",
+  "version": "0.0.1",
+  "entry": "plugin.js",
+  "icon": "icon.svg",
+  "brandColor": "#0078D4",
+  "lines": [
+    { "type": "text", "label": "Balance", "scope": "overview" },
+    { "type": "text", "label": "Balance 2", "scope": "overview" },
+    { "type": "text", "label": "Balance 3", "scope": "overview" },
+    { "type": "text", "label": "Balance 4", "scope": "overview" },
+    { "type": "text", "label": "Balance 5", "scope": "overview" }
+  ]
+}

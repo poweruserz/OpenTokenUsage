@@ -89,6 +89,432 @@ export const es419: Messages = {
   "settings.tray.logoColors": "Logos a color",
   "settings.strip.title": "Franja en la barra de tareas (experimental)",
   "settings.strip.desc": "Logotipos de proveedores con uso de la sesión y semanal en la barra de tareas.",
+
+  "settings.widgets.title": "Widgets de escritorio",
+
+  "settings.widgets.desc": "Logos de los proveedores con el uso de la sesión y semanal, en cualquier lugar del escritorio.",
+
+  "settings.stripLook.title": "Aspecto de la franja y los widgets",
+
+  "settings.stripLook.desc": "Los proveedores, la fuente y los colores que comparten la franja y los widgets.",
+
+  "settings.categories": "Categorías de configuración",
+
+
+  "settings.configBroken": "No se guardó: ~/.openusage/config.json no es un JSON válido. Corrige o borra ese archivo y vuelve a guardar.",
+
+
+  "settings.strip.desktopEdgeSide": "Borde",
+
+
+  "settings.strip.desktopEdgeRight": "Derecha",
+
+
+  "settings.strip.desktopEdgeLeft": "Izquierda",
+
+
+  "settings.strip.desktopEdgeTop": "Arriba",
+
+
+  "settings.strip.desktopPinned": "Mantener abierta la barra del borde de la pantalla (también con su botón de fijar)",
+
+
+  "settings.strip.onlyWhileRunning": "Solo mientras se ejecuta una herramienta de IA",
+
+
+  "settings.strip.onlyWhileRunningHint": "La franja se oculta mientras no se ejecute ninguna app ni CLI de sus proveedores (Claude Code, Codex, …).",
+
+
+  "settings.strip.desktopSlide": "Deslizar suavemente la barra del borde de la pantalla",
+
+
+  "settings.strip.desktopSlideMs": "Duración del deslizamiento",
+
+
+  "settings.strip.desktopGradient": "Degradado suave en la barra del borde de la pantalla",
+
+
+  "whatsNew.title": "Novedades",
+
+
+  "whatsNew.close": "Cerrar",
+
+
+  "whatsNew.video": "Un video corto con las novedades de esta versión",
+
+
+  "settings.whatsNew.title": "Novedades",
+
+
+  "settings.whatsNew.label": "Mostrar las novedades después de una actualización",
+
+
+  "settings.whatsNew.hint": "Una vez, la primera vez que se abre el panel tras una actualización: las notas de la versión y un video corto si la actualización trae uno. El video se elimina cuando cierras la ventana.",
+
+
+  "rate.perMinute": "{tokens}/min",
+
+
+  "settings.strip.tokenRate": "Tokens por minuto en vivo (Claude, Codex), también en el texto emergente de la bandeja",
+
+
+  "settings.strip.desktopEdge": "Borde de la pantalla",
+
+
+  "settings.strip.desktopEdgeHint": "Anclado a un borde de la pantalla (derecha, izquierda o arriba), casi oculto; se desliza hacia afuera bajo el puntero.",
+
+
+  "settings.cards.tokscale": "Unas 30 herramientas más con tokscale (Gemini CLI, Copilot, Kiro…)",
+
+
+  "settings.cards.tokscaleHint": "Ejecuta tokscale, de código abierto, con bunx o npx (necesita bun o Node.js), que se descarga junto con su lista de precios. Lee los registros locales de esas herramientas como mucho cada 30 minutos.",
+
+
+  "settings.balances.title": "Saldos personalizados",
+
+
+  "settings.balances.desc": "New API, One API, Sub2API o tu propio endpoint: su saldo en la tarjeta Custom balances",
+
+
+  "settings.balances.name": "Nombre",
+
+
+  "settings.balances.preset": "Tipo",
+
+
+  "settings.balances.custom": "Endpoint personalizado",
+
+
+  "settings.balances.url": "Dirección",
+
+
+  "settings.balances.env": "Variable de entorno con la clave (OTU_…)",
+
+
+  "settings.balances.userId": "ID de usuario",
+
+
+  "settings.balances.path": "Ruta",
+
+
+  "settings.balances.remaining": "Saldo en",
+
+
+  "settings.balances.used": "Usado en",
+
+
+  "settings.balances.total": "Total en",
+
+
+  "settings.balances.divisor": "Dividir entre",
+
+
+  "settings.balances.currency": "Moneda",
+
+
+  "settings.balances.auth": "Encabezado de la clave",
+
+
+  "settings.balances.remove": "Quitar",
+
+
+  "settings.balances.add": "Agregar saldo",
+
+
+  "settings.balances.save": "Guardar",
+
+
+  "settings.balances.saved": "Guardado. Activa la tarjeta Custom balances para verlos.",
+
+
+  "settings.balances.invalid": "No se guardó: revisa la dirección, el nombre de la variable (OTU_ y luego A–Z, 0–9, _) y las rutas.",
+
+
+  "settings.balances.hint": "La clave nunca se guarda: ponla en una variable de entorno y escribe su nombre. Las rutas apuntan dentro de la respuesta, como data.balance.",
+
+
+  "year.title": "Uso en el año",
+
+
+  "year.streak": "racha de {days} días",
+
+
+  "year.summary": "Racha más larga {longest} días · {active} días activos · {tokens} tokens",
+
+
+  "year.cell": "{date}: {tokens} tokens",
+
+
+  "settings.cards.yearHeatmap": "Un año de uso diario con rachas en las páginas de Claude y Codex",
+
+
+  "settings.cards.keepUsage": "Conservar el uso cuyos registros se borraron",
+
+
+  "settings.cards.keepUsageHint": "Claude Code borra sus registros a los 30 días de forma predeterminada. Los tokens de cada día se guardan en la carpeta de datos de la app, así el año y la exportación los siguen contando.",
+
+
+  "settings.export.title": "Exportar uso",
+
+
+  "settings.export.desc": "Tokens por día y los últimos límites en CSV y JSON en Descargas",
+
+
+  "settings.export.now": "Exportar ahora",
+
+
+  "settings.export.done": "Guardado: {path}",
+
+
+  "settings.export.failed": "No se pudo escribir la exportación.",
+
+
+  "settings.export.daily": "Volver a escribirla una vez al día",
+
+
+  "card.sessions.cache": "caché {time}",
+
+
+  "card.sessions.cacheHint": "Tiempo restante del caché de prompts de esta sesión. Al vencer, el siguiente prompt reenvía todo el contexto y gasta más del límite.",
+
+
+  "settings.cards.cacheTimer": "Tiempo restante del caché de prompts de una sesión de Claude",
+
+
+  "settings.cards.contextFill": "Qué tan lleno está el contexto de cada sesión",
+
+
+  "spend.planMultiple": "{name}: {times}× su plan",
+
+
+  "spend.planMultipleHint": "30 días a precios de API ({cost}) son {times} veces el precio mensual del plan ({price}).",
+
+
+  "settings.plans.title": "Suscripciones",
+
+
+  "settings.plans.desc": "Lo que cuesta cada plan al mes, para compararlo con su uso a precios de API",
+
+
+  "settings.plans.multiple": "Mostrar en el resumen de gastos el uso de cada plan como múltiplo de su precio",
+
+
+  "settings.plans.price": "{name}: precio mensual",
+
+
+  "settings.claudeCode.retention": "Guardar los registros de Claude Code:",
+
+
+  "settings.claudeCode.retentionDays": "{days} días",
+
+
+  "settings.claudeCode.retentionHint": "Claude Code borra las transcripciones más antiguas al iniciarse. La grilla por hora, los proyectos y los gastos se leen de ellas.",
+
+
+  "settings.alerts.refills": "Cuando un límite se recarga antes de su reinicio (un crédito de reinicio o una recarga parcial)",
+
+
+  "settings.alerts.refillPoints": "En al menos",
+
+
+  "settings.alerts.points": "{points} puntos",
+
+
+  "settings.strip.followDetail": "En detalle: cada límite con el tiempo hasta su reinicio",
+
+
+  "settings.strip.activityDots": "Punto en el logo mientras su agente trabaja (azul) o te espera (amarillo)",
+
+
+  "settings.strip.desktopClickThroughKey": "Mantén esta tecla para hacer clic o arrastrar",
+
+
+  "settings.cards.title": "En las tarjetas",
+
+
+  "settings.cards.desc": "Lo que muestra el resumen además de los límites",
+
+
+  "settings.cards.liveSessions": "Sesiones activas de Claude Code y Codex en sus tarjetas",
+
+
+  "settings.cards.spend": "Resumen de gastos debajo de las tarjetas",
+
+
+  "settings.cards.spendTools": "Contar también los registros propios de estas herramientas",
+
+
+  "alert.refill.title": "{provider}: {label} se recargó antes de tiempo",
+
+
+  "alert.refill.body": "El {percent} % vuelve a estar disponible.",
+
+
+  "settings.strip.followActive": "Seguir la app activa",
+
+
+  "settings.strip.followActiveHint": "La herramienta de IA de la ventana que estás usando va primero.",
+
+
+  "settings.strip.desktopClickThrough": "Dejar pasar los clics a la ventana de atrás",
+
+
+  "spend.title": "Gasto",
+
+
+  "spend.today": "Hoy",
+
+
+  "spend.yesterday": "Ayer",
+
+
+  "spend.month": "30 días",
+
+
+  "spend.cost": "Costo",
+
+
+  "spend.tokens": "Tokens",
+
+
+  "spend.models": "Modelos, últimos 30 días (por tokens)",
+
+
+  "settings.strip.desktopCycle": "Por turnos",
+
+
+  "settings.strip.desktopCycleHint": "Un solo widget que muestra cada proveedor durante 8 segundos",
+
+
+  "settings.theme.halloween": "Halloween",
+
+
+  "settings.theme.glass": "Vidrio",
+
+
+  "settings.theme.glassHint": "Desenfoca el escritorio detrás del panel (Windows 11)",
+
+
+  "label.Installed models": "Modelos instalados",
+
+
+  "label.Loaded now": "Cargados ahora",
+
+
+  "label.Vouchers": "Cupones",
+
+
+  "label.Cash": "Efectivo",
+
+
+  "label.Requests today": "Solicitudes de hoy",
+
+
+  "label.Requests this month": "Solicitudes de este mes",
+
+
+  "label.Models": "Modelos",
+
+
+  "label.Token Plan usage": "Uso del Token Plan",
+
+
+  "card.customize": "Personalizar filas",
+
+
+  "card.customizeHint": "Arrastra las filas para ordenarlas y oculta las que no necesites. Ctrl+Z deshace, Esc cierra.",
+
+
+  "card.customizeMove": "Mover {row}",
+
+
+  "card.customizeShow": "Mostrar {row}",
+
+
+  "card.customizeHide": "Ocultar {row}",
+
+
+  "card.customizeReset": "Volver a lo predeterminado",
+
+
+  "card.customizeDone": "Listo",
+
+
+  "weekDays.capacity": "Con la mezcla de modelos de esta semana, el límite completo equivale a unos {tokens} tokens, {cost} a precios de la API.",
+
+
+  "weekDays.capacityTokens": "Con la mezcla de modelos de esta semana, el límite completo equivale a unos {tokens} tokens.",
+
+
+  "card.copyImage": "Copiar como imagen",
+
+
+  "card.imageCopied": "Copiado al portapapeles",
+
+
+  "card.imageCopyFailed": "No se pudo copiar la imagen",
+
+
+  "settings.privacy.title": "Privacidad",
+
+
+  "settings.privacy.hideWhenSharing": "Ocultar al compartir pantalla",
+
+
+  "settings.privacy.hideWhenSharingHint": "El panel y los widgets de escritorio nunca aparecen en pantallas compartidas, grabaciones ni capturas; tú los sigues viendo. Windows no avisa a las apps cuando se comparte la pantalla, así que los números del área de notificación y la franja de la barra de tareas solo se ocultan mientras presentas o alguien controla esta PC de forma remota.",
+
+
+  "settings.backup.reset": "Restablecer toda la configuración",
+
+
+  "settings.backup.resetHint": "Todas las preferencias vuelven a su valor predeterminado. Tus proveedores, cuentas y presupuestos de proyectos se mantienen. La app se reinicia.",
+
+
+  "settings.backup.resetConfirm": "Restablecer y reiniciar",
+
+
+  "settings.backup.resetCancel": "Cancelar",
+
+
+  "settings.backup.resetError": "No se pudo restablecer la configuración.",
+
+
+  "settings.proxy.title": "Proxy",
+
+
+  "settings.proxy.desc": "Envía las solicitudes a proveedores, páginas de estado y actualizaciones a través de un servidor proxy.",
+
+
+  "settings.proxy.enable": "Usar un proxy",
+
+
+  "settings.proxy.url": "Dirección del proxy",
+
+
+  "settings.proxy.save": "Guardar",
+
+
+  "settings.proxy.saved": "Guardado; se aplica desde la próxima solicitud.",
+
+
+  "settings.proxy.invalid": "No es una dirección de proxy. Usa http://, https://, socks5:// o socks5h:// con un host, por ejemplo http://127.0.0.1:8080.",
+
+
+  "settings.proxy.error": "No se pudo guardar el proxy.",
+
+
+  "card.showUsed": "Mostrar lo usado",
+
+
+  "card.showLeft": "Mostrar lo restante",
+
+  "settings.category.usage": "Uso",
+
+  "settings.category.taskbar": "Barra de tareas y escritorio",
+
+  "settings.category.appearance": "Apariencia",
+
+  "settings.category.app": "Aplicación",
   "settings.strip.position": "Posición",
   "settings.strip.positionLeft": "Izquierda",
   "settings.strip.positionRight": "Derecha",
@@ -134,6 +560,8 @@ export const es419: Messages = {
   "settings.strip.colorTraffic": "Semáforo (verde → amarillo → rojo)",
   "settings.strip.colorCool": "Frío (azul → morado → rojo)",
   "settings.strip.colorMono": "Simple, rojo solo cerca del límite",
+
+  "settings.strip.colorPace": "Según el ritmo",
   "settings.strip.colorThresholds": "Umbrales personalizados",
   "settings.strip.colorOff": "Desactivado",
   "settings.strip.drag": "Arrastrar {name}",
@@ -146,6 +574,23 @@ export const es419: Messages = {
   "settings.strip.criticalAt": "Crítico desde",
   "settings.strip.usageColorsHint": "Según la parte del límite ya usada.",
   "settings.strip.reset": "Restablecer apariencia",
+  "settings.strip.desktop": "Mostrar en el escritorio",
+  "settings.strip.desktopHint": "Widgets que puedes arrastrar a cualquier lugar; un clic abre el panel y, con el puntero encima, ves cuándo se reinician los límites. Un número que sube parpadea y luego se queda en el color de énfasis durante un minuto. Se ocultan mientras una app en pantalla completa está al frente. Los proveedores y el aspecto de abajo también se aplican a ellos.",
+  "settings.strip.desktopLayout": "Widgets",
+  "settings.strip.desktopRow": "Lado a lado",
+
+  "settings.strip.desktopColumn": "Apilados",
+  "settings.strip.desktopSeparate": "Separados",
+  "settings.strip.desktopPlate": "Opacidad del fondo",
+  "settings.strip.desktopLogo": "Logotipos",
+  "settings.strip.desktopLogoBrand": "Color",
+  "settings.strip.desktopLogoWhite": "Blanco",
+  "settings.strip.desktopLogoBlack": "Negro",
+  "settings.strip.desktopOnTop": "Siempre en primer plano",
+  "settings.strip.desktopSnap": "Ajustar a los bordes de la pantalla y entre sí",
+  "settings.strip.desktopLocked": "Bloquear la posición (transparente bajo el puntero)",
+
+  "settings.strip.desktopBars": "Barras bajo los números",
   "settings.tray.perProviderHint": "Si un ícono queda en ^, actívalo en la configuración de la barra de tareas para dejarlo junto al reloj.",
   "settings.tray.openTaskbarSettings": "Abrir configuración de la barra de tareas",
   "settings.tray.provider": "Proveedor",
@@ -157,7 +602,7 @@ export const es419: Messages = {
   "settings.tray.auto": "Automático",
   "settings.tray.tightest": "El más usado",
   "settings.theme.title": "Tema",
-  "settings.theme.desc": "Oscuro (negro puro) o claro",
+  "settings.theme.desc": "Oscuro (negro puro), claro o Halloween",
   "settings.theme.light": "Claro",
   "settings.theme.dark": "Oscuro",
   "settings.theme.darkHint": "Negro puro, ideal para pantallas OLED",
@@ -189,6 +634,9 @@ export const es419: Messages = {
   "settings.panel.desc": "Dónde se abre el panel. El pin de la barra de título lo mantiene sobre las demás ventanas.",
   "settings.panel.remember": "Recordar la posición",
   "settings.panel.rememberHint": "Arrastra el panel por la barra de título y la próxima vez se abrirá en el mismo lugar, en vez de encima de la barra de tareas.",
+  "settings.panel.navSide": "Barra de proveedores",
+  "settings.panel.navLeft": "Izquierda",
+  "settings.panel.navRight": "Derecha",
   "settings.alerts.levels": "Avisar al",
   "settings.alerts.ticksHint": "Las barras marcan cada nivel con una muesca.",
   "settings.alerts.perProvider": "Por proveedor",

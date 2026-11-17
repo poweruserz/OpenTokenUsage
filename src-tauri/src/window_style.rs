@@ -8,6 +8,8 @@ use tauri::WebviewWindow;
 /// First Windows 11 build. Older builds (Windows 10) get no backdrop: their
 /// only acrylic path (SetWindowCompositionAttribute) lags on drag/resize.
 const WIN11_FIRST_BUILD: u32 = 22000;
+/// First build with DWM's system backdrop types (Acrylic and Mica switch cleanly): glass needs it.
+const SYSTEM_BACKDROP_FIRST_BUILD: u32 = 22523;
 
 static APPLIED_BACKDROP: OnceLock<&'static str> = OnceLock::new();
 
@@ -64,6 +66,35 @@ fn round_corners(window: &WebviewWindow) {
     };
     if hr < 0 {
         log::warn!("rounded corners failed: HRESULT {:#x}", hr);
+    }
+}
+
+/// Settings → Appearance → Glass: Acrylic (it blurs what is behind the panel) in place of Mica, or
+/// Mica again. Returns whether the window has Acrylic now; never on Windows 10, which got no backdrop.
+#[tauri::command]
+pub fn set_window_glass(app_handle: tauri::AppHandle, enabled: bool) -> bool {
+    use tauri::Manager;
+    // Before 22523 window-vibrancy's Acrylic is the laggy SetWindowCompositionAttribute one, and
+    // its Mica there can't take that back off.
+    if APPLIED_BACKDROP.get().copied().unwrap_or("none") == "none"
+        || windows_version::OsVersion::current().build < SYSTEM_BACKDROP_FIRST_BUILD
+    {
+        return false;
+    }
+    let Some(window) = app_handle.get_webview_window("main") else {
+        return false;
+    };
+    let applied = if enabled {
+        window_vibrancy::apply_acrylic(&window, None)
+    } else {
+        window_vibrancy::apply_mica(&window, None)
+    };
+    match applied {
+        Ok(()) => enabled,
+        Err(e) => {
+            log::warn!("glass backdrop switch failed: {}", e);
+            false
+        }
     }
 }
 

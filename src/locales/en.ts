@@ -89,6 +89,432 @@ export const en = {
   "settings.tray.logoColors": "Colored logos",
   "settings.strip.title": "Taskbar strip (experimental)",
   "settings.strip.desc": "Provider logos with session and weekly usage on the taskbar.",
+
+  "settings.widgets.title": "Desktop widgets",
+
+  "settings.widgets.desc": "Provider logos with session and weekly usage, anywhere on the desktop.",
+
+  "settings.stripLook.title": "Strip and widget look",
+
+  "settings.stripLook.desc": "The providers, font and colors the strip and the widgets share.",
+
+  "settings.categories": "Settings categories",
+
+
+  "settings.configBroken": "Not saved: ~/.openusage/config.json isn't valid JSON. Fix or delete that file, then save again.",
+
+
+  "settings.strip.desktopEdgeSide": "Edge",
+
+
+  "settings.strip.desktopEdgeRight": "Right",
+
+
+  "settings.strip.desktopEdgeLeft": "Left",
+
+
+  "settings.strip.desktopEdgeTop": "Top",
+
+
+  "settings.strip.desktopPinned": "Keep the screen-edge rail open (also its pin button)",
+
+
+  "settings.strip.onlyWhileRunning": "Only while an AI tool runs",
+
+
+  "settings.strip.onlyWhileRunningHint": "The strip hides while none of its providers' apps or CLIs (Claude Code, Codex, …) is running.",
+
+
+  "settings.strip.desktopSlide": "Slide the screen-edge rail out smoothly",
+
+
+  "settings.strip.desktopSlideMs": "Slide duration",
+
+
+  "settings.strip.desktopGradient": "Soft color gradient on the screen-edge rail",
+
+
+  "whatsNew.title": "What's new",
+
+
+  "whatsNew.close": "Close",
+
+
+  "whatsNew.video": "A short video of what's new in this version",
+
+
+  "settings.whatsNew.title": "What's new",
+
+
+  "settings.whatsNew.label": "Show what's new after an update",
+
+
+  "settings.whatsNew.hint": "Once, when the panel first opens after an update: the release notes, and a short video when the update brings one. The video is deleted once you close the window.",
+
+
+  "rate.perMinute": "{tokens}/min",
+
+
+  "settings.strip.tokenRate": "Live tokens per minute (Claude, Codex), also in the tray's hover text",
+
+
+  "settings.strip.desktopEdge": "Screen edge",
+
+
+  "settings.strip.desktopEdgeHint": "Docked on a screen edge (right, left or top), almost out of sight; slides out under the pointer.",
+
+
+  "settings.cards.tokscale": "About 30 more tools through tokscale (Gemini CLI, Copilot, Kiro…)",
+
+
+  "settings.cards.tokscaleHint": "Runs the open-source tokscale with bunx or npx (needs bun or Node.js), which downloads it and its price list. It reads those tools' local logs at most every 30 minutes.",
+
+
+  "settings.balances.title": "Custom balances",
+
+
+  "settings.balances.desc": "New API, One API, Sub2API or your own endpoint: their balance on the Custom balances card",
+
+
+  "settings.balances.name": "Name",
+
+
+  "settings.balances.preset": "Type",
+
+
+  "settings.balances.custom": "Custom endpoint",
+
+
+  "settings.balances.url": "Address",
+
+
+  "settings.balances.env": "Environment variable with the key (OTU_…)",
+
+
+  "settings.balances.userId": "User ID",
+
+
+  "settings.balances.path": "Path",
+
+
+  "settings.balances.remaining": "Balance at",
+
+
+  "settings.balances.used": "Used at",
+
+
+  "settings.balances.total": "Total at",
+
+
+  "settings.balances.divisor": "Divide by",
+
+
+  "settings.balances.currency": "Currency",
+
+
+  "settings.balances.auth": "Key header",
+
+
+  "settings.balances.remove": "Remove",
+
+
+  "settings.balances.add": "Add balance",
+
+
+  "settings.balances.save": "Save",
+
+
+  "settings.balances.saved": "Saved. Turn on the Custom balances card to see them.",
+
+
+  "settings.balances.invalid": "Not saved: check the address, the variable name (OTU_ then A–Z, 0–9, _) and the paths.",
+
+
+  "settings.balances.hint": "The key itself is never saved: put it in an environment variable and enter its name. Paths point into the answer, such as data.balance.",
+
+
+  "year.title": "Year of use",
+
+
+  "year.streak": "{days}-day streak",
+
+
+  "year.summary": "Longest streak {longest} days · {active} active days · {tokens} tokens",
+
+
+  "year.cell": "{date}: {tokens} tokens",
+
+
+  "settings.cards.yearHeatmap": "A year of daily use with streaks on Claude and Codex detail pages",
+
+
+  "settings.cards.keepUsage": "Keep usage whose logs were deleted",
+
+
+  "settings.cards.keepUsageHint": "Claude Code deletes its logs after 30 days by default. Each day's tokens are kept in the app's data folder, so the year and the export still count them.",
+
+
+  "settings.export.title": "Usage export",
+
+
+  "settings.export.desc": "Daily tokens and the latest limits as CSV and JSON in Downloads",
+
+
+  "settings.export.now": "Export now",
+
+
+  "settings.export.done": "Saved: {path}",
+
+
+  "settings.export.failed": "Couldn't write the export.",
+
+
+  "settings.export.daily": "Write it again once a day",
+
+
+  "card.sessions.cache": "cache {time}",
+
+
+  "card.sessions.cacheHint": "Time left on this session's prompt cache. Once it runs out, the next prompt sends the whole context again, which uses more of the limit.",
+
+
+  "settings.cards.cacheTimer": "Time left on a Claude session's prompt cache",
+
+
+  "settings.cards.contextFill": "How full each session's context window is",
+
+
+  "spend.planMultiple": "{name}: {times}× its plan",
+
+
+  "spend.planMultipleHint": "30 days at API prices ({cost}) are {times} times the plan's monthly price ({price}).",
+
+
+  "settings.plans.title": "Subscriptions",
+
+
+  "settings.plans.desc": "What each plan costs a month, to set against its use at API prices",
+
+
+  "settings.plans.multiple": "Show each plan's use as a multiple of its price in the spend summary",
+
+
+  "settings.plans.price": "{name}: monthly price",
+
+
+  "settings.claudeCode.retention": "Keep Claude Code's logs for",
+
+
+  "settings.claudeCode.retentionDays": "{days} days",
+
+
+  "settings.claudeCode.retentionHint": "Claude Code deletes older transcripts when it starts. The hour grid, projects and spend are read from them.",
+
+
+  "settings.alerts.refills": "When a limit refills before its reset (a reset credit or a partial refill)",
+
+
+  "settings.alerts.refillPoints": "By at least",
+
+
+  "settings.alerts.points": "{points} points",
+
+
+  "settings.strip.followDetail": "In detail: each limit with its time to reset",
+
+
+  "settings.strip.activityDots": "Dot on a logo while its agent works (blue) or waits for you (yellow)",
+
+
+  "settings.strip.desktopClickThroughKey": "Hold this key to click or drag",
+
+
+  "settings.cards.title": "On the cards",
+
+
+  "settings.cards.desc": "What the overview shows besides the limits",
+
+
+  "settings.cards.liveSessions": "Live Claude Code and Codex sessions on their cards",
+
+
+  "settings.cards.spend": "Spend summary under the cards",
+
+
+  "settings.cards.spendTools": "Also count these tools' own records",
+
+
+  "alert.refill.title": "{provider}: {label} refilled early",
+
+
+  "alert.refill.body": "{percent}% is available again.",
+
+
+  "settings.strip.followActive": "Follow the active app",
+
+
+  "settings.strip.followActiveHint": "The AI tool in the window you're using goes first.",
+
+
+  "settings.strip.desktopClickThrough": "Let clicks pass through to the window behind",
+
+
+  "spend.title": "Spend",
+
+
+  "spend.today": "Today",
+
+
+  "spend.yesterday": "Yesterday",
+
+
+  "spend.month": "30 days",
+
+
+  "spend.cost": "Cost",
+
+
+  "spend.tokens": "Tokens",
+
+
+  "spend.models": "Models, last 30 days (by tokens)",
+
+
+  "settings.strip.desktopCycle": "In turn",
+
+
+  "settings.strip.desktopCycleHint": "One widget showing each provider for 8 seconds",
+
+
+  "settings.theme.halloween": "Halloween",
+
+
+  "settings.theme.glass": "Glass",
+
+
+  "settings.theme.glassHint": "Blurs the desktop behind the panel (Windows 11)",
+
+
+  "label.Installed models": "Installed models",
+
+
+  "label.Loaded now": "Loaded now",
+
+
+  "label.Vouchers": "Vouchers",
+
+
+  "label.Cash": "Cash",
+
+
+  "label.Requests today": "Requests today",
+
+
+  "label.Requests this month": "Requests this month",
+
+
+  "label.Models": "Models",
+
+
+  "label.Token Plan usage": "Token Plan usage",
+
+
+  "card.customize": "Customize rows",
+
+
+  "card.customizeHint": "Drag rows into order and hide the ones you don't need. Ctrl+Z undoes, Esc closes.",
+
+
+  "card.customizeMove": "Move {row}",
+
+
+  "card.customizeShow": "Show {row}",
+
+
+  "card.customizeHide": "Hide {row}",
+
+
+  "card.customizeReset": "Back to default",
+
+
+  "card.customizeDone": "Done",
+
+
+  "weekDays.capacity": "At this week's mix of models, the whole limit is about {tokens} tokens, worth {cost} at API prices.",
+
+
+  "weekDays.capacityTokens": "At this week's mix of models, the whole limit is about {tokens} tokens.",
+
+
+  "card.copyImage": "Copy as image",
+
+
+  "card.imageCopied": "Copied to the clipboard",
+
+
+  "card.imageCopyFailed": "Couldn't copy the image",
+
+
+  "settings.privacy.title": "Privacy",
+
+
+  "settings.privacy.hideWhenSharing": "Hide from screen sharing",
+
+
+  "settings.privacy.hideWhenSharingHint": "The panel and the desktop widgets never show in screen shares, recordings or screenshots; you still see them. Windows can't tell apps when the screen is shared, so the tray numbers and the taskbar strip hide only while you present or someone controls this PC remotely.",
+
+
+  "settings.backup.reset": "Reset all settings",
+
+
+  "settings.backup.resetHint": "Every preference goes back to its default. Your providers, accounts and project budgets stay. The app restarts.",
+
+
+  "settings.backup.resetConfirm": "Reset and restart",
+
+
+  "settings.backup.resetCancel": "Cancel",
+
+
+  "settings.backup.resetError": "Couldn't reset the settings.",
+
+
+  "settings.proxy.title": "Proxy",
+
+
+  "settings.proxy.desc": "Send provider, status page and update requests through a proxy server.",
+
+
+  "settings.proxy.enable": "Use a proxy",
+
+
+  "settings.proxy.url": "Proxy address",
+
+
+  "settings.proxy.save": "Save",
+
+
+  "settings.proxy.saved": "Saved; it applies from the next request.",
+
+
+  "settings.proxy.invalid": "That isn't a proxy address. Use http://, https://, socks5:// or socks5h:// with a host, for example http://127.0.0.1:8080.",
+
+
+  "settings.proxy.error": "Couldn't save the proxy.",
+
+
+  "card.showUsed": "Show what's used",
+
+
+  "card.showLeft": "Show what's left",
+
+  "settings.category.usage": "Usage",
+
+  "settings.category.taskbar": "Taskbar & desktop",
+
+  "settings.category.appearance": "Appearance",
+
+  "settings.category.app": "App",
   "settings.strip.position": "Position",
   "settings.strip.positionLeft": "Left",
   "settings.strip.positionRight": "Right",
@@ -134,6 +560,8 @@ export const en = {
   "settings.strip.colorTraffic": "Traffic light (green → yellow → red)",
   "settings.strip.colorCool": "Cool (blue → purple → red)",
   "settings.strip.colorMono": "Plain, red only near the limit",
+
+  "settings.strip.colorPace": "By pace",
   "settings.strip.colorThresholds": "Custom thresholds",
   "settings.strip.colorOff": "Off",
   "settings.strip.drag": "Drag {name}",
@@ -146,6 +574,23 @@ export const en = {
   "settings.strip.criticalAt": "Critical from",
   "settings.strip.usageColorsHint": "Based on the share of the limit already used.",
   "settings.strip.reset": "Reset look",
+  "settings.strip.desktop": "Show on the desktop",
+  "settings.strip.desktopHint": "Widgets you can drag anywhere; a click opens the panel, and the pointer over one shows when its limits reset. A number that goes up blinks, then stays in the accent color for a minute. They hide while a full-screen app is in front. The providers and look below apply to them too.",
+  "settings.strip.desktopLayout": "Widgets",
+  "settings.strip.desktopRow": "Side by side",
+
+  "settings.strip.desktopColumn": "Stacked",
+  "settings.strip.desktopSeparate": "Separate",
+  "settings.strip.desktopPlate": "Background opacity",
+  "settings.strip.desktopLogo": "Logos",
+  "settings.strip.desktopLogoBrand": "Color",
+  "settings.strip.desktopLogoWhite": "White",
+  "settings.strip.desktopLogoBlack": "Black",
+  "settings.strip.desktopOnTop": "Always on top",
+  "settings.strip.desktopSnap": "Snap to screen edges and each other",
+  "settings.strip.desktopLocked": "Lock in place (see-through under the pointer)",
+
+  "settings.strip.desktopBars": "Bars under the numbers",
   "settings.tray.perProviderHint": "If an icon ends up under ^, switch it on in the taskbar settings to keep it next to the clock.",
   "settings.tray.openTaskbarSettings": "Open taskbar settings",
   "settings.tray.provider": "Provider",
@@ -157,7 +602,7 @@ export const en = {
   "settings.tray.auto": "Auto",
   "settings.tray.tightest": "Most used",
   "settings.theme.title": "Theme",
-  "settings.theme.desc": "Dark (pure black) or light",
+  "settings.theme.desc": "Dark (pure black), light or Halloween",
   "settings.theme.light": "Light",
   "settings.theme.dark": "Dark",
   "settings.theme.darkHint": "Pure black, easy on OLED screens",
@@ -189,6 +634,9 @@ export const en = {
   "settings.panel.desc": "Where the panel opens. The pin in its title bar keeps it above other windows.",
   "settings.panel.remember": "Remember position",
   "settings.panel.rememberHint": "Drag the panel by its title bar and it opens in the same place next time, instead of above the taskbar.",
+  "settings.panel.navSide": "Provider bar",
+  "settings.panel.navLeft": "Left",
+  "settings.panel.navRight": "Right",
   "settings.alerts.levels": "Notify at",
   "settings.alerts.ticksHint": "Bars show a notch at each level.",
   "settings.alerts.perProvider": "Per provider",

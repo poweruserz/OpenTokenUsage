@@ -47,7 +47,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
   Get-FileHash .\OpenTokenUsage_<version>_x64-setup.exe
   ```
 
-- **Releases can't be changed.** From 0.8.7 on, releases are immutable: once published, a release's files and tag are locked, so a download can't be swapped later. GitHub also keeps signed records for each setup, filed under its SHA-256 (nothing is added to the file itself). With the [GitHub CLI](https://cli.github.com/):
+- **Releases can't be changed.** From 0.9.1 on, releases are immutable: once published, a release's files and tag are locked, so a download can't be swapped later. GitHub also keeps signed records for each setup, filed under its SHA-256 (nothing is added to the file itself). With the [GitHub CLI](https://cli.github.com/):
 
   ```powershell
   # The file is the one published in that release:
@@ -63,7 +63,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
 
 ## What It Does
 
-- **One glance.** All your AI tools in one panel, opened from the tray or a global shortcut. Pin it above other windows, or have it open where you left it.
+- **One glance.** All your AI tools in one panel, opened from the tray or a global shortcut. Pin it above other windows, have it open where you left it, or drag its left or right edge to make it wider.
 - **Next to the clock.** The tray shows the app icon, a percent, bars, or one number or logo ring per provider.
 - **Taskbar strip (experimental).** Provider logos with session and weekly usage right in the taskbar, in your own fonts, colors and order, on one monitor or all of them.
 - **Pace.** Every limit says whether you're ahead or behind, and when it runs out at this rate. A weekly limit's pace can count work days only.
@@ -128,20 +128,26 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Amp**](docs/providers/amp.md) / free tier, bonus, credits
 - [**Antigravity**](docs/providers/antigravity.md) / Gemini and Claude models, session and weekly
 - [**Claude**](docs/providers/claude.md) / session, weekly, Fable, extra usage, rate limit resets, local token usage (ccusage)
+- [**Codebuff**](docs/providers/codebuff.md) / credits, weekly limit
 - [**Codex**](docs/providers/codex.md) / session, weekly, reviews, credits, banked resets with expiry countdowns
 - [**Copilot**](docs/providers/copilot.md) / credits, extra usage, chat, completions
+- [**Custom balances**](docs/providers/custom-balance.md) / New API, One API, Sub2API or your own endpoint (set up in Settings)
 - [**Cursor**](docs/providers/cursor.md) / credits, total usage, requests, auto usage, API usage, Grok Bot, on-demand, bonus spend, CLI auth
 - [**DeepSeek**](docs/providers/deepseek.md) / API balance
 - [**Devin**](docs/providers/devin.md) / weekly and daily quota, extra usage
 - [**Factory / Droid**](docs/providers/factory.md) / standard, premium tokens
 - [**Grok**](docs/providers/grok.md) / weekly limit, credits used, pay-as-you-go cap
 - [**JetBrains AI Assistant**](docs/providers/jetbrains-ai-assistant.md) / quota, remaining
+- [**Kilo**](docs/providers/kilo.md) / credits, Kilo Pass month
+- [**Kimi API**](docs/providers/kimi-api.md) / API balance, vouchers, cash
 - [**Kimi Code**](docs/providers/kimi.md) / session, weekly
 - [**Kiro**](docs/providers/kiro.md) / credits, bonus credits, overages
 - [**MiniMax**](docs/providers/minimax.md) / coding plan session
 - [**Muse Code**](docs/providers/muse.md) / session, weekly (turn it on in Settings)
+- [**Ollama**](docs/providers/ollama.md) / installed and loaded models (local server)
 - [**OpenCode Go**](docs/providers/opencode-go.md) / 5h, weekly, monthly usage limits
 - [**OpenRouter**](docs/providers/openrouter.md) / credits, API key spending cap, daily and monthly spend
+- [**Qwen Code**](docs/providers/qwen-code.md) / requests today and this month (local ledger)
 - [**Synthetic**](docs/providers/synthetic.md) / 5-hour rate limit, subscription, tool calls, search
 - [**Z.ai**](docs/providers/zai.md) / session, weekly, web searches
 

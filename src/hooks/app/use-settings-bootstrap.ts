@@ -32,6 +32,8 @@ import {
   loadRememberPanelPosition,
   loadTrayLogoColors,
   loadPaceWorkdays,
+  loadNavRight,
+  loadDesktopWidgets,
   loadTaskbarStrip,
   loadTaskbarStripStyle,
   loadTrayPercentColor,
@@ -55,6 +57,7 @@ import {
   type PluginSettings,
   type ResetTimerDisplayMode,
   type TaskbarStripStyle,
+  type DesktopWidgets,
   type ThemeMode,
   type TimeFormatMode,
   type TrayMetric,
@@ -88,6 +91,8 @@ type UseSettingsBootstrapArgs = {
   setPaceWorkdays: (value: boolean) => void
   setTaskbarStrip: (value: boolean) => void
   setTaskbarStripStyle: (value: TaskbarStripStyle) => void
+  setNavRight: (value: boolean) => void
+  setDesktopWidgets: (value: DesktopWidgets) => void
   setLoadingForPlugins: (ids: string[]) => void
   setErrorForPlugins: (ids: string[], error: string) => void
   startBatch: (pluginIds?: string[]) => Promise<string[] | undefined>
@@ -118,6 +123,8 @@ export function useSettingsBootstrap({
   setPaceWorkdays,
   setTaskbarStrip,
   setTaskbarStripStyle,
+  setNavRight,
+  setDesktopWidgets,
   setLoadingForPlugins,
   setErrorForPlugins,
   startBatch,
@@ -173,6 +180,7 @@ export function useSettingsBootstrap({
         console.error("Failed to load panel settings:", error)
       }
       try {
+        // Before the plugin settings' first save below: a style not saved yet tells a new install by them.
         const [logoColors, strip, stripStyle] = await Promise.all([
           loadTrayLogoColors(),
           loadTaskbarStrip(),
@@ -191,6 +199,15 @@ export function useSettingsBootstrap({
         if (isMounted) setPaceWorkdays(workdays)
       } catch (error) {
         console.error("Failed to load the work-day pace setting:", error)
+      }
+      try {
+        const [navRight, desktopWidgets] = await Promise.all([loadNavRight(), loadDesktopWidgets()])
+        if (isMounted) {
+          setNavRight(navRight)
+          setDesktopWidgets(desktopWidgets)
+        }
+      } catch (error) {
+        console.error("Failed to load the nav side or desktop widget settings:", error)
       }
       try {
         const storedLanguage = await loadLanguage()
@@ -356,6 +373,8 @@ export function useSettingsBootstrap({
     setPaceWorkdays,
     setTaskbarStrip,
     setTaskbarStripStyle,
+    setNavRight,
+    setDesktopWidgets,
     migrateWindsurfToDevin,
     migrateLegacyTraySettings,
     setPluginSettings,

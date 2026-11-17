@@ -4,7 +4,7 @@ mod cursor_safe_storage;
 pub(crate) mod http_gate;
 pub mod manifest;
 pub mod runtime;
-mod sqlite;
+pub(crate) mod sqlite;
 
 use manifest::LoadedPlugin;
 use std::path::{Path, PathBuf};

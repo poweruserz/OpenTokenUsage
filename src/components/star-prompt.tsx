@@ -76,7 +76,7 @@ export function StarPromptCard() {
   return (
     <div
       role="status"
-      className="absolute inset-x-0 bottom-1 z-20 flex items-start gap-2.5 rounded-lg border bg-popover p-3 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
+      className="absolute left-0 right-3 bottom-1 z-20 flex items-start gap-2.5 rounded-lg border bg-popover p-3 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200"
     >
       <Star aria-hidden className="mt-0.5 size-4 shrink-0 text-support" fill="currentColor" strokeWidth={1.5} />
       <div className="min-w-0 flex-1">
