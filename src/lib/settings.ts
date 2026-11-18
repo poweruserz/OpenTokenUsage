@@ -606,6 +606,8 @@ export const SPEND_TOOLS = [
 /** Extra parts of the overview and cards: live sessions, the spend summary and the tools it counts. */
 export type CardFeatures = {
   liveSessions: boolean;
+  /** Also on the overview's cards; off, only a card's detail page lists its sessions. */
+  sessionsOnOverview: boolean;
   /** On a live Claude session: when its prompt cache runs out. */
   cacheTimer: boolean;
   /** On a live session: how full its context window is. */
@@ -626,6 +628,7 @@ export type CardFeatures = {
 };
 export const DEFAULT_CARD_FEATURES: CardFeatures = {
   liveSessions: true,
+  sessionsOnOverview: true,
   cacheTimer: true,
   contextFill: true,
   spend: true,
@@ -641,6 +644,7 @@ export function normalizeCardFeatures(value: unknown): CardFeatures {
   const known: readonly string[] = SPEND_TOOLS.map((tool) => tool.id);
   return {
     liveSessions: raw.liveSessions !== false,
+    sessionsOnOverview: raw.sessionsOnOverview !== false,
     cacheTimer: raw.cacheTimer !== false,
     contextFill: raw.contextFill !== false,
     spend: raw.spend !== false,

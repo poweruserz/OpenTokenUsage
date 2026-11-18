@@ -101,6 +101,9 @@ export const ptBR: Messages = {
   "settings.categories": "Categorias de configurações",
 
 
+  "settings.cards.sessionsOnOverview": "Também na visão geral (desativado: só na página de um cartão)",
+
+
   "settings.newBadge": "Novo",
 
 

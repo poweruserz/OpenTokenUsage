@@ -101,6 +101,9 @@ export const de: Messages = {
   "settings.categories": "Einstellungsbereiche",
 
 
+  "settings.cards.sessionsOnOverview": "Auch in der Übersicht (aus: nur auf der Detailseite einer Karte)",
+
+
   "settings.newBadge": "Neu",
 
 

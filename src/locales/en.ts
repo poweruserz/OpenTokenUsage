@@ -101,6 +101,9 @@ export const en = {
   "settings.categories": "Settings categories",
 
 
+  "settings.cards.sessionsOnOverview": "Also on the overview (off: only on a card's detail page)",
+
+
   "settings.newBadge": "New",
 
 

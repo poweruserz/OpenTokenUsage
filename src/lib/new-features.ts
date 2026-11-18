@@ -8,7 +8,7 @@ import { useAppUiStore } from "@/stores/app-ui-store"
  * once a release ships two versions after its `since` (new-features.test.ts fails until then).
  */
 export const NEW_FEATURES = {
-  cards: { since: "0.9.1", category: "usage" },
+  cards: { since: "0.9.2", category: "usage" },
   plans: { since: "0.9.1", category: "usage" },
   widgets: { since: "0.9.1", category: "taskbar" },
   stripLook: { since: "0.9.1", category: "taskbar" },

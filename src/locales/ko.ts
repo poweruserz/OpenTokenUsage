@@ -101,6 +101,9 @@ export const ko: Messages = {
   "settings.categories": "설정 범주",
 
 
+  "settings.cards.sessionsOnOverview": "개요에도 표시 (끄면 카드의 상세 페이지에만)",
+
+
   "settings.newBadge": "신규",
 
 

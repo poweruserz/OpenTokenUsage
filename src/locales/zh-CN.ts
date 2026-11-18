@@ -101,6 +101,9 @@ export const zhCN: Messages = {
   "settings.categories": "设置类别",
 
 
+  "settings.cards.sessionsOnOverview": "也在概览中显示（关闭后仅在卡片的详情页显示）",
+
+
   "settings.newBadge": "新",
 
 

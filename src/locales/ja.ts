@@ -101,6 +101,9 @@ export const ja: Messages = {
   "settings.categories": "設定のカテゴリ",
 
 
+  "settings.cards.sessionsOnOverview": "概要にも表示（オフの場合はカードの詳細ページのみ）",
+
+
   "settings.newBadge": "新機能",
 
 
