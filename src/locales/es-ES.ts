@@ -101,6 +101,9 @@ export const esES: Messages = {
   "settings.categories": "Categorías de ajustes",
 
 
+  "settings.newBadge": "Nuevo",
+
+
   "settings.plugins.signedOut": "Sesión cerrada",
 
 
@@ -332,7 +335,7 @@ export const esES: Messages = {
   "settings.strip.followDetail": "En detalle: cada límite con el tiempo hasta su reinicio",
 
 
-  "settings.strip.activityDots": "Punto en el logo mientras su agente trabaja (azul) o te espera (amarillo)",
+  "settings.strip.activityDots": "Punto en el logo mientras su agente trabaja (verde) o te espera (amarillo)",
 
 
   "settings.strip.desktopClickThroughKey": "Mantén pulsada esta tecla para hacer clic o arrastrar",

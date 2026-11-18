@@ -36,7 +36,7 @@ export function ClaudeCodeSection() {
   }
 
   return (
-    <SettingsSection title={t("settings.claudeCode.title")} description={t("settings.claudeCode.desc")}>
+    <SettingsSection newFeature="claudeCode" title={t("settings.claudeCode.title")} description={t("settings.claudeCode.desc")}>
       <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           checked={state === "on"}

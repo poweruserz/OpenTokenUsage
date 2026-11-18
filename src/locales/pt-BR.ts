@@ -101,6 +101,9 @@ export const ptBR: Messages = {
   "settings.categories": "Categorias de configurações",
 
 
+  "settings.newBadge": "Novo",
+
+
   "settings.plugins.signedOut": "Desconectado",
 
 
@@ -332,7 +335,7 @@ export const ptBR: Messages = {
   "settings.strip.followDetail": "Em detalhe: cada limite com o tempo até reiniciar",
 
 
-  "settings.strip.activityDots": "Ponto no logo enquanto o agente trabalha (azul) ou espera por você (amarelo)",
+  "settings.strip.activityDots": "Ponto no logo enquanto o agente trabalha (verde) ou espera por você (amarelo)",
 
 
   "settings.strip.desktopClickThroughKey": "Segure esta tecla para clicar ou arrastar",

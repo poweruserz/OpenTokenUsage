@@ -101,6 +101,9 @@ export const ja: Messages = {
   "settings.categories": "設定のカテゴリ",
 
 
+  "settings.newBadge": "新機能",
+
+
   "settings.plugins.signedOut": "サインアウト中",
 
 
@@ -332,7 +335,7 @@ export const ja: Messages = {
   "settings.strip.followDetail": "詳細表示：各上限とリセットまでの時間",
 
 
-  "settings.strip.activityDots": "エージェントの作業中（青）や応答待ち（黄）にロゴへ点を表示",
+  "settings.strip.activityDots": "エージェントの作業中（緑）や応答待ち（黄）にロゴへ点を表示",
 
 
   "settings.strip.desktopClickThroughKey": "クリックやドラッグのときに押し続けるキー",

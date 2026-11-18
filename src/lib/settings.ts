@@ -64,6 +64,7 @@ const PANEL_POSITION_KEY = "panelPosition";
 const TRAY_LOGO_COLORS_KEY = "trayLogoColors";
 const PACE_WORKDAYS_KEY = "paceWorkdays";
 const CLAUDE_DESKTOP_LOGIN_KEY = "claudeDesktopLogin";
+const SEEN_NEW_FEATURES_KEY = "seenNewFeatures";
 const TASKBAR_STRIP_KEY = "taskbarStrip";
 const TASKBAR_STRIP_STYLE_KEY = "taskbarStripStyle";
 const DESKTOP_WIDGETS_KEY = "desktopWidgets";
@@ -819,6 +820,17 @@ export async function markStarPromptShown(): Promise<void> {
 /** Provider logos in their brand color (tray "logos" style and the taskbar strip). */
 export const loadTrayLogoColors = () => loadBoolean(TRAY_LOGO_COLORS_KEY, true);
 /** Weekly pace counts Monday to Friday only (`pace-status.ts`). */
+/** Ids of new-feature badges whose settings group was opened (`new-features.ts`); this PC's, not backed up. */
+export async function loadSeenNewFeatures(): Promise<string[]> {
+  const stored = await store.get<unknown>(SEEN_NEW_FEATURES_KEY);
+  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+}
+
+export async function saveSeenNewFeatures(ids: string[]): Promise<void> {
+  await store.set(SEEN_NEW_FEATURES_KEY, ids);
+  await store.save();
+}
+
 /** The Claude card reads the Claude app's sign-in when Claude Code has none (`claude_desktop.rs`). */
 export const loadClaudeDesktopLogin = () => loadBoolean(CLAUDE_DESKTOP_LOGIN_KEY, true);
 export const saveClaudeDesktopLogin = (value: boolean) => saveBoolean(CLAUDE_DESKTOP_LOGIN_KEY, value);
@@ -827,7 +839,21 @@ export const savePaceWorkdays = (value: boolean) => saveBoolean(PACE_WORKDAYS_KE
 export const saveTrayLogoColors = (value: boolean) => saveBoolean(TRAY_LOGO_COLORS_KEY, value);
 
 /** Experimental: usage text embedded in the taskbar next to the tray (`taskbar_strip.rs`). */
-export const loadTaskbarStrip = () => loadBoolean(TASKBAR_STRIP_KEY, false);
+/**
+ * On unless the user turned it off, or picked a tray style that shows numbers (the two exclude each other):
+ * a new install, and an older one that never touched it, gets the strip.
+ */
+export async function loadTaskbarStrip(): Promise<boolean> {
+  const stored = await store.get<unknown>(TASKBAR_STRIP_KEY);
+  if (typeof stored === "boolean") return stored;
+  // A legacy tray style not migrated yet (the bootstrap migrates it later): the ones that become a style with
+  // numbers (`migrateLegacyTraySettings`) are a choice made too.
+  const legacy = await store.get<unknown>(LEGACY_TRAY_ICON_STYLE_KEY);
+  if ((await store.get<unknown>(MENUBAR_ICON_STYLE_KEY)) == null && (legacy === "bars" || legacy === "circle")) {
+    return false;
+  }
+  return (await loadMenubarIconStyle()) === "icon";
+}
 export const saveTaskbarStrip = (value: boolean) => saveBoolean(TASKBAR_STRIP_KEY, value);
 
 export const MAX_TASKBAR_STRIP_PROVIDERS = 6;

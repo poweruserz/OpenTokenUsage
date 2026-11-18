@@ -101,6 +101,9 @@ export const zhCN: Messages = {
   "settings.categories": "设置类别",
 
 
+  "settings.newBadge": "新",
+
+
   "settings.plugins.signedOut": "已退出登录",
 
 
@@ -332,7 +335,7 @@ export const zhCN: Messages = {
   "settings.strip.followDetail": "详细显示：每项限额及距重置的时间",
 
 
-  "settings.strip.activityDots": "代理工作时（蓝）或等待你时（黄）在图标上显示圆点",
+  "settings.strip.activityDots": "代理工作时（绿）或等待你时（黄）在图标上显示圆点",
 
 
   "settings.strip.desktopClickThroughKey": "按住此键可点击或拖动",

@@ -101,6 +101,9 @@ export const fr: Messages = {
   "settings.categories": "Catégories de paramètres",
 
 
+  "settings.newBadge": "Nouveau",
+
+
   "settings.plugins.signedOut": "Déconnecté",
 
 
@@ -332,7 +335,7 @@ export const fr: Messages = {
   "settings.strip.followDetail": "En détail : chaque limite avec son délai de réinitialisation",
 
 
-  "settings.strip.activityDots": "Point sur un logo quand son agent travaille (bleu) ou vous attend (jaune)",
+  "settings.strip.activityDots": "Point sur un logo quand son agent travaille (vert) ou vous attend (jaune)",
 
 
   "settings.strip.desktopClickThroughKey": "Maintenir cette touche pour cliquer ou déplacer",

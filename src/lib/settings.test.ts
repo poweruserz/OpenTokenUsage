@@ -28,6 +28,7 @@ import {
   loadStartOnLogin,
   loadTimeFormatMode,
   loadTaskbarStripStyle,
+  loadTaskbarStrip,
   loadRememberPanelPosition,
   migrateLegacyTraySettings,
   migrateWindsurfToDevin,
@@ -96,6 +97,24 @@ describe("settings", () => {
     storeState.clear()
     await restoreSettingsBackup(backup)
     await expect(loadCollapsedSections()).resolves.toEqual(["heatmap"])
+  })
+
+  it("shows the taskbar strip unless it was turned off or a tray style with numbers was picked", async () => {
+    storeState.clear()
+    await expect(loadTaskbarStrip()).resolves.toBe(true)
+    storeState.set("menubarIconStyle", "numbers")
+    await expect(loadTaskbarStrip()).resolves.toBe(false)
+    storeState.set("menubarIconStyle", "icon")
+    storeState.set("taskbarStrip", false)
+    await expect(loadTaskbarStrip()).resolves.toBe(false)
+    // A tray style from before `menubarIconStyle`, migrated only later in the bootstrap.
+    storeState.clear()
+    storeState.set("trayIconStyle", "bars")
+    await expect(loadTaskbarStrip()).resolves.toBe(false)
+    // One that migrates to the plain icon gets the strip on its first start already.
+    storeState.clear()
+    storeState.set("trayIconStyle", "provider")
+    await expect(loadTaskbarStrip()).resolves.toBe(true)
   })
 
   it("remembers the panel's spot on a new install, not on an older one, and keeps a choice", async () => {

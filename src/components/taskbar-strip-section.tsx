@@ -483,7 +483,7 @@ export function TaskbarStripSection({ onMenubarIconStyleChange }: { onMenubarIco
         )}
       </SettingsSection>
 
-      <SettingsSection title={t("settings.widgets.title")} description={t("settings.widgets.desc")}>
+      <SettingsSection newFeature="widgets" title={t("settings.widgets.title")} description={t("settings.widgets.desc")}>
         <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
           <Checkbox
             key={`desktop-${widgets.enabled}`}
@@ -500,7 +500,7 @@ export function TaskbarStripSection({ onMenubarIconStyleChange }: { onMenubarIco
       </SettingsSection>
 
       {(enabled || widgets.enabled) && (
-        <SettingsSection title={t("settings.stripLook.title")} description={t("settings.stripLook.desc")}>
+        <SettingsSection newFeature="stripLook" title={t("settings.stripLook.title")} description={t("settings.stripLook.desc")}>
           <div className="space-y-3">
             <div>
               <div className="text-xs text-muted-foreground mb-1">

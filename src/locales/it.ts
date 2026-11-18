@@ -101,6 +101,9 @@ export const it: Messages = {
   "settings.categories": "Categorie delle impostazioni",
 
 
+  "settings.newBadge": "Nuovo",
+
+
   "settings.plugins.signedOut": "Disconnesso",
 
 
@@ -332,7 +335,7 @@ export const it: Messages = {
   "settings.strip.followDetail": "In dettaglio: ogni limite con il tempo al reset",
 
 
-  "settings.strip.activityDots": "Punto sul logo mentre il suo agente lavora (blu) o ti aspetta (giallo)",
+  "settings.strip.activityDots": "Punto sul logo mentre il suo agente lavora (verde) o ti aspetta (giallo)",
 
 
   "settings.strip.desktopClickThroughKey": "Tieni premuto questo tasto per cliccare o trascinare",

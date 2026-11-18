@@ -101,6 +101,9 @@ export const tr: Messages = {
   "settings.categories": "Ayar kategorileri",
 
 
+  "settings.newBadge": "Yeni",
+
+
   "settings.plugins.signedOut": "Oturum kapalı",
 
 
@@ -332,7 +335,7 @@ export const tr: Messages = {
   "settings.strip.followDetail": "Ayrıntılı: her limit sıfırlanmaya kalan süresiyle",
 
 
-  "settings.strip.activityDots": "Ajanı çalışırken (mavi) veya seni beklerken (sarı) logoda nokta",
+  "settings.strip.activityDots": "Ajanı çalışırken (yeşil) veya seni beklerken (sarı) logoda nokta",
 
 
   "settings.strip.desktopClickThroughKey": "Tıklamak veya sürüklemek için basılı tutulacak tuş",

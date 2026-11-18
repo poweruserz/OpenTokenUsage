@@ -100,6 +100,7 @@ import { AccountsSection } from "@/components/accounts-section";
 import { ClaudeCodeSection } from "@/components/claude-code-section";
 import { CustomBalancesSection } from "@/components/custom-balances-section";
 import { useAppPreferencesStore } from "@/stores/app-preferences-store";
+import { hasNewFeature, NewFeaturesContext, useNewFeatures } from "@/lib/new-features";
 
 interface PluginConfig {
   id: string;
@@ -124,6 +125,8 @@ const SETTINGS_CATEGORIES = [
   { id: "appearance", labelKey: "settings.category.appearance", Icon: Palette },
   { id: "app", labelKey: "settings.category.app", Icon: AppWindow },
 ] as const satisfies readonly { id: string; labelKey: string; Icon: LucideIcon }[];
+
+const FIRST_CATEGORY = SETTINGS_CATEGORIES[0].id;
 
 /** A WinUI NavigationView item, as in the side nav: accent pill and fill on the chosen one. */
 const CATEGORY_TAB = cn(
@@ -687,7 +690,7 @@ function PanelSection() {
     }
   };
   return (
-    <SettingsSection title={t("settings.panel.title")} description={t("settings.panel.desc")}>
+    <SettingsSection newFeature="panel" title={t("settings.panel.title")} description={t("settings.panel.desc")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={`remember-position-${remember}`}
@@ -725,7 +728,7 @@ function CardFeaturesSection() {
   const toggleTool = (id: string, on: boolean) =>
     update({ spendToolsOff: on ? features.spendToolsOff.filter((off) => off !== id) : [...features.spendToolsOff, id] });
   return (
-    <SettingsSection title={t("settings.cards.title")} description={t("settings.cards.desc")}>
+    <SettingsSection newFeature="cards" title={t("settings.cards.title")} description={t("settings.cards.desc")}>
       <div className="space-y-2">
         <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
           <Checkbox
@@ -829,7 +832,7 @@ function WhatsNewSection() {
   }, []);
   if (on === null) return null;
   return (
-    <SettingsSection title={t("settings.whatsNew.title")}>
+    <SettingsSection newFeature="whatsNew" title={t("settings.whatsNew.title")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={String(on)}
@@ -872,7 +875,7 @@ function UsageExportSection() {
     }
   };
   return (
-    <SettingsSection title={t("settings.export.title")} description={t("settings.export.desc")}>
+    <SettingsSection newFeature="export" title={t("settings.export.title")} description={t("settings.export.desc")}>
       <button type="button" disabled={busy} onClick={() => void exportNow()} className="fluent-control px-3 disabled:opacity-50">
         {t("settings.export.now")}
       </button>
@@ -914,7 +917,7 @@ function SubscriptionsSection({ plugins }: { plugins: PluginConfig[] }) {
   const shown = (usd: number | undefined) =>
     usd == null ? "" : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(usd * currency.rate);
   return (
-    <SettingsSection title={t("settings.plans.title")} description={t("settings.plans.desc")}>
+    <SettingsSection newFeature="plans" title={t("settings.plans.title")} description={t("settings.plans.desc")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={`plan-multiple-${features.planMultiple}`}
@@ -959,7 +962,7 @@ function NotificationsSection({ plugins }: { plugins: PluginConfig[] }) {
   const usageAlerts = useAppPreferencesStore((state) => state.usageAlerts);
   const setUsageAlerts = useAppPreferencesStore((state) => state.setUsageAlerts);
   return (
-    <SettingsSection title={t("settings.alerts.title")} description={t("settings.alerts.desc")}>
+    <SettingsSection newFeature="alerts" title={t("settings.alerts.title")} description={t("settings.alerts.desc")}>
       <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={`usage-alerts-${usageAlerts}`}
@@ -1077,6 +1080,7 @@ export function SettingsPage({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const tabsRef = useRef<HTMLDivElement>(null);
+  const newFeatures = useNewFeatures(FIRST_CATEGORY);
 
   // Enabled providers first (stable sort keeps the user's order inside each group); dragging works
   // on this list, so a reorder saves the grouped order.
@@ -1094,12 +1098,16 @@ export function SettingsPage({
 
   return (
     // The wider settings view (SETTINGS_PANEL_WIDTH): the groups on the left, the chosen one's cards in a column.
+    <NewFeaturesContext.Provider value={newFeatures.shown}>
     <Tabs
       ref={tabsRef}
       orientation="vertical"
-      defaultValue="usage"
+      defaultValue={FIRST_CATEGORY}
       // A long group may have been scrolled: start the next one at its top.
-      onValueChange={() => tabsRef.current?.scrollIntoView?.({ block: "start" })}
+      onValueChange={(value) => {
+        tabsRef.current?.scrollIntoView?.({ block: "start" });
+        newFeatures.opened(String(value));
+      }}
       className="items-start py-2"
     >
       <TabsPrimitive.List aria-label={t("settings.categories")} className="sticky top-2 flex w-44 shrink-0 flex-col gap-0.5">
@@ -1107,6 +1115,12 @@ export function SettingsPage({
           <TabsPrimitive.Tab key={id} value={id} className={CATEGORY_TAB}>
             <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
             {t(labelKey)}
+            {hasNewFeature(newFeatures.shown, id) && (
+              <span
+                className="ml-auto size-1.5 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+                aria-hidden
+              />
+            )}
           </TabsPrimitive.Tab>
         ))}
       </TabsPrimitive.List>
@@ -1272,7 +1286,7 @@ export function SettingsPage({
       </TabsContent>
 
       <TabsContent value="appearance" className="min-w-0 space-y-1">
-        <SettingsSection title={t("settings.theme.title")} description={t("settings.theme.desc")}>
+        <SettingsSection newFeature="theme" title={t("settings.theme.title")} description={t("settings.theme.desc")}>
           <SegmentedControl
             ariaLabel={t("settings.theme.title")}
             options={THEME_OPTIONS}
@@ -1342,6 +1356,7 @@ export function SettingsPage({
         <SettingsBackupSection />
       </TabsContent>
     </Tabs>
+    </NewFeaturesContext.Provider>
   );
 }
 

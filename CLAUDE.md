@@ -46,7 +46,7 @@ This file holds the project facts that are easy to get wrong.
   no pid file: while N `codex.exe` run, the N newest `sessions/YYYY/MM/DD/*.jsonl` written in the last 6 h (7 newest day
   folders) over every Codex login are the sessions, each on the card whose folder holds it; the tail says idle (`task_complete`, `turn_aborted`, a `final_answer`) or busy (a newer user
   message or step, written in the last 10 min). `agent_activity` folds every card's sessions into "waiting" > "busy" for
-  a dot on the strip's and widgets' logos (`useAgentActivity`, every 5 s while either shows, Windows blue / caution yellow).
+  a dot on the strip's and widgets' logos (`useAgentActivity`, every 5 s while either shows, Windows success green / caution yellow).
   Both commands read files off the main thread (async + `spawn_blocking`).
 - Codex Business answers `rate_limit: null`; its admin-set monthly cap is `spend_control.individual_limit` (`used_percent`,
   else `used`/`limit`, numbers or strings; reset `reset_at`, else `reset_after_seconds`): a "Monthly" line.
@@ -234,6 +234,12 @@ This file holds the project facts that are easy to get wrong.
   too) are promoted via `HKCU\Control Panel\NotifyIconSettings\*\IsPromoted` only when the user hasn't
   chosen yet, matched by exe file name (Program Files paths are stored as `{GUID}\OpenTokenUsage\...`),
   retried for 30 s because Explorer writes the entry late. Explorer applies the value live.
+- "New" badges (`new-features.ts`): a settings card added to in the last two releases names its entry
+  (`<SettingsSection newFeature="…">`) and shows a slowly pulsing "New" pill, its group a dot, until that group
+  was opened once (`seenNewFeatures`, per PC; the badges stay for the rest of that visit). When a release ships,
+  drop entries older than the release before it: `new-features.test.ts` fails until then, and when an entry has no card.
+- The taskbar strip is on unless the user turned it off or picked a tray style that shows numbers (`loadTaskbarStrip`:
+  an unset key follows the tray style), so new installs and installs that never touched it get it.
 - Taskbar strip (experimental, `taskbar_strip.rs`): layered child windows of `Shell_TrayWnd` (left of
   `TrayNotifyWnd`) and, per `taskbarStripStyle.monitors` ("primary" | "all" | picked `{id,name}`), of
   `Shell_SecondaryTrayWnd` (no tray window there: left of a fixed 88 px clock width). One thread owns
