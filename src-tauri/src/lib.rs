@@ -646,6 +646,7 @@ pub fn run() {
             whats_new::whats_new_video,
             whats_new::forget_whats_new_video,
             capture_privacy::set_capture_privacy,
+            plugin_engine::claude_desktop::set_claude_desktop_login,
             clipboard_image::copy_image_to_clipboard,
             taskbar_strip::list_taskbar_monitors,
             taskbar_strip::taskbar_icons_left,

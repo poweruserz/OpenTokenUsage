@@ -36,6 +36,7 @@ import {
   loadDesktopWidgets,
   loadTaskbarStrip,
   loadTaskbarStripStyle,
+  loadClaudeDesktopLogin,
   loadTrayPercentColor,
   loadTrayProvider,
   migrateLegacyTraySettings,
@@ -208,6 +209,12 @@ export function useSettingsBootstrap({
         }
       } catch (error) {
         console.error("Failed to load the nav side or desktop widget settings:", error)
+      }
+      try {
+        // Before the first probe below: the host reads the Claude app's sign-in unless told not to.
+        if (!(await loadClaudeDesktopLogin())) await invoke("set_claude_desktop_login", { enabled: false })
+      } catch (error) {
+        console.error("Failed to apply the Claude app sign-in setting:", error)
       }
       try {
         const storedLanguage = await loadLanguage()

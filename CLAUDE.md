@@ -204,6 +204,14 @@ This file holds the project facts that are easy to get wrong.
   language, and never paste English into another locale. `translation-lock.test.ts` fails when
   English text changes; after translating everything, run `bun run locales:lock`. Never re-lock
   without translating first.
+- Errors the user clears (sign in, open an app, a key: `isActionNeededError`, `plugin-errors.ts`) show grey with an
+  info icon; red stays for failures (network, HTTP, a changed response, a crash). A card that asks for a sign-in
+  (`needsSignIn`) also gets "Signed out · Sign in" in Settings → Providers (`loginFix`, the card button's click).
+- Claude desktop app (`plugin_engine/claude_desktop.rs`, `claudeDesktopLogin`, on by default, Settings → Claude Code):
+  without a Claude Code login, the usual Claude card reads usage with the app's `oauth:tokenCacheV2` (safeStorage, as
+  Cursor's). Read only: the host passes the token, expiry, plan and account id, never the refresh token; the plugin
+  never refreshes it (that would sign the app out) and asks to open Claude once it expires. The Codex app shares the
+  CLI's `~/.codex`, so it needs nothing of the kind.
 - Errors: `getPluginErrorAction` turns known errors into one-click fixes: a login command →
   `run_in_terminal` (Rust allow-list in `setup_actions.rs`, test-synced with the plugin fixtures),
   a missing API-key env var → the Windows Environment Variables dialog. Env vars are also read from

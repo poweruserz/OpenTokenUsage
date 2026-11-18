@@ -101,6 +101,15 @@ export const de: Messages = {
   "settings.categories": "Einstellungsbereiche",
 
 
+  "settings.plugins.signedOut": "Abgemeldet",
+
+
+  "settings.claudeCode.desktopLogin": "Anmeldung der Claude-App verwenden",
+
+
+  "settings.claudeCode.desktopLoginHint": "Ist Claude Code nicht angemeldet, liest die Claude-Karte die Nutzung mit der Anmeldung der Claude-App. Sie wird nur gelesen, nie erneuert.",
+
+
   "settings.configBroken": "Nicht gespeichert: ~/.openusage/config.json ist kein gültiges JSON. Datei korrigieren oder löschen, dann erneut speichern.",
 
 

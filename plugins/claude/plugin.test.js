@@ -2837,4 +2837,97 @@ describe("claude plugin", () => {
       expect(() => plugin.probe(ctx)).toThrow("Not logged in")
     })
   })
+
+  describe("the Claude app's sign-in", () => {
+    const APP_EXPIRED = "Claude session expired. Open Claude and sign in again."
+    const appLogin = (overrides = {}) => ({
+      accessToken: "app-token",
+      expiresAt: Date.now() + 60 * 60 * 1000,
+      subscriptionType: "max",
+      rateLimitTier: "default_claude_max_20x",
+      account: "acc-1",
+      ...overrides,
+    })
+    const withApp = (ctx, ...logins) => {
+      const readLogin = vi.fn()
+      for (const login of logins) readLogin.mockReturnValueOnce(login && JSON.stringify(login))
+      ctx.host.claudeDesktop = { readLogin }
+      return readLogin
+    }
+    const refreshCalls = (ctx) =>
+      ctx.host.http.request.mock.calls.filter((call) => String(call[0]?.url).includes("/oauth/token"))
+    const usageAuth = (ctx) =>
+      ctx.host.http.request.mock.calls.filter((call) => isUsagePoll(call[0]?.url)).map((call) => call[0].headers.Authorization)
+
+    it("reads usage with the app's login when Claude Code has none", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin())
+      ctx.host.http.request.mockReturnValue(
+        okUsageResponse({ five_hour: { utilization: 12, resets_at: "2099-01-01T00:00:00.000Z" } })
+      )
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+      expect(result.lines.find((line) => line.label === "Session")?.used).toBe(12)
+      expect(usageAuth(ctx)).toEqual(["Bearer app-token"])
+      expect(refreshCalls(ctx)).toHaveLength(0)
+    })
+
+    it("never refreshes an expired app login: it asks to open the app, without a request", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin({ expiresAt: Date.now() - 1000 }), appLogin({ expiresAt: Date.now() - 1000 }))
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow(APP_EXPIRED)
+      expect(ctx.host.http.request).not.toHaveBeenCalled()
+    })
+
+    it("takes the token the app renewed meanwhile", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin({ expiresAt: Date.now() - 1000 }), appLogin({ accessToken: "renewed" }))
+      ctx.host.http.request.mockReturnValue(
+        okUsageResponse({ five_hour: { utilization: 5, resets_at: "2099-01-01T00:00:00.000Z" } })
+      )
+      const plugin = await loadPlugin()
+      plugin.probe(ctx)
+      expect(usageAuth(ctx)).toEqual(["Bearer renewed"])
+    })
+
+    it("a rejected app login asks to open the app, never to run `claude`", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin(), appLogin())
+      ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "{}", headers: {} })
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow(APP_EXPIRED)
+      expect(refreshCalls(ctx)).toHaveLength(0)
+    })
+
+    it("Claude Code's own login wins, and the app is not read then", async () => {
+      const ctx = makeCtx()
+      const readLogin = withApp(ctx, appLogin())
+      ctx.host.fs.writeText(
+        "~/.claude/.credentials.json",
+        JSON.stringify({ claudeAiOauth: { accessToken: "cli-token", expiresAt: Date.now() + 3600000 } })
+      )
+      ctx.host.http.request.mockReturnValue(
+        okUsageResponse({ five_hour: { utilization: 1, resets_at: "2099-01-01T00:00:00.000Z" } })
+      )
+      const plugin = await loadPlugin()
+      plugin.probe(ctx)
+      expect(usageAuth(ctx)).toEqual(["Bearer cli-token"])
+      expect(readLogin).not.toHaveBeenCalled()
+    })
+
+    it("without the app's login it stays a plain not-set-up error", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, null)
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow("Not logged in. Run `claude` to authenticate.")
+    })
+
+    it("names the app's account for the WSL same-account check", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin())
+      const plugin = await loadPlugin()
+      expect(plugin.accountKey(ctx)).toBe("acc-1")
+    })
+  })
 })

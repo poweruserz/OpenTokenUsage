@@ -157,6 +157,45 @@ export function isNotSetUpError(message: string) {
   return key !== undefined && NOT_SET_UP.has(key)
 }
 
+/**
+ * Nothing is broken, the user has something to do: sign in, open an app, add or fix a key. The card
+ * shows these calmly; red stays for failures (network, HTTP, a changed response, a crash).
+ */
+const ACTION_NEEDED: ReadonlySet<PluginErrorKey> = new Set<PluginErrorKey>([
+  ...NOT_SET_UP,
+  "wslNotRunning",
+  "usageNotForApiKey",
+  "sessionExpiredRun",
+  "sessionExpiredRunAuth",
+  "tokenExpiredRun",
+  "tokenExpiredRunAuth",
+  "tokenConflictRun",
+  "tokenRevokedRun",
+  "tokenInvalidRun",
+  "invalidAuthFileRun",
+  "sessionExpiredSignInOrRun",
+  "tokenExpiredSignInOrRun",
+  "sessionExpiredReauthIn",
+  "productAuthInvalidRun",
+  "productAuthExpiredRun",
+  "productSessionExpiredOpenApp",
+  "sessionExpiredCheckKey",
+  "apiKeyInvalid",
+  "apiKeyInvalidOrExpired",
+  "keyRejected",
+  "noSubscriptionOnKey",
+  "authFileUnreadable",
+  "noActiveSubscription",
+  "noActivePlanSubscribe",
+  "quotaUnavailableOpenOnce",
+  "usageUnavailableOpenDashboard",
+])
+
+export function isActionNeededError(message: string) {
+  const key = matchPluginError(message)?.key
+  return key !== undefined && ACTION_NEEDED.has(key)
+}
+
 export type PluginErrorAction ={ kind: "run"; command: string } | { kind: "env"; names: string[] }
 
 /**

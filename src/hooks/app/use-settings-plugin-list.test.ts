@@ -22,6 +22,7 @@ describe("useSettingsPluginList", () => {
       disabled: ["cursor"],
     }
 
+    const state = (error: string | null) => ({ data: null, loading: false, error, lastManualRefreshAt: null, lastUpdatedAt: null })
     const { result } = renderHook(() =>
       useSettingsPluginList({
         pluginSettings,
@@ -29,12 +30,17 @@ describe("useSettingsPluginList", () => {
           createPluginMeta("cursor", "Cursor"),
           createPluginMeta("codex", "Codex"),
         ],
+        pluginStates: {
+          codex: state("Token expired. Run `codex` to log in again."),
+          // Not a lost login: the app isn't running.
+          cursor: state("Start Cursor or run `agent` and try again."),
+        },
       })
     )
 
     expect(result.current).toEqual([
-      { id: "codex", name: "Codex", enabled: true },
-      { id: "cursor", name: "Cursor", enabled: false },
+      { id: "codex", name: "Codex", enabled: true, signInError: "Token expired. Run `codex` to log in again." },
+      { id: "cursor", name: "Cursor", enabled: false, signInError: null },
     ])
   })
 

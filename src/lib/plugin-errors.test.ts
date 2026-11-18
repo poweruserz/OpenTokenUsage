@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs"
 import { afterEach, describe, expect, it } from "vitest"
 import { LANGUAGES, useLocaleStore } from "@/lib/i18n"
-import { getPluginErrorAction, isNotSetUpError, PLUGIN_ERROR_PATTERNS, translatePluginError } from "@/lib/plugin-errors"
+import {
+  getPluginErrorAction,
+  isActionNeededError,
+  isNotSetUpError,
+  PLUGIN_ERROR_PATTERNS,
+  translatePluginError,
+} from "@/lib/plugin-errors"
 import enUS, { type PluginErrorKey } from "@/locales/plugin-errors/en-US"
 import deDE from "@/locales/plugin-errors/de-DE"
 import es419 from "@/locales/plugin-errors/es-419"
@@ -271,6 +277,23 @@ describe("isNotSetUpError", () => {
     expect(isNotSetUpError("Request failed. Check your connection.")).toBe(false)
     expect(isNotSetUpError("quota exceeded for org")).toBe(false)
     expect(isNotSetUpError("")).toBe(false)
+  })
+})
+
+describe("isActionNeededError", () => {
+  it("is calm for what the user fixes and red for failures", () => {
+    expect(isActionNeededError("Token expired. Run `codex` to log in again.")).toBe(true)
+    expect(isActionNeededError("Session expired. Sign in via Cursor app or run `agent login`.")).toBe(true)
+    expect(isActionNeededError("Claude session expired. Open Claude and sign in again.")).toBe(true)
+    expect(isActionNeededError("JetBrains AI Assistant quota data unavailable. Open AI Assistant once and try again.")).toBe(true)
+    expect(isActionNeededError("Not logged in. Run `claude` to authenticate.")).toBe(true)
+    expect(isActionNeededError("API key invalid. Check your Z.ai API key.")).toBe(true)
+
+    expect(isActionNeededError("Request failed. Check your connection.")).toBe(false)
+    expect(isActionNeededError("Usage request failed (HTTP 503). Try again later.")).toBe(false)
+    expect(isActionNeededError("Antigravity quota data unavailable. Try again later.")).toBe(false)
+    expect(isActionNeededError("Rate limited by Claude, retry in ~5m")).toBe(false)
+    expect(isActionNeededError("quota exceeded for org")).toBe(false)
   })
 })
 

@@ -26,14 +26,17 @@ import {
   EyeOff,
   Gauge,
   GripVertical,
+  LogIn,
   Palette,
   PanelBottom,
   Play,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { loginFix } from "@/components/plugin-error";
 import { GlobalShortcutSection } from "@/components/global-shortcut-section";
 import { PrivacySection } from "@/components/privacy-section";
 import { GlassToggle } from "@/components/glass-toggle";
@@ -102,6 +105,7 @@ interface PluginConfig {
   id: string;
   name: string;
   enabled: boolean;
+  signInError?: string | null;
 }
 
 const TRAY_PREVIEW_SIZE_PX = getTrayIconSizePx(1) / 2;
@@ -324,6 +328,7 @@ function SortablePluginItem({
   onToggleTray: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: plugin.id });
+  const signIn = plugin.enabled && plugin.signInError ? loginFix(plugin.signInError, plugin.id) : null;
 
   return (
     <div
@@ -348,6 +353,24 @@ function SortablePluginItem({
       <span className={cn("flex-1 text-[13px]", !plugin.enabled && "text-muted-foreground")}>
         {plugin.name}
       </span>
+
+      {signIn && (
+        <>
+          <span className="text-xs text-muted-foreground">{t("settings.plugins.signedOut")}</span>
+          <Button
+            variant="outline"
+            size="xs"
+            className="text-[11px]"
+            onClick={(e) => {
+              e.stopPropagation();
+              signIn();
+            }}
+          >
+            <LogIn className="size-3" />
+            {t("settings.accounts.signIn")}
+          </Button>
+        </>
+      )}
 
       {plugin.enabled && (
         <button

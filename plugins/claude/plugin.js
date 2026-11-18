@@ -12,6 +12,7 @@
   // single-use: if both refresh at once, one is rejected and Claude Code can end up signed out
   // (upstream #1417; seen here as `invalid_grant`). So refresh only once the token has expired.
   const REFRESH_BUFFER_MS = 0
+  const DESKTOP_SESSION_EXPIRED = "Claude session expired. Open Claude and sign in again."
   // NOTE: the host runs every probe in a fresh runtime, so nothing at module scope survives
   // between probes. The host remembers 429s (answering them without a network call); anything
   // else that must persist lives in pluginDataDir.
@@ -328,10 +329,52 @@
     return null
   }
 
+  // The Claude app's own sign-in, for people without Claude Code's CLI login (host:
+  // claude_desktop.rs, only on the usual card, null when its setting is off). Never refreshed or
+  // written here: the app renews it, and a refresh would rotate its token and sign the app out.
+  function loadDesktopCredentials(ctx) {
+    const desktop = ctx.host.claudeDesktop
+    if (!desktop || typeof desktop.readLogin !== "function") return null
+    try {
+      const login = ctx.util.tryParseJson(desktop.readLogin() || "")
+      if (!login || typeof login.accessToken !== "string" || !login.accessToken.trim()) return null
+      return {
+        oauth: {
+          accessToken: login.accessToken,
+          expiresAt: login.expiresAt,
+          subscriptionType: login.subscriptionType,
+          rateLimitTier: login.rateLimitTier,
+          scopes: ["user:profile"],
+        },
+        source: "desktop",
+        account: typeof login.account === "string" && login.account ? login.account : null,
+      }
+    } catch (e) {
+      ctx.host.log.warn("Claude app sign-in read failed: " + String(e))
+      return null
+    }
+  }
+
+  // A newer token the app stored meanwhile (it renews its login while it runs), else null.
+  function adoptDesktopLogin(ctx, creds) {
+    const fresh = loadDesktopCredentials(ctx)
+    if (!fresh || fresh.oauth.accessToken === creds.oauth.accessToken) return null
+    if (needsRefresh(ctx, fresh.oauth, Date.now())) return null
+    ctx.host.log.info("using the login the Claude app renewed meanwhile")
+    Object.assign(creds, fresh)
+    return fresh.oauth.accessToken
+  }
+
+  function loadDesktopFallback(ctx) {
+    const desktop = loadDesktopCredentials(ctx)
+    if (desktop) ctx.host.log.info("credentials loaded from the Claude app")
+    return desktop
+  }
+
   function loadCredentials(ctx) {
     const envAccessToken = readEnvText(ctx, "CLAUDE_CODE_OAUTH_TOKEN")
     if (!envAccessToken) {
-      return loadStoredCredentials(ctx, false)
+      return loadStoredCredentials(ctx, false) || loadDesktopFallback(ctx)
     }
 
     // CLAUDE_CODE_OAUTH_TOKEN is inference-only (typically a `claude setup-token` token) and
@@ -350,6 +393,9 @@
       ctx.host.log.info("preferring stored profile-scoped login over CLAUDE_CODE_OAUTH_TOKEN")
       return fileCredentials
     }
+    // The app's login reads usage; the inference-only token can't.
+    const desktop = loadDesktopFallback(ctx)
+    if (desktop) return desktop
     const stored = keychainCredentials || fileCredentials
 
     const oauth = stored && stored.oauth ? Object.assign({}, stored.oauth) : {}
@@ -447,6 +493,7 @@
   }
 
   function refreshToken(ctx, creds) {
+    if (creds.source === "desktop") return adoptDesktopLogin(ctx, creds)
     const adopted = adoptStoredLogin(ctx, creds)
     if (adopted) return adopted
     const { oauth, source, fullData } = creds
@@ -756,7 +803,7 @@
   // status line is never laid over another login's model limits.
   function usageAccount(ctx, creds) {
     try {
-      const key = accountKey(ctx)
+      const key = creds.source === "desktop" ? creds.account : accountIdOf(readClaudeJson(ctx))
       if (key) return key
     } catch (e) {
       ctx.host.log.warn("usage cache: account lookup failed: " + String(e))
@@ -1292,6 +1339,9 @@
           const refreshed = refreshToken(ctx, creds)
           if (refreshed) {
             accessToken = refreshed
+          } else if (creds.source === "desktop") {
+            // Expired (no refresh buffer) and the app hasn't renewed it: it does once opened.
+            throw DESKTOP_SESSION_EXPIRED
           } else {
             ctx.host.log.warn("proactive refresh failed, trying with existing token")
           }
@@ -1326,6 +1376,7 @@
 
         if (ctx.util.isAuthStatus(resp.status)) {
           ctx.host.log.error("usage returned auth error after all retries: status=" + resp.status)
+          if (creds.source === "desktop") throw DESKTOP_SESSION_EXPIRED
           throw "Token expired. Run `claude` to log in again."
         }
 
@@ -1457,9 +1508,15 @@
     return typeof id === "string" && id.trim() ? id.trim() : null
   }
 
-  // Who is signed in, for the WSL same-account check (wsl.rs).
+  // Who is signed in, for the WSL same-account check (wsl.rs). The Claude app keys its logins by
+  // the same account id as Claude Code.
   function accountKey(ctx) {
-    return accountIdOf(readClaudeJson(ctx))
+    const id = accountIdOf(readClaudeJson(ctx))
+    if (id) return id
+    // The card reads the app's login only while Claude Code has none.
+    if (loadStoredCredentials(ctx, true)) return null
+    const desktop = loadDesktopCredentials(ctx)
+    return desktop ? desktop.account : null
   }
 
   globalThis.__openusage_plugin = { id: "claude", probe, accountKey }

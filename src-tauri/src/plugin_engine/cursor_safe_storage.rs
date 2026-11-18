@@ -17,6 +17,15 @@ pub fn decrypt_stored_value(raw: &str, key: &[u8]) -> Result<String, String> {
 }
 
 pub fn decrypt_v10_blob(key: &[u8], blob: &[u8]) -> Result<String, String> {
+    let text = open_v10(key, blob)?;
+    if text.is_empty() || !text.bytes().all(|byte| (0x21..=0x7e).contains(&byte)) {
+        return Err("decrypted value is not a token".to_string());
+    }
+    Ok(text)
+}
+
+/// A `v10` blob's text, whatever it holds (the Claude app keeps JSON there).
+pub fn open_v10(key: &[u8], blob: &[u8]) -> Result<String, String> {
     if key.len() != 32 {
         return Err("Windows DPAPI returned an unexpected key".to_string());
     }
@@ -35,11 +44,7 @@ pub fn decrypt_v10_blob(key: &[u8], blob: &[u8]) -> Result<String, String> {
     let plain = cipher
         .decrypt(nonce, sealed.as_ref())
         .map_err(|_| "decryption failed".to_string())?;
-    let text = String::from_utf8(plain).map_err(|_| "decrypted value is not a token".to_string())?;
-    if text.is_empty() || !text.bytes().all(|byte| (0x21..=0x7e).contains(&byte)) {
-        return Err("decrypted value is not a token".to_string());
-    }
-    Ok(text)
+    String::from_utf8(plain).map_err(|_| "decrypted value is not a token".to_string())
 }
 
 pub fn read_wrapped_key(local_state_json: &str) -> Result<Vec<u8>, String> {
@@ -229,6 +234,18 @@ mod tests {
         assert_eq!(
             decrypt_stored_value(token, &key).expect("plaintext"),
             token
+        );
+    }
+
+    #[test]
+    fn open_v10_returns_any_text_a_token_check_would_refuse() {
+        let key = [7_u8; 32];
+        let json = r#"{"a b": {"token": "x"}}"#;
+        let blob = seal(&key, &[9_u8; 12], json);
+        assert_eq!(open_v10(&key, &blob).expect("open"), json);
+        assert_eq!(
+            decrypt_v10_blob(&key, &blob).expect_err("spaces"),
+            "decrypted value is not a token"
         );
     }
 

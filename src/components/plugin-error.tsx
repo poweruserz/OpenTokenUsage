@@ -1,11 +1,12 @@
 import { invoke } from "@tauri-apps/api/core"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { AlertCircle, ExternalLink, SlidersHorizontal, SquareTerminal } from "lucide-react"
+import { AlertCircle, ExternalLink, Info, SlidersHorizontal, SquareTerminal } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { isAccountId, isWslId } from "@/lib/accounts"
 import { t, tLabel } from "@/lib/i18n"
-import { getPluginErrorAction, translatePluginError } from "@/lib/plugin-errors"
+import { getPluginErrorAction, isActionNeededError, translatePluginError } from "@/lib/plugin-errors"
+import { cn } from "@/lib/utils"
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 
 type PluginErrorProps = {
@@ -32,6 +33,23 @@ function formatMessage(message: string) {
   )
 }
 
+const run = (command: string, args?: Record<string, unknown>) => () => {
+  invoke(command, args).catch((error) => console.error(`${command} failed:`, error))
+}
+
+/**
+ * The click that signs a card in when its error's fix is a login command, else null. A WSL card's
+ * login lives in WSL: a Windows terminal can't fix it.
+ */
+export function loginFix(message: string, pluginId?: string): (() => void) | null {
+  const action = getPluginErrorAction(message)
+  if (action?.kind !== "run" || isWslId(pluginId)) return null
+  // An extra account signs in to its own folder (`accounts.rs`), never the usual login.
+  return isAccountId(pluginId)
+    ? run("start_account_login", { id: pluginId })
+    : run("run_in_terminal", { command: action.command })
+}
+
 function ErrorAction({ message, pluginId }: PluginErrorProps) {
   const apiKeysUrl = useAppPluginStore(
     (state) => state.pluginsMeta.find((meta) => meta.id === pluginId)?.links?.find((link) => link.label === API_KEYS_LINK)?.url
@@ -39,17 +57,10 @@ function ErrorAction({ message, pluginId }: PluginErrorProps) {
   const action = getPluginErrorAction(message)
   // A WSL card's login lives in WSL: a Windows terminal or the Windows environment can't fix it.
   if (!action || isWslId(pluginId)) return null
-  const run = (command: string, args?: Record<string, unknown>) => () => {
-    invoke(command, args).catch((error) => console.error(`${command} failed:`, error))
-  }
 
   if (action.kind === "run") {
-    // An extra account signs in to its own folder (`accounts.rs`), never the usual login.
-    const onClick = isAccountId(pluginId)
-      ? run("start_account_login", { id: pluginId })
-      : run("run_in_terminal", { command: action.command })
     return (
-      <Button variant="outline" size="xs" className="mt-2 text-[11px]" onClick={onClick}>
+      <Button variant="outline" size="xs" className="mt-2 text-[11px]" onClick={loginFix(message, pluginId) ?? undefined}>
         <SquareTerminal className="size-3" />
         {t("error.runInTerminal", { cmd: action.command })}
       </Button>
@@ -76,12 +87,18 @@ function ErrorAction({ message, pluginId }: PluginErrorProps) {
 }
 
 export function PluginError({ message, pluginId }: PluginErrorProps) {
+  // Something for the user to do (sign in, open an app) is no failure: grey, not red.
+  const calm = isActionNeededError(message)
+  const Icon = calm ? Info : AlertCircle
   return (
     <Alert
-      variant="destructive"
-      className="flex items-start gap-2 [&>svg]:static [&>svg]:translate-y-0 [&>svg]:mt-0.5 [&>svg~*]:pl-0 [&>svg+div]:translate-y-0"
+      variant={calm ? "default" : "destructive"}
+      className={cn(
+        "flex items-start gap-2 [&>svg]:static [&>svg]:translate-y-0 [&>svg]:mt-0.5 [&>svg~*]:pl-0 [&>svg+div]:translate-y-0",
+        calm && "bg-transparent text-muted-foreground [&>svg]:text-muted-foreground"
+      )}
     >
-      <AlertCircle className="h-4 w-4 shrink-0" />
+      <Icon className="h-4 w-4 shrink-0" />
       <AlertDescription className="select-text cursor-text">
         {formatMessage(translatePluginError(message))}
         <ErrorAction message={message} pluginId={pluginId} />

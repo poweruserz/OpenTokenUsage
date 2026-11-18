@@ -101,6 +101,15 @@ export const zhCN: Messages = {
   "settings.categories": "设置类别",
 
 
+  "settings.plugins.signedOut": "已退出登录",
+
+
+  "settings.claudeCode.desktopLogin": "使用 Claude 应用的登录",
+
+
+  "settings.claudeCode.desktopLoginHint": "Claude Code 未登录时，Claude 卡片会用 Claude 应用的登录读取用量。只读取，从不续期。",
+
+
   "settings.configBroken": "未保存：~/.openusage/config.json 不是有效的 JSON。请修复或删除该文件后再保存。",
 
 

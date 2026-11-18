@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { invoke } from "@tauri-apps/api/core"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { PluginError } from "@/components/plugin-error"
+import { loginFix, PluginError } from "@/components/plugin-error"
 import type { PluginMeta } from "@/lib/plugin-types"
 import { useAppPluginStore } from "@/stores/app-plugin-store"
 
@@ -17,6 +17,24 @@ describe("PluginError", () => {
     render(<PluginError message="Boom" />)
     expect(screen.getByText("Boom")).toBeInTheDocument()
     expect(screen.queryByRole("button")).toBeNull()
+  })
+
+  it("shows a lost sign-in calmly and a failure in red", () => {
+    const { unmount } = render(<PluginError message="Token expired. Run `codex` to log in again." />)
+    expect(screen.getByRole("alert").className).not.toContain("destructive")
+    unmount()
+    render(<PluginError message="Request failed. Check your connection." />)
+    expect(screen.getByRole("alert").className).toContain("destructive")
+  })
+
+  it("loginFix runs the login command, signs an account in its own folder, and skips WSL", () => {
+    const expired = "Token expired. Run `codex` to log in again."
+    loginFix(expired, "codex")?.()
+    expect(invoke).toHaveBeenCalledWith("run_in_terminal", { command: "codex" })
+    loginFix(expired, "codex-1a2b3c4d")?.()
+    expect(invoke).toHaveBeenCalledWith("start_account_login", { id: "codex-1a2b3c4d" })
+    expect(loginFix(expired, "codex-wsl-1a2b3c4d")).toBeNull()
+    expect(loginFix("Request failed. Check your connection.", "codex")).toBeNull()
   })
 
   it("formats backtick code in message", () => {

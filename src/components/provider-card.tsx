@@ -3,7 +3,7 @@ import { ClaudeSessions, hasLiveSessions } from "@/components/claude-sessions"
 import { DetailSection } from "@/components/detail-section"
 import { detailLines } from "@/lib/detail-sections"
 import { Fragment, useMemo, useState } from "react"
-import { AlertCircle, Clock, ExternalLink, Hourglass, RefreshCw, SlidersHorizontal } from "lucide-react"
+import { AlertCircle, Clock, ExternalLink, Hourglass, Info, RefreshCw, SlidersHorizontal } from "lucide-react"
 import { LineLayoutEditor } from "@/components/line-layout-editor"
 import { applyLineLayout } from "@/lib/line-layout"
 import { openUrl } from "@tauri-apps/plugin-opener"
@@ -30,7 +30,7 @@ import { calculateDeficit, calculatePaceStatus, paceElapsedFraction, type PaceSt
 import { buildPaceDetailText, formatDeficitText, formatRunsOutText, getPaceStatusText } from "@/lib/pace-tooltip"
 import { formatResetAbsoluteLabel, formatResetRelativeLabel, formatResetTooltipText } from "@/lib/reset-tooltip"
 import { getLocale, t, tLabel } from "@/lib/i18n"
-import { matchPluginError, translatePluginError } from "@/lib/plugin-errors"
+import { isActionNeededError, matchPluginError, translatePluginError } from "@/lib/plugin-errors"
 
 // A provider's rate limit is a wait, not a fault: over the last good bars it reads as a quiet note.
 const isRateLimitWait = (error: string) => /^rateLimited/.test(matchPluginError(error)?.key ?? "")
@@ -365,11 +365,13 @@ export function ProviderCard({
               render={(props) => (
                 <div
                   {...props}
-                  className={`flex items-center gap-1.5 mb-2 text-xs ${isRateLimitWait(error) ? "text-muted-foreground" : "text-destructive"}`}
+                  className={`flex items-center gap-1.5 mb-2 text-xs ${isRateLimitWait(error) || isActionNeededError(error) ? "text-muted-foreground" : "text-destructive"}`}
                 >
                   {isRateLimitWait(error)
                     ? <Clock className="h-3 w-3 flex-shrink-0" />
-                    : <AlertCircle className="h-3 w-3 flex-shrink-0" />}
+                    : isActionNeededError(error)
+                      ? <Info className="h-3 w-3 flex-shrink-0" />
+                      : <AlertCircle className="h-3 w-3 flex-shrink-0" />}
                   <span className="truncate">{translatePluginError(error)}</span>
                 </div>
               )}

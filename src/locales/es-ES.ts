@@ -101,6 +101,15 @@ export const esES: Messages = {
   "settings.categories": "Categorías de ajustes",
 
 
+  "settings.plugins.signedOut": "Sesión cerrada",
+
+
+  "settings.claudeCode.desktopLogin": "Usar el inicio de sesión de la aplicación de Claude",
+
+
+  "settings.claudeCode.desktopLoginHint": "Si Claude Code no tiene la sesión iniciada, la tarjeta de Claude lee el uso con el inicio de sesión de la aplicación de Claude. Solo se lee, nunca se renueva.",
+
+
   "settings.configBroken": "No se ha guardado: ~/.openusage/config.json no es un JSON válido. Corrige o borra ese archivo y vuelve a guardar.",
 
 

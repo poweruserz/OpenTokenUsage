@@ -63,6 +63,7 @@ const REMEMBER_PANEL_POSITION_KEY = "rememberPanelPosition";
 const PANEL_POSITION_KEY = "panelPosition";
 const TRAY_LOGO_COLORS_KEY = "trayLogoColors";
 const PACE_WORKDAYS_KEY = "paceWorkdays";
+const CLAUDE_DESKTOP_LOGIN_KEY = "claudeDesktopLogin";
 const TASKBAR_STRIP_KEY = "taskbarStrip";
 const TASKBAR_STRIP_STYLE_KEY = "taskbarStripStyle";
 const DESKTOP_WIDGETS_KEY = "desktopWidgets";
@@ -807,6 +808,9 @@ export async function markStarPromptShown(): Promise<void> {
 /** Provider logos in their brand color (tray "logos" style and the taskbar strip). */
 export const loadTrayLogoColors = () => loadBoolean(TRAY_LOGO_COLORS_KEY, true);
 /** Weekly pace counts Monday to Friday only (`pace-status.ts`). */
+/** The Claude card reads the Claude app's sign-in when Claude Code has none (`claude_desktop.rs`). */
+export const loadClaudeDesktopLogin = () => loadBoolean(CLAUDE_DESKTOP_LOGIN_KEY, true);
+export const saveClaudeDesktopLogin = (value: boolean) => saveBoolean(CLAUDE_DESKTOP_LOGIN_KEY, value);
 export const loadPaceWorkdays = () => loadBoolean(PACE_WORKDAYS_KEY, false);
 export const savePaceWorkdays = (value: boolean) => saveBoolean(PACE_WORKDAYS_KEY, value);
 export const saveTrayLogoColors = (value: boolean) => saveBoolean(TRAY_LOGO_COLORS_KEY, value);

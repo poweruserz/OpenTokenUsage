@@ -11,6 +11,7 @@ export const BACKUP_KEYS = [
   "autoUpdateInterval",
   "capturePrivacy",
   "cardFeatures",
+  "claudeDesktopLogin",
   "collapsedSections",
   "currency",
   "desktopWidgets",

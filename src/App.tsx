@@ -395,6 +395,7 @@ function App() {
   const settingsPlugins = useSettingsPluginList({
     pluginSettings,
     pluginsMeta,
+    pluginStates,
   })
 
   const { displayPlugins, navPlugins, selectedPlugin } = useAppPluginViews({

@@ -101,6 +101,15 @@ export const it: Messages = {
   "settings.categories": "Categorie delle impostazioni",
 
 
+  "settings.plugins.signedOut": "Disconnesso",
+
+
+  "settings.claudeCode.desktopLogin": "Usa l'accesso dell'app Claude",
+
+
+  "settings.claudeCode.desktopLoginHint": "Se Claude Code non ha effettuato l'accesso, la scheda Claude legge l'utilizzo con l'accesso dell'app Claude. Viene solo letto, mai rinnovato.",
+
+
   "settings.configBroken": "Non salvato: ~/.openusage/config.json non è un JSON valido. Correggi o elimina il file, poi salva di nuovo.",
 
 

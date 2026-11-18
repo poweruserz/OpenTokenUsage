@@ -101,6 +101,15 @@ export const tr: Messages = {
   "settings.categories": "Ayar kategorileri",
 
 
+  "settings.plugins.signedOut": "Oturum kapalı",
+
+
+  "settings.claudeCode.desktopLogin": "Claude uygulamasının oturumunu kullan",
+
+
+  "settings.claudeCode.desktopLoginHint": "Claude Code'da oturum açık değilse Claude kartı kullanımı Claude uygulamasının oturumuyla okur. Oturum yalnızca okunur, hiç yenilenmez.",
+
+
   "settings.configBroken": "Kaydedilmedi: ~/.openusage/config.json geçerli bir JSON değil. Dosyayı düzeltin ya da silin, sonra yeniden kaydedin.",
 
 
