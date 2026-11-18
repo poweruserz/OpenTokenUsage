@@ -335,7 +335,7 @@ export const en = {
   "settings.strip.followDetail": "In detail: each limit with its time to reset",
 
 
-  "settings.strip.activityDots": "Dot on a logo while its agent works (blue) or waits for you (yellow)",
+  "settings.strip.activityDots": "Dot on a logo while its agent works (green) or waits for you (yellow)",
 
 
   "settings.strip.desktopClickThroughKey": "Hold this key to click or drag",

@@ -1,7 +1,19 @@
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { describe, expect, it } from "vitest"
-import { hasNewFeature, NEW_FEATURES, seenAfterOpening, shownNewFeatures } from "@/lib/new-features"
+import { renderHook, waitFor } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
+import { hasNewFeature, NEW_FEATURES, seenAfterOpening, shownNewFeatures, useNewFeatures } from "@/lib/new-features"
+import { useAppUiStore } from "@/stores/app-ui-store"
+
+vi.mock("@/lib/settings", () => {
+  let seen: string[] = []
+  return {
+    loadSeenNewFeatures: vi.fn(async () => seen),
+    saveSeenNewFeatures: vi.fn(async (ids: string[]) => {
+      seen = ids
+    }),
+  }
+})
 
 const ROOT = join(__dirname, "..", "..")
 const parts = (version: string) => version.split(".").map(Number)
@@ -22,6 +34,22 @@ describe("new-feature badges", () => {
     expect(hasNewFeature(shown, "app")).toBe(true)
     // Opening a group whose features were already seen changes nothing (no write).
     expect(seenAfterOpening(seen ?? [], "taskbar")).toBeNull()
+  })
+
+  it("a remount within one visit (a language switch) keeps the badges; leaving Settings ends the visit", async () => {
+    useAppUiStore.setState({ activeView: "settings" })
+    const first = renderHook(() => useNewFeatures("usage"))
+    await waitFor(() => expect(first.result.current.shown.has("cards")).toBe(true))
+    first.unmount()
+    const again = renderHook(() => useNewFeatures("usage"))
+    await waitFor(() => expect(again.result.current.shown.has("cards")).toBe(true))
+    useAppUiStore.setState({ activeView: "home" })
+    again.unmount()
+    useAppUiStore.setState({ activeView: "settings" })
+    const next = renderHook(() => useNewFeatures("usage"))
+    await waitFor(() => expect(next.result.current.shown.has("widgets")).toBe(true))
+    expect(next.result.current.shown.has("cards")).toBe(false)
+    next.unmount()
   })
 
   it("lists only features of this release and the one before (drop older ones at release time)", () => {

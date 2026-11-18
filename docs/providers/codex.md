@@ -84,7 +84,7 @@ seconds while the panel is shown. Codex keeps no file per process, so while N `c
 in `sessions/YYYY/MM/DD` written in the last 6 hours are taken as theirs, named after the folder their last turn ran in.
 A session is idle once its last turn ended (`task_complete`, an aborted turn or the final answer) and working while a
 newer prompt or step was written in the last 10 minutes. A sub-agent writes its own log, so it can stand in for its
-parent. With the taskbar strip or desktop widgets on, the Codex logo gets a blue dot while a session works.
+parent. With the taskbar strip or desktop widgets on, the Codex logo gets a green dot while a session works.
 
 OpenUsage floors the remaining credit balance to a whole number and displays its fixed USD
 equivalent at `$0.04` per credit. For example, `820.6969075` renders as

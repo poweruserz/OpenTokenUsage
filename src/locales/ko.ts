@@ -335,7 +335,7 @@ export const ko: Messages = {
   "settings.strip.followDetail": "자세히: 각 한도와 초기화까지 남은 시간",
 
 
-  "settings.strip.activityDots": "에이전트가 작업 중(파랑)이거나 응답을 기다릴 때(노랑) 로고에 점 표시",
+  "settings.strip.activityDots": "에이전트가 작업 중(초록)이거나 응답을 기다릴 때(노랑) 로고에 점 표시",
 
 
   "settings.strip.desktopClickThroughKey": "클릭하거나 끌 때 누르고 있을 키",

@@ -335,7 +335,7 @@ export const de: Messages = {
   "settings.strip.followDetail": "Ausführlich: jedes Limit mit der Zeit bis zum Zurücksetzen",
 
 
-  "settings.strip.activityDots": "Punkt am Logo, solange sein Agent arbeitet (blau) oder auf dich wartet (gelb)",
+  "settings.strip.activityDots": "Punkt am Logo, solange sein Agent arbeitet (grün) oder auf dich wartet (gelb)",
 
 
   "settings.strip.desktopClickThroughKey": "Diese Taste halten zum Klicken oder Ziehen",

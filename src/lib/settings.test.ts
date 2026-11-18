@@ -107,6 +107,10 @@ describe("settings", () => {
     storeState.set("menubarIconStyle", "icon")
     storeState.set("taskbarStrip", false)
     await expect(loadTaskbarStrip()).resolves.toBe(false)
+    // A tray style from before `menubarIconStyle`, migrated only later in the bootstrap.
+    storeState.clear()
+    storeState.set("trayIconStyle", "bars")
+    await expect(loadTaskbarStrip()).resolves.toBe(false)
   })
 
   it("remembers the panel's spot on a new install, not on an older one, and keeps a choice", async () => {
