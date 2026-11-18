@@ -59,6 +59,12 @@ describe("claude sessions", () => {
 
   it("leaves the overview's cards alone when turned off there, and still reads for the detail page", async () => {
     vi.mocked(invoke).mockResolvedValue([])
+    // On, as it comes: an overview card reads them.
+    const overview = render(<ClaudeSessions pluginId="claude" />)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("live_sessions", { pluginId: "claude" }))
+    overview.unmount()
+    vi.mocked(invoke).mockClear()
+
     useAppPreferencesStore.setState({ cardFeatures: { ...DEFAULT_CARD_FEATURES, sessionsOnOverview: false } })
     render(<ClaudeSessions pluginId="claude" />)
     expect(invoke).not.toHaveBeenCalled()

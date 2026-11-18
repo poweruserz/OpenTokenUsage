@@ -153,18 +153,20 @@ function SessionRow({ session }: { session: LiveSession }) {
         className={cn("size-1.5 shrink-0 rounded-full", status?.dot ?? "bg-muted-foreground/50")}
       />
       <span className="min-w-0 flex-1 truncate">{session.name}</span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {details.map((detail, index) => (
-          <Fragment key={index}>
-            {index > 0 && (
-              <span aria-hidden="true" className="text-muted-foreground">
-                ·
-              </span>
-            )}
-            {detail}
-          </Fragment>
-        ))}
-      </span>
+      {details.length > 0 && (
+        <span className="flex shrink-0 items-center gap-1.5">
+          {details.map((detail, index) => (
+            <Fragment key={index}>
+              {index > 0 && (
+                <span aria-hidden="true" className="text-muted-foreground">
+                  ·
+                </span>
+              )}
+              {detail}
+            </Fragment>
+          ))}
+        </span>
+      )}
     </div>
   )
 }
