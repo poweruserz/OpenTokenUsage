@@ -301,8 +301,9 @@ This file holds the project facts that are easy to get wrong.
   localhost never proxied), resolved once and kept in `RESOLVED_PROXY`; `set_proxy_setting` validates, writes the file
   atomically keeping its other keys, and swaps the cached proxy. Plugin HTTP, status badges and the updater
   (`check({ proxy })`) use it.
-- Hide from screen sharing (`capture_privacy.rs`, setting `capturePrivacy`): `WDA_EXCLUDEFROMCAPTURE` on the panel and
-  the widgets; while Windows reports presentation mode or a remote-controlled session (`privacy:sharing`), the tray
+- Hide from screen sharing (`capture_privacy.rs`, setting `capturePrivacy`): `WDA_EXCLUDEFROMCAPTURE` on the panel (given
+  only while visible or right before a show, see "Never call `SetWindowDisplayAffinity`" below) and the widgets;
+  while Windows reports presentation mode or a remote-controlled session (`privacy:sharing`), the tray
   shows the plain icon and the strip hides.
 - Cards: a click on a bar's value flips used ⇄ left (the `displayMode` setting). The header's image button draws the
   card (`share-card.ts`, opaque, 2x) and `copy_image_to_clipboard` puts it on the clipboard (`decode_rgba` caps).
@@ -344,10 +345,21 @@ This file holds the project facts that are easy to get wrong.
   in the work area's corner (`toggle_panel_from_tray`, `click_anchor`; a tray on the left half stays centered on the
   icon; an icon in the hidden-icons flyout still opens it above the taskbar), the strip above itself, a widget beside
   it. `anchor_panel` keeps an `Anchor::Right` panel's right edge in the corner when its width changes (another scale).
-- The main window's `additionalBrowserArgs` (tauri.conf.json) keep wry's defaults (`msWebOOUI,msPdfOOUI,
-  msSmartScreenProtection`, `--autoplay-policy=no-user-gesture-required`) and add `CalculateNativeWinOcclusion`:
-  WebView2 stops painting a hidden window's webview, and the panel (created hidden, shown from the tray) was seen
-  opening black until hidden and shown again. Setting the option replaces wry's defaults, so keep them listed.
+- Never call `SetWindowDisplayAffinity` on a hidden window: Windows (seen on 26200) then draws that window, hidden
+  as it is, at its next move, resize, frame or theme change (even when the value is the one it already has), and a
+  real show is what clears it. 0.9.1 sent the capture setting at every start, so the hidden panel stood in the corner as an empty dark
+  rectangle (its Mica backdrop without the webview; `IsWindowVisible` false, clicks pass through) until first opened.
+  The call is safe on a visible window and right before a show. Every panel show goes through `panel::show`, which
+  applies the exclusion right before showing (`capture_privacy::before_show`); `set_capture_privacy` touches the
+  panel only while it is visible. Both go through `win::sync`, which goes by what the panel was last given
+  (`PANEL_EXCLUDED`), never by `GetWindowDisplayAffinity`: that reads 0 for a hidden window though the exclusion
+  survives hide and show (with the option on, a window about to show is asked again all the same). The widgets'
+  tooltip follows the same rule (`sync_tooltip_privacy`: while it shows, or on
+  `TTN_SHOW` right before): once it was shown, it is drawn the same way. The widgets themselves are layered windows,
+  which are not, so they are asked as they are. None of them is asked while the option has stayed off since start.
+- tao 0.35 re-applies visibility from its own tracked flag on every window-flag change and writes the style bits
+  itself (`apply_diff`): show and hide the panel only through tauri's `show()`/`hide()`, never with a raw `ShowWindow`
+  (tao's flag goes out of step, and a later `show()` or `hide()` does nothing).
 - Support: the side-nav coffee cup (`BmcCup`, from Buy Me a Coffee's brand kit: outline `currentColor`, coffee
   `--support` yellow) opens `SupportDialog`; the About window and the tray menu open `SUPPORT_URL` (TS ↔ tray.rs,
   test-synced). A dialog taller than a short panel sets `data-panel-dialog`: app-shell's `has-[…]:min-h` grows the
