@@ -2837,4 +2837,179 @@ describe("claude plugin", () => {
       expect(() => plugin.probe(ctx)).toThrow("Not logged in")
     })
   })
+
+  describe("the Claude app's sign-in", () => {
+    const APP_EXPIRED = "Claude session expired. Open Claude and sign in again."
+    const appLogin = (overrides = {}) => ({
+      accessToken: "app-token",
+      expiresAt: Date.now() + 60 * 60 * 1000,
+      subscriptionType: "max",
+      rateLimitTier: "default_claude_max_20x",
+      account: "acc-1",
+      ...overrides,
+    })
+    const withApp = (ctx, ...logins) => {
+      const readLogin = vi.fn()
+      for (const login of logins) readLogin.mockReturnValueOnce(login && JSON.stringify(login))
+      ctx.host.claudeDesktop = { readLogin }
+      return readLogin
+    }
+    const refreshCalls = (ctx) =>
+      ctx.host.http.request.mock.calls.filter((call) => String(call[0]?.url).includes("/oauth/token"))
+    const usageAuth = (ctx) =>
+      ctx.host.http.request.mock.calls.filter((call) => isUsagePoll(call[0]?.url)).map((call) => call[0].headers.Authorization)
+
+    it("reads usage with the app's login when Claude Code has none", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin())
+      ctx.host.http.request.mockReturnValue(
+        okUsageResponse({ five_hour: { utilization: 12, resets_at: "2099-01-01T00:00:00.000Z" } })
+      )
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+      expect(result.lines.find((line) => line.label === "Session")?.used).toBe(12)
+      expect(usageAuth(ctx)).toEqual(["Bearer app-token"])
+      expect(refreshCalls(ctx)).toHaveLength(0)
+    })
+
+    it("never refreshes an expired app login: it asks to open the app, without a request", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin({ expiresAt: Date.now() - 1000 }))
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow(APP_EXPIRED)
+      expect(ctx.host.http.request).not.toHaveBeenCalled()
+    })
+
+    it("takes the token the app renewed meanwhile when the endpoint rejects the old one", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin(), appLogin({ accessToken: "renewed" }))
+      ctx.host.http.request.mockImplementation((opts) =>
+        String(opts.headers?.Authorization).includes("renewed")
+          ? okUsageResponse({ five_hour: { utilization: 5, resets_at: "2099-01-01T00:00:00.000Z" } })
+          : { status: 401, bodyText: "{}", headers: {} }
+      )
+      const plugin = await loadPlugin()
+      plugin.probe(ctx)
+      expect(usageAuth(ctx)).toEqual(["Bearer app-token", "Bearer renewed"])
+    })
+
+    const today = () => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    }
+    const withSpend = (ctx) => {
+      ctx.host.ccusage.query = vi.fn(() => ({
+        status: "ok",
+        data: { daily: [{ date: today(), totalTokens: 1200, totalCost: 0.5 }] },
+      }))
+    }
+
+    it("an expired or rejected app login leaves the local-spend card it had without it", async () => {
+      const expired = makeCtx()
+      withApp(expired, appLogin({ expiresAt: Date.now() - 1000 }))
+      withSpend(expired)
+      const result = (await loadPlugin()).probe(expired)
+      expect(result.lines.map((line) => line.label)).toContain("Today")
+      expect(expired.host.http.request).not.toHaveBeenCalled()
+
+      const rejected = makeCtx()
+      withApp(rejected, appLogin(), appLogin())
+      withSpend(rejected)
+      rejected.host.http.request.mockReturnValue({ status: 401, bodyText: "{}", headers: {} })
+      expect((await loadPlugin()).probe(rejected).lines.map((line) => line.label)).toContain("Today")
+    })
+
+    it("an expired app login never shadows an inference-only CLAUDE_CODE_OAUTH_TOKEN", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin({ expiresAt: Date.now() - 1000 }))
+      withSpend(ctx)
+      ctx.host.env.get.mockImplementation((name) => (name === "CLAUDE_CODE_OAUTH_TOKEN" ? "env-oauth-token" : null))
+      const result = (await loadPlugin()).probe(ctx)
+      expect(result.lines.map((line) => line.label)).toContain("Today")
+      expect(usageAuth(ctx)).toEqual([])
+    })
+
+    it("never lays Claude Code's status line (maybe another account's) over the app's usage", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin(), appLogin(), appLogin(), appLogin())
+      ctx.host.http.request.mockReturnValue(
+        okUsageResponse({ five_hour: { utilization: 12, resets_at: "2099-01-01T00:00:00.000Z" } })
+      )
+      ;(await loadPlugin()).probe(ctx)
+      // A snapshot posted after the app's account was seen, which would otherwise go over the kept answer.
+      const DIR = "/tmp/openusage-test/plugin"
+      ctx.host.fs.writeText(DIR + "/account-seen.json", JSON.stringify({ account: "acc-1", since: Date.now() - 600_000 }))
+      ctx.host.fs.writeText(
+        DIR + "/statusline.json",
+        JSON.stringify({ capturedAt: Date.now(), fiveHour: { usedPercent: 88, resetsAtMs: Date.parse("2099-01-01T00:00:00.000Z") } })
+      )
+      const result = (await loadPlugin()).probe(ctx)
+      expect(result.lines.find((line) => line.label === "Session")?.used).toBe(12)
+    })
+
+    it("a rejected app login asks to open the app, never to run `claude`", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, appLogin(), appLogin())
+      ctx.host.http.request.mockReturnValue({ status: 401, bodyText: "{}", headers: {} })
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow(APP_EXPIRED)
+      expect(refreshCalls(ctx)).toHaveLength(0)
+    })
+
+    it("Claude Code's own login wins, and the app is not read then", async () => {
+      const ctx = makeCtx()
+      const readLogin = withApp(ctx, appLogin())
+      ctx.host.fs.writeText(
+        "~/.claude/.credentials.json",
+        JSON.stringify({ claudeAiOauth: { accessToken: "cli-token", expiresAt: Date.now() + 3600000 } })
+      )
+      ctx.host.http.request.mockReturnValue(
+        okUsageResponse({ five_hour: { utilization: 1, resets_at: "2099-01-01T00:00:00.000Z" } })
+      )
+      const plugin = await loadPlugin()
+      plugin.probe(ctx)
+      expect(usageAuth(ctx)).toEqual(["Bearer cli-token"])
+      expect(readLogin).not.toHaveBeenCalled()
+    })
+
+    it("never sends the app's login to a custom OAuth base (CLAUDE_CODE_CUSTOM_OAUTH_URL)", async () => {
+      const ctx = makeCtx()
+      const readLogin = withApp(ctx, appLogin())
+      ctx.host.env.get.mockImplementation((name) =>
+        name === "CLAUDE_CODE_CUSTOM_OAUTH_URL" ? "https://gateway.example" : null
+      )
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow("Not logged in")
+      expect(readLogin).not.toHaveBeenCalled()
+      expect(ctx.host.http.request).not.toHaveBeenCalled()
+    })
+
+    it("without the app's login it stays a plain not-set-up error", async () => {
+      const ctx = makeCtx()
+      withApp(ctx, null)
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow("Not logged in. Run `claude` to authenticate.")
+    })
+
+    it("never names the app's account for the WSL same-account check (that would hide a WSL card)", async () => {
+      const ctx = makeCtx()
+      const readLogin = withApp(ctx, appLogin())
+      const plugin = await loadPlugin()
+      expect(plugin.accountKey(ctx)).toBeNull()
+      expect(readLogin).not.toHaveBeenCalled()
+    })
+
+    it("an unreadable app login is a read failure, never a lost sign-in with a `claude` fix", async () => {
+      const ctx = makeCtx()
+      ctx.host.claudeDesktop = {
+        readLogin: vi.fn(() => {
+          throw new Error("could not read the Claude app's sign-in")
+        }),
+      }
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow(
+        "Couldn't read Claude's config.json. Check its file permissions or log into Claude again."
+      )
+    })
+  })
 })

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core"
 import { SettingsSection } from "@/components/settings-section"
 import { Checkbox } from "@/components/ui/checkbox"
 import { t } from "@/lib/i18n"
+import { loadClaudeDesktopLogin, saveClaudeDesktopLogin } from "@/lib/settings"
 
 /** `claude_statusline.rs`: whether Claude's settings.json runs the bridge. */
 export type ClaudeStatusLineState = "off" | "on" | "other" | "unreadable"
@@ -50,7 +51,38 @@ export function ClaudeCodeSection() {
         <p className="mt-1.5 text-xs text-muted-foreground">{t("settings.claudeCode.hint")}</p>
       )}
       <LogRetention />
+      <DesktopLogin />
     </SettingsSection>
+  )
+}
+
+/** The Claude card falls back to the Claude app's sign-in (`claude_desktop.rs`); on by default. */
+function DesktopLogin() {
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    loadClaudeDesktopLogin()
+      .then(setEnabled)
+      .catch((error) => console.error("Failed to read the Claude app sign-in setting:", error))
+  }, [])
+
+  const toggle = (next: boolean) => {
+    setEnabled(next)
+    invoke("set_claude_desktop_login", { enabled: next }).catch((error) =>
+      console.error("Failed to switch the Claude app sign-in:", error)
+    )
+    void saveClaudeDesktopLogin(next).catch((error) => console.error("Failed to save the Claude app sign-in setting:", error))
+  }
+
+  if (enabled === null) return null
+  return (
+    <div className="mt-3">
+      <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
+        <Checkbox checked={enabled} onCheckedChange={(checked) => toggle(checked === true)} />
+        {t("settings.claudeCode.desktopLogin")}
+      </label>
+      <p className="mt-1.5 text-xs text-muted-foreground">{t("settings.claudeCode.desktopLoginHint")}</p>
+    </div>
   )
 }
 

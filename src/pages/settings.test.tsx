@@ -117,6 +117,25 @@ describe("SettingsPage", () => {
     expect(onToggle).toHaveBeenCalledWith("b")
   })
 
+  it("offers a sign-in next to an enabled provider that lost its login", async () => {
+    render(
+      <SettingsPage
+        {...defaultProps}
+        plugins={[
+          { id: "a", name: "Alpha", enabled: true, signInError: "Token expired. Run `codex` to log in again." },
+          { id: "b", name: "Beta", enabled: false, signInError: "Session expired. Run `agent login` to log in again." },
+          { id: "c", name: "Gamma", enabled: true, signInError: null },
+        ]}
+      />
+    )
+    await openCategory("Providers")
+    const row = (name: string) => screen.getByText(name).closest("div")!
+    expect(within(row("Alpha")).getByText("Signed out")).toBeInTheDocument()
+    expect(within(row("Alpha")).getByRole("button", { name: "Sign in" })).toBeInTheDocument()
+    expect(within(row("Beta")).queryByText("Signed out")).toBeNull()
+    expect(within(row("Gamma")).queryByText("Signed out")).toBeNull()
+  })
+
   it("reorders plugins on drag end", async () => {
     const onReorder = vi.fn()
     render(

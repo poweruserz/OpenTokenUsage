@@ -101,6 +101,15 @@ export const ko: Messages = {
   "settings.categories": "설정 범주",
 
 
+  "settings.plugins.signedOut": "로그아웃됨",
+
+
+  "settings.claudeCode.desktopLogin": "Claude 앱의 로그인 사용",
+
+
+  "settings.claudeCode.desktopLoginHint": "Claude Code에 로그인되어 있지 않으면 Claude 카드가 Claude 앱의 로그인으로 사용량을 읽습니다. 읽기만 하고 갱신하지 않습니다.",
+
+
   "settings.configBroken": "저장되지 않음: ~/.openusage/config.json이 올바른 JSON이 아닙니다. 파일을 고치거나 삭제한 뒤 다시 저장하세요.",
 
 

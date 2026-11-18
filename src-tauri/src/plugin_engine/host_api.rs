@@ -788,6 +788,10 @@ pub(crate) fn inject_host_api_with_deadline<'js>(
     if cursor_id == "cursor" {
         inject_cursor_auth(ctx, &host)?;
     }
+    // The usual Claude card only: an extra account or a WSL copy has a login of its own.
+    if account.is_none() && plugin_id == "claude" {
+        inject_claude_desktop(ctx, &host)?;
+    }
     inject_ls(ctx, &host, plugin_id)?;
     // An account copy reads the same kind of local logs as its base plugin (from its own home). A
     // WSL copy reads none: its logs live in WSL, far too slow to scan over \\wsl.localhost.
@@ -832,6 +836,19 @@ fn inject_cursor_auth<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Resu
         })?,
     )?;
     host.set("cursorAuth", cursor_auth)?;
+    Ok(())
+}
+
+fn inject_claude_desktop<'js>(ctx: &Ctx<'js>, host: &Object<'js>) -> rquickjs::Result<()> {
+    let desktop = Object::new(ctx.clone())?;
+    desktop.set(
+        "readLogin",
+        Function::new(ctx.clone(), |ctx_inner: Ctx<'_>| -> rquickjs::Result<Option<String>> {
+            super::claude_desktop::read_login()
+                .map_err(|message| Exception::throw_message(&ctx_inner, &message))
+        })?,
+    )?;
+    host.set("claudeDesktop", desktop)?;
     Ok(())
 }
 

@@ -100,6 +100,24 @@ Keychain values use the same JSON structure as the legacy credentials file:
 
 **Fallback:** `~/.claude/.credentials.json`. This file can be left behind by older Claude Code versions, so it is treated as a fallback when Keychain does not contain usable credentials.
 
+### The Claude app's sign-in
+
+Someone who uses the Claude desktop app without Claude Code has no login above. With **Settings → Claude Code → Use the Claude app's sign-in** on (the default), the usual Claude card then reads usage with the app's own login (`claude_desktop.rs`); extra accounts and WSL copies never do. The Store app keeps it in `%LOCALAPPDATA%\Claude-Data\<package>\config.json` (older installs: `%APPDATA%\Claude\config.json`) as `oauth:tokenCacheV2`: Electron's safeStorage (`v10`, AES-256-GCM under the DPAPI-wrapped key in `Local State`, as for Cursor) around a JSON object with one entry per scope set, keyed `acct:<account uuid>|…:https://api.anthropic.com:<scopes>`:
+
+```jsonc
+{
+  "acct:<account>|<…>:<…>:https://api.anthropic.com:user:inference user:file_upload user:profile": {
+    "token": "<access token>",
+    "refreshToken": "<token>",       // never read out of Rust
+    "expiresAt": 1823278079409,      // unix ms
+    "subscriptionType": "max",
+    "rateLimitTier": "default_claude_max_20x"
+  }
+}
+```
+
+The host hands the plugin the `user:profile` entry that lasts longest: its token, expiry, plan and account id, never the refresh token. The plugin never refreshes it (that would rotate the app's refresh token and sign the app out): when the endpoint rejects it, the plugin reads the app's login again (the app renews it while it runs). One that has expired, is still rejected, or can't be read counts as no login: the card shows what it showed without it (local spend under "Not logged in", or an inference-only `CLAUDE_CODE_OAUTH_TOKEN`'s card), and only with nothing to show says "Claude session expired. Open Claude and sign in again." Claude Code's status line is ignored while the app's login is in use: it carries no account and may be another account's. The app's login is only ever sent to Anthropic's own API: with a custom, staging or local OAuth base (`CLAUDE_CODE_CUSTOM_OAUTH_URL` and the like) it isn't read at all. The account id (Claude Code's own) keys the kept usage answer and the reset grants. It never feeds the WSL same-account check: a WSL card matching it would be hidden even while the usual card is off or its app login has expired. A login the app has but that can't be read (mid-write, DPAPI) shows as a read failure, not as a lost sign-in with a `claude` fix.
+
 ### Token Refresh
 
 Access tokens are short-lived JWTs. The login is Claude Code's: it renews it ahead of expiry while it runs, and its refresh tokens are single-use, so refreshing alongside it can sign Claude Code out (upstream #1417). The plugin therefore refreshes only once the token has expired, or on 401/403, and right before refreshing reads the stored login again: if Claude Code renewed it meanwhile, that login is used instead. When the refresh comes back `invalid_grant` (Claude Code used the refresh token first), the login Claude Code stored is used; "Session expired" shows only when there is none.

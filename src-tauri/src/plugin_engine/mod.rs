@@ -1,5 +1,6 @@
 pub mod host_api;
 mod ccusage_cache;
+pub mod claude_desktop;
 mod cursor_safe_storage;
 pub(crate) mod http_gate;
 pub mod manifest;

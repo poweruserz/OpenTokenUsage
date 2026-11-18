@@ -101,6 +101,15 @@ export const en = {
   "settings.categories": "Settings categories",
 
 
+  "settings.plugins.signedOut": "Signed out",
+
+
+  "settings.claudeCode.desktopLogin": "Use the Claude app's sign-in",
+
+
+  "settings.claudeCode.desktopLoginHint": "When Claude Code isn't signed in, the Claude card reads usage with the Claude app's sign-in. It is only read, never renewed.",
+
+
   "settings.configBroken": "Not saved: ~/.openusage/config.json isn't valid JSON. Fix or delete that file, then save again.",
 
 
