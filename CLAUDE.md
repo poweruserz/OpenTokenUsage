@@ -332,9 +332,10 @@ This file holds the project facts that are easy to get wrong.
   `anchor_panel`/`toggle_panel_at`, clamped into the work area. Move the panel only through `place()`,
   or your move is remembered as a drag. "Remember position" is on for a new install and off for one from 0.9.1 and
   older, decided once in `loadRememberPanelPosition` (before the first plugin-settings save, like `colorMode`); "Reset
-  all settings" turns it on. Without a remembered spot a tray icon click opens the panel in the work area's corner
-  (`toggle_panel_from_tray`, `click_anchor`; a tray on the left half stays centered on the icon), the strip above
-  itself, a widget beside it.
+  all settings" turns it on and forgets the dragged spot. Without a remembered spot a tray icon click opens the panel
+  in the work area's corner (`toggle_panel_from_tray`, `click_anchor`; a tray on the left half stays centered on the
+  icon; an icon in the hidden-icons flyout still opens it above the taskbar), the strip above itself, a widget beside
+  it. `anchor_panel` keeps an `Anchor::Right` panel's right edge in the corner when its width changes (another scale).
 - The main window's `additionalBrowserArgs` (tauri.conf.json) keep wry's defaults (`msWebOOUI,msPdfOOUI,
   msSmartScreenProtection`, `--autoplay-policy=no-user-gesture-required`) and add `CalculateNativeWinOcclusion`:
   WebView2 stops painting a hidden window's webview, and the panel (created hidden, shown from the tray) was seen

@@ -83,8 +83,8 @@ describe("settings backup", () => {
     expect(storeState.get("rememberPanelPosition")).toBe(true)
     expect(storeState.has("themeMode")).toBe(false)
     expect(storeState.has("navRight")).toBe(false)
-    // Not a preference a backup carries: left alone.
-    expect(storeState.get("panelPosition")).toEqual({ x: 1, y: 2 })
+    // Not a preference a backup carries, but a reset forgets it: the panel opens in its default corner again.
+    expect(storeState.has("panelPosition")).toBe(false)
   })
 
   it("keeps this PC's sound when the backup's is a custom file it doesn't carry", async () => {

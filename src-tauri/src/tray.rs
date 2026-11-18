@@ -962,7 +962,11 @@ pub fn anchor_panel(window: &tauri::WebviewWindow) {
     let area = work_area_of(&monitor);
     let margin = (FLYOUT_MARGIN * window.scale_factor().unwrap_or(1.0)).round() as i32;
     let (x, anchor_bottom) = match last_anchor_bottom_physical_y() {
-        Some(bottom) => (pos.x, bottom),
+        // A corner panel keeps its right edge in the corner whatever width it has now (another scale).
+        Some(bottom) => match anchor_slot().lock().ok().and_then(|slot| *slot) {
+            Some(anchor @ Anchor::Right(_)) => (anchored_x(anchor, size.width as i32, area), bottom),
+            _ => (pos.x, bottom),
+        },
         None => {
             let bottom = area.3 - margin;
             set_last_anchor_bottom_physical_y(bottom);
@@ -1019,9 +1023,6 @@ fn position_window_at_tray_icon(
     let area = work_area_of(&monitor);
     let margin = (FLYOUT_MARGIN * scale).round() as i32;
 
-    // Bottom taskbar: the icon sits below the work area, so anchor on the work area's bottom.
-    let anchor_bottom = (icon_y.round() as i32).min(area.3) - margin;
-    set_last_anchor_bottom_physical_y(anchor_bottom);
     let (anchor, x) = click_anchor(
         icon_center_x.round() as i32,
         size.width as i32,
@@ -1030,6 +1031,15 @@ fn position_window_at_tray_icon(
         corner,
     );
     set_anchor(anchor);
+    // Bottom taskbar: the icon sits below the work area, so anchor on the work area's bottom. A corner
+    // panel goes there too for an icon in the hidden-icons flyout, which sits inside the work area.
+    let in_lower_half = icon_y >= ((area.1 + area.3) / 2) as f64;
+    let anchor_bottom = if matches!(anchor, Anchor::Right(_)) && in_lower_half {
+        area.3 - margin
+    } else {
+        (icon_y.round() as i32).min(area.3) - margin
+    };
+    set_last_anchor_bottom_physical_y(anchor_bottom);
     let (x, y) = flyout_origin(
         x,
         anchor_bottom,

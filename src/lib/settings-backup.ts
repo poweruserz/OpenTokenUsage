@@ -171,6 +171,8 @@ export async function resetAllSettings(): Promise<void> {
     const value = await backupStore.get(key)
     if (value !== undefined) kept[key] = value
   }
+  // With "Remember position" back on, an old dragged spot would keep the panel out of its default corner.
+  await backupStore.delete("panelPosition")
   await restore(kept, true)
 }
 
