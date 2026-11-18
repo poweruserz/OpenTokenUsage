@@ -165,12 +165,14 @@ function restoredValue(key: (typeof BACKUP_KEYS)[number], has: boolean, imported
  * everything a backup never touches (accounts, logins, this PC's sound file) stay.
  */
 export async function resetAllSettings(): Promise<void> {
-  // The style's default as a new install has it (usage colors off), not an old backup's.
-  const kept: Record<string, unknown> = { taskbarStripStyle: DEFAULT_TASKBAR_STRIP_STYLE }
+  // Defaults as a new install has them (usage colors off, the panel's spot remembered), not an old install's.
+  const kept: Record<string, unknown> = { taskbarStripStyle: DEFAULT_TASKBAR_STRIP_STYLE, rememberPanelPosition: true }
   for (const key of ["plugins", "projectBudgets"] as const) {
     const value = await backupStore.get(key)
     if (value !== undefined) kept[key] = value
   }
+  // With "Remember position" back on, an old dragged spot would keep the panel out of its default corner.
+  await backupStore.delete("panelPosition")
   await restore(kept, true)
 }
 

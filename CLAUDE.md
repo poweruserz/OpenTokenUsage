@@ -330,7 +330,16 @@ This file holds the project facts that are easy to get wrong.
   records every position it sets itself (`place`); any other move while visible is the user's drag
   and is saved as `panelPosition` (outer top-left, physical px) in settings.json, then used by
   `anchor_panel`/`toggle_panel_at`, clamped into the work area. Move the panel only through `place()`,
-  or your move is remembered as a drag.
+  or your move is remembered as a drag. "Remember position" is on for a new install and off for one from 0.9.1 and
+  older, decided once in `loadRememberPanelPosition` (before the first plugin-settings save, like `colorMode`); "Reset
+  all settings" turns it on and forgets the dragged spot. Without a remembered spot a tray icon click opens the panel
+  in the work area's corner (`toggle_panel_from_tray`, `click_anchor`; a tray on the left half stays centered on the
+  icon; an icon in the hidden-icons flyout still opens it above the taskbar), the strip above itself, a widget beside
+  it. `anchor_panel` keeps an `Anchor::Right` panel's right edge in the corner when its width changes (another scale).
+- The main window's `additionalBrowserArgs` (tauri.conf.json) keep wry's defaults (`msWebOOUI,msPdfOOUI,
+  msSmartScreenProtection`, `--autoplay-policy=no-user-gesture-required`) and add `CalculateNativeWinOcclusion`:
+  WebView2 stops painting a hidden window's webview, and the panel (created hidden, shown from the tray) was seen
+  opening black until hidden and shown again. Setting the option replaces wry's defaults, so keep them listed.
 - Support: the side-nav coffee cup (`BmcCup`, from Buy Me a Coffee's brand kit: outline `currentColor`, coffee
   `--support` yellow) opens `SupportDialog`; the About window and the tray menu open `SUPPORT_URL` (TS ↔ tray.rs,
   test-synced). A dialog taller than a short panel sets `data-panel-dialog`: app-shell's `has-[…]:min-h` grows the

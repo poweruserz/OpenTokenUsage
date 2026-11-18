@@ -326,7 +326,7 @@ struct TrayMenu(Menu<tauri::Wry>);
 #[derive(Default)]
 struct ProviderTrays(Mutex<Vec<String>>);
 
-/// Left click toggles the panel above the icon; a provider icon also opens that provider's page.
+/// Left click toggles the panel in the corner by the tray; a provider icon also opens that provider's page.
 fn on_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
     let TrayIconEvent::Click {
         button: MouseButton::Left,
@@ -338,7 +338,7 @@ fn on_icon_event(tray: &TrayIcon, event: TrayIconEvent) {
         return;
     };
     let app_handle = tray.app_handle();
-    if !toggle_panel_at(app_handle, rect.position, rect.size) {
+    if !toggle_panel_from_tray(app_handle, rect.position, rect.size) {
         return;
     }
     if let Some(provider_id) = tray.id().as_ref().strip_prefix(PROVIDER_TRAY_PREFIX) {
@@ -355,7 +355,19 @@ pub fn toggle_panel_at(
     size: tauri::Size,
 ) -> bool {
     toggle_panel(app_handle, |window| {
-        position_window_at_tray_icon(window, position, size)
+        position_window_at_tray_icon(window, position, size, false)
+    })
+}
+
+/// A click on one of our tray icons: like `toggle_panel_at`, but the panel opens in the work area's corner, as
+/// Windows 11's own flyouts do, instead of centered on the icon a few pixels from it.
+fn toggle_panel_from_tray(
+    app_handle: &AppHandle,
+    position: tauri::Position,
+    size: tauri::Size,
+) -> bool {
+    toggle_panel(app_handle, |window| {
+        position_window_at_tray_icon(window, position, size, true)
     })
 }
 
@@ -899,6 +911,24 @@ fn flyout_origin(
     (x, y)
 }
 
+/// Pure (physical px): the anchor and left edge of a panel `width` wide opened by a click at `middle`. With
+/// `corner` (a tray icon) on the right half of the work area it goes in the corner, `margin` from the edge;
+/// otherwise (the strip, or a tray on the left) it is centered on the click.
+fn click_anchor(
+    middle: i32,
+    width: i32,
+    margin: i32,
+    area: (i32, i32, i32, i32),
+    corner: bool,
+) -> (Anchor, i32) {
+    if corner && middle >= (area.0 + area.2) / 2 {
+        let right = area.2 - margin;
+        (Anchor::Right(right), right - width)
+    } else {
+        (Anchor::Middle(middle), middle - width / 2)
+    }
+}
+
 fn work_area_of(monitor: &tauri::Monitor) -> (i32, i32, i32, i32) {
     let area = monitor.work_area();
     (
@@ -932,7 +962,11 @@ pub fn anchor_panel(window: &tauri::WebviewWindow) {
     let area = work_area_of(&monitor);
     let margin = (FLYOUT_MARGIN * window.scale_factor().unwrap_or(1.0)).round() as i32;
     let (x, anchor_bottom) = match last_anchor_bottom_physical_y() {
-        Some(bottom) => (pos.x, bottom),
+        // A corner panel keeps its right edge in the corner whatever width it has now (another scale).
+        Some(bottom) => match anchor_slot().lock().ok().and_then(|slot| *slot) {
+            Some(anchor @ Anchor::Right(_)) => (anchored_x(anchor, size.width as i32, area), bottom),
+            _ => (pos.x, bottom),
+        },
         None => {
             let bottom = area.3 - margin;
             set_last_anchor_bottom_physical_y(bottom);
@@ -950,11 +984,12 @@ pub fn anchor_panel(window: &tauri::WebviewWindow) {
     place(window, x, y);
 }
 
-/// Position the window above the tray icon, centered horizontally on it.
+/// Position the window above the clicked icon or strip: centered on it, or in the corner (`click_anchor`).
 fn position_window_at_tray_icon(
     window: &tauri::WebviewWindow,
     icon_position: tauri::Position,
     icon_size: tauri::Size,
+    corner: bool,
 ) {
     let scale = window.scale_factor().unwrap_or(1.0);
     let (icon_x, icon_y) = position_to_physical(&icon_position, scale);
@@ -988,11 +1023,23 @@ fn position_window_at_tray_icon(
     let area = work_area_of(&monitor);
     let margin = (FLYOUT_MARGIN * scale).round() as i32;
 
-    // Bottom taskbar: the icon sits below the work area, so anchor on the work area's bottom.
-    let anchor_bottom = (icon_y.round() as i32).min(area.3) - margin;
+    let (anchor, x) = click_anchor(
+        icon_center_x.round() as i32,
+        size.width as i32,
+        margin,
+        area,
+        corner,
+    );
+    set_anchor(anchor);
+    // Bottom taskbar: the icon sits below the work area, so anchor on the work area's bottom. A corner
+    // panel goes there too for an icon in the hidden-icons flyout, which sits inside the work area.
+    let in_lower_half = icon_y >= ((area.1 + area.3) / 2) as f64;
+    let anchor_bottom = if matches!(anchor, Anchor::Right(_)) && in_lower_half {
+        area.3 - margin
+    } else {
+        (icon_y.round() as i32).min(area.3) - margin
+    };
     set_last_anchor_bottom_physical_y(anchor_bottom);
-    set_anchor(Anchor::Middle(icon_center_x.round() as i32));
-    let x = (icon_center_x - size.width as f64 / 2.0).round() as i32;
     let (x, y) = flyout_origin(
         x,
         anchor_bottom,
@@ -1056,6 +1103,25 @@ mod flyout_tests {
         );
         assert_eq!(super::beside_x((20, 300, 260, 340), 400, 12, AREA), 272);
         assert_eq!(super::beside_x((200, 300, 2400, 340), 400, 12, AREA), 0);
+    }
+
+    #[test]
+    fn a_tray_click_opens_the_panel_in_the_corner_and_the_strip_above_itself() {
+        use super::{click_anchor, Anchor};
+        // A tray icon near the corner: right edge 12 px from the work area's, not centered on the icon.
+        assert_eq!(
+            click_anchor(2400, 400, 12, AREA, true),
+            (Anchor::Right(2548), 2148)
+        );
+        // The strip (and a tray on the left half) stays centered on what was clicked.
+        assert_eq!(
+            click_anchor(2400, 400, 12, AREA, false),
+            (Anchor::Middle(2400), 2200)
+        );
+        assert_eq!(
+            click_anchor(300, 400, 12, AREA, true),
+            (Anchor::Middle(300), 100)
+        );
     }
 
     #[test]
