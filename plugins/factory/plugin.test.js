@@ -105,6 +105,59 @@ describe("factory plugin", () => {
     expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
   })
 
+  describe("with both auth.v2.keyring and auth.v2.file", () => {
+    const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+    const keyringToken = makeJwt(exp)
+    const fileToken = makeJwt(exp + 60)
+    const setup = (keyringKey) => {
+      const ctx = makeCtx()
+      const keyring = makeEncryptedAuthV2({ access_token: keyringToken, refresh_token: "r-keyring" })
+      const file = makeEncryptedAuthV2({ access_token: fileToken, refresh_token: "r-file" })
+      ctx.host.fs.writeText("~/.factory/auth.v2.keyring", keyring.envelope)
+      ctx.host.fs.writeText("~/.factory/auth.v2.file", file.envelope)
+      ctx.host.fs.writeText("~/.factory/auth.v2.key", file.keyB64)
+      ctx.host.keychain.readGenericPassword.mockImplementation((service, account) => {
+        if (service !== "Factory CLI" || account !== "auth-encryption-key") return null
+        const key = keyringKey(keyring.keyB64)
+        if (key instanceof Error) throw key
+        return key
+      })
+      ctx.host.http.request.mockReturnValue({
+        status: 200,
+        headers: {},
+        bodyText: JSON.stringify({
+          usage: {
+            startDate: 1770623326000,
+            endDate: 1772956800000,
+            standard: { orgTotalTokensUsed: 1, totalAllowance: 20000000 },
+            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
+          },
+        }),
+      })
+      return ctx
+    }
+    const tokenSent = (ctx) => {
+      const auth = ctx.host.http.request.mock.calls.map((call) => call[0]?.headers?.Authorization).find(Boolean)
+      return auth === "Bearer " + keyringToken ? "keyring" : auth === "Bearer " + fileToken ? "file" : auth
+    }
+
+    it("a usable keyring login wins", async () => {
+      const ctx = setup((key) => key)
+      ;(await loadPlugin()).probe(ctx)
+      expect(tokenSent(ctx)).toBe("keyring")
+    })
+
+    it("a missing key, an unreadable one or a wrong one falls back to the file login", async () => {
+      for (const keyringKey of [() => null, () => new Error("keychain item not found"), () => crypto.randomBytes(32).toString("base64")]) {
+        delete globalThis.__openusage_plugin
+        vi.resetModules()
+        const ctx = setup(keyringKey)
+        ;(await loadPlugin()).probe(ctx)
+        expect(tokenSent(ctx)).toBe("file")
+      }
+    })
+  })
+
   it("prefers auth.v2.file over expired auth.encrypted", async () => {
     const ctx = makeCtx()
     const pastExp = Math.floor(Date.now() / 1000) - 1000
