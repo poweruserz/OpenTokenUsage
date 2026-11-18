@@ -452,6 +452,7 @@ mod win {
     };
     use std::cell::{Cell, RefCell};
     use std::ptr::{null, null_mut};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::time::{Duration, Instant};
     use tauri::Emitter;
     use tauri_plugin_store::StoreExt;
@@ -464,10 +465,10 @@ mod win {
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::System::Threading::GetCurrentThreadId;
     use windows_sys::Win32::UI::Controls::{
-        InitCommonControlsEx, SetWindowTheme, ICC_BAR_CLASSES, INITCOMMONCONTROLSEX,
+        InitCommonControlsEx, SetWindowTheme, ICC_BAR_CLASSES, INITCOMMONCONTROLSEX, NMHDR,
         TOOLTIPS_CLASSW, TTDT_AUTOPOP, TTF_IDISHWND, TTF_SUBCLASS, TTM_ADDTOOLW, TTM_DELTOOLW,
-        TTM_SETDELAYTIME, TTM_SETMAXTIPWIDTH, TTM_UPDATETIPTEXTW, TTS_ALWAYSTIP, TTS_NOPREFIX,
-        TTTOOLINFOW, WM_MOUSELEAVE,
+        TTM_SETDELAYTIME, TTM_SETMAXTIPWIDTH, TTM_UPDATETIPTEXTW, TTN_SHOW, TTS_ALWAYSTIP,
+        TTS_NOPREFIX, TTTOOLINFOW, WM_MOUSELEAVE,
     };
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
         GetAsyncKeyState, TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT, VK_CONTROL, VK_MENU,
@@ -513,6 +514,9 @@ mod win {
         see_through: bool,
     }
 
+    /// The capture exclusion the tooltip was last given (`capture_privacy::win::sync`).
+    static TOOLTIP_EXCLUDED: AtomicBool = AtomicBool::new(false);
+
     thread_local! {
         /// This thread's widget windows; the window procedure reads them, so borrows stay short.
         static WINDOWS: RefCell<Vec<Window>> = const { RefCell::new(Vec::new()) };
@@ -520,8 +524,6 @@ mod win {
         static TOOLTIP: Cell<HWND> = const { Cell::new(null_mut()) };
         /// Whether that tooltip is in the dark theme; None until first set.
         static TOOLTIP_DARK: Cell<Option<bool>> = const { Cell::new(None) };
-        /// Whether that tooltip is kept out of screen capture now, like the widgets.
-        static TOOLTIP_EXCLUDED: Cell<bool> = const { Cell::new(false) };
         /// The widget under the pointer, if any (a locked one fades).
         static HOVERED: Cell<HWND> = const { Cell::new(null_mut()) };
         /// The monitor a full-screen app has in front, if any: the widgets there hide.
@@ -773,14 +775,15 @@ mod win {
     }
 
     /// "Hide from screen sharing" keeps the hover text out of capture too: it names providers and
-    /// their usage, and is a window of its own.
-    fn sync_tooltip_privacy(private: bool) {
+    /// their usage, and is a window of its own. Windows is asked only while the text shows or is
+    /// `showing` next (TTN_SHOW): a hidden window that was asked for is drawn at its next move
+    /// or theme change (`capture_privacy`).
+    fn sync_tooltip_privacy(showing: bool) {
         let tip = TOOLTIP.get();
-        if tip.is_null() || TOOLTIP_EXCLUDED.get() == private {
-            return;
+        if !tip.is_null() {
+            let private = crate::capture_privacy::enabled();
+            crate::capture_privacy::win::sync(tip, &TOOLTIP_EXCLUDED, private, showing);
         }
-        crate::capture_privacy::win::exclude(tip, private);
-        TOOLTIP_EXCLUDED.set(private);
     }
 
     /// The whole widget's opacity, its image kept (UpdateLayeredWindow without a source).
@@ -865,7 +868,7 @@ mod win {
             }
             TOOLTIP.set(create_tooltip(instance));
             TOOLTIP_DARK.set(None);
-            TOOLTIP_EXCLUDED.set(false);
+            TOOLTIP_EXCLUDED.store(false, Ordering::Relaxed);
             FULLSCREEN.set(fullscreen_monitor());
             let fullscreen_check = SetTimer(null_mut(), 0, FULLSCREEN_CHECK_MS, None);
             let mut timer: usize = 0;
@@ -1022,7 +1025,7 @@ mod win {
         };
         let ids: Vec<&String> = widgets.iter().map(|(id, _)| id).collect();
         sync_tooltip_theme(options.dark);
-        sync_tooltip_privacy(crate::capture_privacy::enabled());
+        sync_tooltip_privacy(false);
         // Take the list out: the Win32 calls below send messages to window_proc, which borrows it.
         let mut windows = WINDOWS.with(|windows| std::mem::take(&mut *windows.borrow_mut()));
         unsafe {
@@ -1428,6 +1431,11 @@ mod win {
                         let _ = app.emit("desktop-widgets:redraw", ());
                     }
                     wake_self();
+                    0
+                }
+                // The hover text is about to show: its capture exclusion is due right now.
+                WM_NOTIFY if (*(lparam as *const NMHDR)).code == TTN_SHOW => {
+                    sync_tooltip_privacy(true);
                     0
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),

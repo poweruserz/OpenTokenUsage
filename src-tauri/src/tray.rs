@@ -389,8 +389,7 @@ fn toggle_panel(app_handle: &AppHandle, place_fresh: impl FnOnce(&tauri::Webview
         return false;
     }
     log::debug!("panel click: showing window");
-    let _ = window.show();
-    let _ = window.set_focus();
+    crate::panel::show(&window);
     match remembered_position(&window) {
         Some(spot) => place_at_remembered(&window, spot),
         None => place_fresh(&window),
