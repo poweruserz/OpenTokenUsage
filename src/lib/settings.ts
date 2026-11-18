@@ -716,8 +716,19 @@ export async function savePanelWidth(value: number): Promise<void> {
   await store.save();
 }
 
-/** Open the panel where the user last dragged it instead of above the taskbar (`tray.rs`). */
-export const loadRememberPanelPosition = () => loadBoolean(REMEMBER_PANEL_POSITION_KEY, false);
+/**
+ * Open the panel where the user last dragged it instead of above the taskbar (`tray.rs`, which reads the stored
+ * key). Decided once when unset: on for a new install, off for one from 0.9.1 and older (plugin settings saved),
+ * so it must run before the bootstrap's first plugin-settings save.
+ */
+export async function loadRememberPanelPosition(): Promise<boolean> {
+  const stored = await store.get<unknown>(REMEMBER_PANEL_POSITION_KEY);
+  if (typeof stored === "boolean") return stored;
+  const value = (await store.get<unknown>(PLUGIN_SETTINGS_KEY)) == null;
+  await store.set(REMEMBER_PANEL_POSITION_KEY, value);
+  await store.save();
+  return value;
+}
 
 /** Turning it on keeps the panel's current spot (outer top-left, physical px); off forgets it. */
 export async function saveRememberPanelPosition(value: boolean, position: { x: number; y: number } | null): Promise<void> {

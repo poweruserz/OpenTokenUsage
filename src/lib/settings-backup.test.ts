@@ -80,6 +80,7 @@ describe("settings backup", () => {
     expect(storeState.get("plugins")).toEqual(plugins)
     expect(storeState.get("projectBudgets")).toEqual(budgets)
     expect(storeState.get("taskbarStripStyle")).toMatchObject({ colorMode: "off" })
+    expect(storeState.get("rememberPanelPosition")).toBe(true)
     expect(storeState.has("themeMode")).toBe(false)
     expect(storeState.has("navRight")).toBe(false)
     // Not a preference a backup carries: left alone.

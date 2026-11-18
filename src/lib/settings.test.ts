@@ -28,6 +28,7 @@ import {
   loadStartOnLogin,
   loadTimeFormatMode,
   loadTaskbarStripStyle,
+  loadRememberPanelPosition,
   migrateLegacyTraySettings,
   migrateWindsurfToDevin,
   loadThemeMode,
@@ -95,6 +96,18 @@ describe("settings", () => {
     storeState.clear()
     await restoreSettingsBackup(backup)
     await expect(loadCollapsedSections()).resolves.toEqual(["heatmap"])
+  })
+
+  it("remembers the panel's spot on a new install, not on an older one, and keeps a choice", async () => {
+    storeState.clear()
+    await expect(loadRememberPanelPosition()).resolves.toBe(true)
+    expect(storeState.get("rememberPanelPosition")).toBe(true)
+    storeState.clear()
+    storeState.set("plugins", { order: ["claude"], disabled: [] })
+    await expect(loadRememberPanelPosition()).resolves.toBe(false)
+    expect(storeState.get("rememberPanelPosition")).toBe(false)
+    storeState.set("rememberPanelPosition", true)
+    await expect(loadRememberPanelPosition()).resolves.toBe(true)
   })
 
   it("saves strip placement and restores it after reloading settings", async () => {
