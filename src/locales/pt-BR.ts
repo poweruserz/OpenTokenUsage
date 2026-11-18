@@ -101,6 +101,9 @@ export const ptBR: Messages = {
   "settings.categories": "Categorias de configurações",
 
 
+  "settings.newBadge": "Novo",
+
+
   "settings.plugins.signedOut": "Desconectado",
 
 

@@ -101,6 +101,9 @@ export const tr: Messages = {
   "settings.categories": "Ayar kategorileri",
 
 
+  "settings.newBadge": "Yeni",
+
+
   "settings.plugins.signedOut": "Oturum kapalı",
 
 

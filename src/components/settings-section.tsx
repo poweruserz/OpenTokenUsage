@@ -1,21 +1,38 @@
-import type { ReactNode } from "react"
+import { useContext, type ReactNode } from "react"
 import { t } from "@/lib/i18n"
+import { NewFeaturesContext, type NewFeatureId } from "@/lib/new-features"
 import type { SettingOption } from "@/lib/settings"
 import { cn } from "@/lib/utils"
+
+/** A small "New" pill that breathes slowly (still under reduced motion). */
+export function NewBadge() {
+  return (
+    <span className="ml-1.5 inline-flex rounded-full bg-primary/15 px-1.5 align-middle text-[10px] font-semibold leading-4 text-primary animate-pulse motion-reduce:animate-none">
+      {t("settings.newBadge")}
+    </span>
+  )
+}
 
 /** Windows 11 Settings card: title, one-line description, then the control. */
 export function SettingsSection({
   title,
   description,
+  newFeature,
   children,
 }: {
   title: string
   description?: string
+  /** Badged "New" while this card's addition is new and its group wasn't opened before (`new-features.ts`). */
+  newFeature?: NewFeatureId
   children: ReactNode
 }) {
+  const shown = useContext(NewFeaturesContext)
   return (
     <section className="rounded-lg border border-surface-stroke bg-surface px-3 py-2.5">
-      <h3 className="text-sm font-semibold leading-5">{title}</h3>
+      <h3 className="text-sm font-semibold leading-5">
+        {title}
+        {newFeature && shown.has(newFeature) && <NewBadge />}
+      </h3>
       {description && <p className="text-xs text-muted-foreground leading-4 mb-2">{description}</p>}
       {!description && <div className="h-1.5" />}
       {children}

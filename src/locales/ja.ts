@@ -101,6 +101,9 @@ export const ja: Messages = {
   "settings.categories": "設定のカテゴリ",
 
 
+  "settings.newBadge": "新機能",
+
+
   "settings.plugins.signedOut": "サインアウト中",
 
 

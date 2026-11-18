@@ -307,7 +307,7 @@ describe("agent activity on the strip", () => {
       activity: { claude: "waiting", codex: "busy" },
       focusId: "codex",
     })
-    expect(items.map((item) => item.dot)).toEqual(["#FCE100", "#4CC2FF"])
+    expect(items.map((item) => item.dot)).toEqual(["#FCE100", "#6CCB5F"])
     expect(items.map((item) => item.lines.length)).toEqual([1, 2])
     // The followed card in detail: each line's name, its number and the time to its reset.
     expect(items[1]!.lines.map((line) => [line.text, line.value])).toEqual([

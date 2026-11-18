@@ -101,6 +101,9 @@ export const en = {
   "settings.categories": "Settings categories",
 
 
+  "settings.newBadge": "New",
+
+
   "settings.plugins.signedOut": "Signed out",
 
 

@@ -101,6 +101,9 @@ export const de: Messages = {
   "settings.categories": "Einstellungsbereiche",
 
 
+  "settings.newBadge": "Neu",
+
+
   "settings.plugins.signedOut": "Abgemeldet",
 
 

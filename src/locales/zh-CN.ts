@@ -101,6 +101,9 @@ export const zhCN: Messages = {
   "settings.categories": "设置类别",
 
 
+  "settings.newBadge": "新",
+
+
   "settings.plugins.signedOut": "已退出登录",
 
 

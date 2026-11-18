@@ -101,6 +101,9 @@ export const it: Messages = {
   "settings.categories": "Categorie delle impostazioni",
 
 
+  "settings.newBadge": "Nuovo",
+
+
   "settings.plugins.signedOut": "Disconnesso",
 
 

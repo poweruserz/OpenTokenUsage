@@ -101,6 +101,9 @@ export const ko: Messages = {
   "settings.categories": "설정 범주",
 
 
+  "settings.newBadge": "신규",
+
+
   "settings.plugins.signedOut": "로그아웃됨",
 
 

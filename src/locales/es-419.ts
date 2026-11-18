@@ -101,6 +101,9 @@ export const es419: Messages = {
   "settings.categories": "Categorías de configuración",
 
 
+  "settings.newBadge": "Nuevo",
+
+
   "settings.plugins.signedOut": "Sesión cerrada",
 
 

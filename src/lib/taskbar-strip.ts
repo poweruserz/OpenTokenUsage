@@ -44,9 +44,9 @@ export type TaskbarStripItem = {
 /** What a card's live sessions do (`agent_activity`): one waits for the user, or one works. */
 export type AgentActivity = "busy" | "waiting"
 
-/** Windows' own blue and caution yellow, each as it reads on a light or a dark taskbar. */
+/** Windows' own success green and caution yellow, each as it reads on a light or a dark taskbar. */
 const ACTIVITY_COLORS: Record<AgentActivity, { light: string; dark: string }> = {
-  busy: { light: "#0078D4", dark: "#4CC2FF" },
+  busy: { light: "#0F7B0F", dark: "#6CCB5F" },
   waiting: { light: "#9D5D00", dark: "#FCE100" },
 }
 
