@@ -101,6 +101,9 @@ export const tr: Messages = {
   "settings.categories": "Ayar kategorileri",
 
 
+  "settings.cards.sessionsOnOverview": "Genel bakışta da göster (kapalıyken yalnızca kartın ayrıntı sayfasında)",
+
+
   "settings.newBadge": "Yeni",
 
 

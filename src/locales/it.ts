@@ -101,6 +101,9 @@ export const it: Messages = {
   "settings.categories": "Categorie delle impostazioni",
 
 
+  "settings.cards.sessionsOnOverview": "Anche nella panoramica (se disattivato: solo nella pagina di una scheda)",
+
+
   "settings.newBadge": "Nuovo",
 
 

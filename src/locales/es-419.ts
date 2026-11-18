@@ -101,6 +101,9 @@ export const es419: Messages = {
   "settings.categories": "Categorías de configuración",
 
 
+  "settings.cards.sessionsOnOverview": "También en el resumen (desactivado: solo en la página de una tarjeta)",
+
+
   "settings.newBadge": "Nuevo",
 
 

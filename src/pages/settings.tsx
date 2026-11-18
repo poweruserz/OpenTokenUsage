@@ -743,6 +743,15 @@ function CardFeaturesSection() {
           <div className="ml-6 space-y-1.5">
             <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
               <Checkbox
+                key={`sessions-overview-${features.sessionsOnOverview}`}
+                checked={features.sessionsOnOverview}
+                className="mt-0.5"
+                onCheckedChange={(checked) => update({ sessionsOnOverview: checked === true })}
+              />
+              {t("settings.cards.sessionsOnOverview")}
+            </label>
+            <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
+              <Checkbox
                 key={`cache-timer-${features.cacheTimer}`}
                 checked={features.cacheTimer}
                 className="mt-0.5"

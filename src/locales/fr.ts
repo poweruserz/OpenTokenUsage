@@ -101,6 +101,9 @@ export const fr: Messages = {
   "settings.categories": "Catégories de paramètres",
 
 
+  "settings.cards.sessionsOnOverview": "Aussi dans la vue d'ensemble (désactivé : seulement sur la page d'une carte)",
+
+
   "settings.newBadge": "Nouveau",
 
 

@@ -590,6 +590,7 @@ describe("alert settings", () => {
       spendToolsOff: ["grok"],
       autoExport: true,
     })
+    expect(normalizeCardFeatures({ sessionsOnOverview: false }).sessionsOnOverview).toBe(false)
     // tokscale runs a downloaded package: only an explicit true turns it on.
     expect(DEFAULT_CARD_FEATURES.tokscale).toBe(false)
     expect(normalizeCardFeatures({ tokscale: true }).tokscale).toBe(true)

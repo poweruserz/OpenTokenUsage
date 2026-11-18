@@ -3,10 +3,13 @@ import { invoke } from "@tauri-apps/api/core"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import {
   ClaudeSessionList,
+  ClaudeSessions,
   hasLiveSessions,
   useClaudeSessions,
   type LiveSession,
 } from "@/components/claude-sessions"
+import { DEFAULT_CARD_FEATURES } from "@/lib/settings"
+import { useAppPreferencesStore } from "@/stores/app-preferences-store"
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: () => true }))
 let panelOpen = true
@@ -25,6 +28,7 @@ describe("claude sessions", () => {
   beforeEach(() => {
     vi.mocked(invoke).mockReset()
     panelOpen = true
+    useAppPreferencesStore.setState({ cardFeatures: DEFAULT_CARD_FEATURES })
   })
 
   it("lists sessions only for the usual Claude and Codex logins and their extra accounts", () => {
@@ -53,6 +57,22 @@ describe("claude sessions", () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
+  it("leaves the overview's cards alone when turned off there, and still reads for the detail page", async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    // On, as it comes: an overview card reads them.
+    const overview = render(<ClaudeSessions pluginId="claude" />)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("live_sessions", { pluginId: "claude" }))
+    overview.unmount()
+    vi.mocked(invoke).mockClear()
+
+    useAppPreferencesStore.setState({ cardFeatures: { ...DEFAULT_CARD_FEATURES, sessionsOnOverview: false } })
+    render(<ClaudeSessions pluginId="claude" />)
+    expect(invoke).not.toHaveBeenCalled()
+
+    render(<ClaudeSessions pluginId="claude" section />)
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("live_sessions", { pluginId: "claude" }))
+  })
+
   it("shows nothing without sessions", () => {
     const { container } = render(<ClaudeSessionList sessions={[]} />)
     expect(container).toBeEmptyDOMElement()
@@ -76,5 +96,7 @@ describe("claude sessions", () => {
     // The warning takes the busy text's place; the dot still says it.
     expect(screen.queryByText("Working")).not.toBeInTheDocument()
     expect(screen.getAllByRole("img", { name: "Working" })).toHaveLength(1)
+    // A dot between a row's state and its context; none on the row with the state alone.
+    expect(screen.getAllByText("·")).toHaveLength(2)
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { DetailSection } from "@/components/detail-section"
 import { invoke, isTauri } from "@tauri-apps/api/core"
 import { useNowTicker } from "@/hooks/use-now-ticker"
@@ -37,13 +37,16 @@ const STATUS: Record<string, { key: MessageKey; dot: string }> = {
   idle: { key: "card.sessions.idle", dot: "bg-muted-foreground/50" },
 }
 
-/** Live sessions of a Claude or Codex card's login, read every few seconds while the panel is shown. */
-export function useClaudeSessions(pluginId: string) {
+/**
+ * Live sessions of a Claude or Codex card's login, read every few seconds while the panel is shown.
+ * `wanted` false: the place asking doesn't list them now, so nothing is read.
+ */
+export function useClaudeSessions(pluginId: string, wanted = true) {
   const [sessions, setSessions] = useState<LiveSession[]>([])
   // The OS's answer: the hidden panel's page reports itself visible until it is first shown.
   const panelOpen = usePanelOpen()
   const shown = useAppPreferencesStore((state) => state.cardFeatures.liveSessions)
-  const enabled = isTauri() && shown && hasLiveSessions(pluginId) && panelOpen
+  const enabled = isTauri() && shown && wanted && hasLiveSessions(pluginId) && panelOpen
   const tick = useNowTicker({ enabled, intervalMs: SESSIONS_POLL_MS })
   const failedRef = useRef(false)
 
@@ -91,8 +94,10 @@ export function ClaudeSessionList({ sessions, section = false }: { sessions: Liv
   )
 }
 
-export function ClaudeSessions({ pluginId, section }: { pluginId: string; section?: boolean }) {
-  return <ClaudeSessionList sessions={useClaudeSessions(pluginId)} section={section} />
+/** `section`: on the detail page, which always lists them; the overview's cards only with that option on. */
+export function ClaudeSessions({ pluginId, section = false }: { pluginId: string; section?: boolean }) {
+  const onOverview = useAppPreferencesStore((state) => state.cardFeatures.sessionsOnOverview)
+  return <ClaudeSessionList sessions={useClaudeSessions(pluginId, section || onOverview)} section={section} />
 }
 
 /** A prompt cache this close to running out is shown in yellow: the next prompt soon re-reads it all. */
@@ -107,6 +112,39 @@ function SessionRow({ session }: { session: LiveSession }) {
   // Sessions are read every few seconds, so this counts down with them.
   const cacheLeftMs = features.cacheTimer && session.cacheExpiresAt != null ? session.cacheExpiresAt - Date.now() : null
   const cacheText = cacheLeftMs != null && cacheLeftMs > 0 ? formatCompactDuration(cacheLeftMs) : null
+  // What follows the name; a dot between any two, or state and cache read as one phrase.
+  const details = [
+    compactSoon ? (
+      <span className="text-destructive">{t("card.sessions.compactSoon")}</span>
+    ) : (
+      statusText && <span className="text-muted-foreground">{statusText}</span>
+    ),
+    cacheText && (
+      <span
+        title={t("card.sessions.cacheHint")}
+        className={cn(
+          "tabular-nums",
+          cacheLeftMs! <= CACHE_WARN_MS ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"
+        )}
+      >
+        {t("card.sessions.cache", { time: cacheText })}
+      </span>
+    ),
+    percent != null && (
+      <span
+        className={cn(
+          "tabular-nums",
+          compactSoon
+            ? "text-destructive"
+            : percent >= CONTEXT_WARN_PERCENT
+              ? "text-yellow-600 dark:text-yellow-500"
+              : "text-muted-foreground"
+        )}
+      >
+        {t("card.sessions.context", { percent })}
+      </span>
+    ),
+  ].filter(Boolean)
   return (
     <div className="flex items-center gap-2 text-xs" title={session.cwd}>
       <span
@@ -115,34 +153,18 @@ function SessionRow({ session }: { session: LiveSession }) {
         className={cn("size-1.5 shrink-0 rounded-full", status?.dot ?? "bg-muted-foreground/50")}
       />
       <span className="min-w-0 flex-1 truncate">{session.name}</span>
-      {compactSoon ? (
-        <span className="shrink-0 text-destructive">{t("card.sessions.compactSoon")}</span>
-      ) : (
-        statusText && <span className="shrink-0 text-muted-foreground">{statusText}</span>
-      )}
-      {cacheText && (
-        <span
-          title={t("card.sessions.cacheHint")}
-          className={cn(
-            "shrink-0 tabular-nums",
-            cacheLeftMs! <= CACHE_WARN_MS ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"
-          )}
-        >
-          {t("card.sessions.cache", { time: cacheText })}
-        </span>
-      )}
-      {percent != null && (
-        <span
-          className={cn(
-            "shrink-0 tabular-nums",
-            compactSoon
-              ? "text-destructive"
-              : percent >= CONTEXT_WARN_PERCENT
-                ? "text-yellow-600 dark:text-yellow-500"
-                : "text-muted-foreground"
-          )}
-        >
-          {t("card.sessions.context", { percent })}
+      {details.length > 0 && (
+        <span className="flex shrink-0 items-center gap-1.5">
+          {details.map((detail, index) => (
+            <Fragment key={index}>
+              {index > 0 && (
+                <span aria-hidden="true" className="text-muted-foreground">
+                  ·
+                </span>
+              )}
+              {detail}
+            </Fragment>
+          ))}
         </span>
       )}
     </div>

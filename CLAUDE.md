@@ -79,7 +79,9 @@ This file holds the project facts that are easy to get wrong.
   `taskbarStripStyle.followActive`/`followDetail`/`activityDots` (the strip and widgets' look), `desktopWidgets.clickThrough`/
   `clickThroughKey`, and `cardFeatures` (Usage → On the cards, in `BACKUP_KEYS`: `liveSessions`, `spend`, `spendToolsOff`;
   a tool left out is passed to no reader: `local_spend` reads only the `tools` it is given). A Codex "Monthly" row hides
-  with the card's line layout like any row.
+  with the card's line layout like any row. `cardFeatures.sessionsOnOverview` off keeps live sessions to a card's detail
+  page: the overview's cards then read none (`useClaudeSessions(pluginId, wanted)`). A session row's state, cache
+  countdown and context fill are set apart by a middle dot.
 - After token-monitor (github.com/Javis603/token-monitor, MIT), each with its switch:
   - Live sessions also show a Claude session's prompt-cache countdown (`claude_cache_expiry`: the last assistant
     message's `ephemeral_5m`/`ephemeral_1h` write, a compaction resets it) and a Codex session's context fill (last
