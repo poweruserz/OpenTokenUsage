@@ -368,6 +368,8 @@
   }
 
   function loadDesktopFallback(ctx) {
+    // The app's login is for Anthropic's own API: never sent to a custom, staging or local OAuth base.
+    if (getOauthConfig(ctx).baseApiUrl !== PROD_BASE_API_URL) return null
     let desktop
     try {
       desktop = loadDesktopCredentials(ctx)

@@ -2972,6 +2972,18 @@ describe("claude plugin", () => {
       expect(readLogin).not.toHaveBeenCalled()
     })
 
+    it("never sends the app's login to a custom OAuth base (CLAUDE_CODE_CUSTOM_OAUTH_URL)", async () => {
+      const ctx = makeCtx()
+      const readLogin = withApp(ctx, appLogin())
+      ctx.host.env.get.mockImplementation((name) =>
+        name === "CLAUDE_CODE_CUSTOM_OAUTH_URL" ? "https://gateway.example" : null
+      )
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow("Not logged in")
+      expect(readLogin).not.toHaveBeenCalled()
+      expect(ctx.host.http.request).not.toHaveBeenCalled()
+    })
+
     it("without the app's login it stays a plain not-set-up error", async () => {
       const ctx = makeCtx()
       withApp(ctx, null)
