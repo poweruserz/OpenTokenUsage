@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.2
+
+The panel no longer leaves a dark rectangle on the screen, Claude is found through its desktop app, and a signed-out card simply asks you to sign in.
+
+### New Features
+- Claude without Claude Code: with only the Claude desktop app signed in, the Claude card shows your limits through the app's own login. It is only read, never refreshed or changed, and Settings → Providers can turn it off
+- A provider you are signed out of, or that still needs its key or its app opened once, shows a quiet grey card with its button instead of a red error, and Settings → Providers shows "Signed out · Sign in" next to it. Network and server errors stay red
+- Live sessions can be left off the overview (Settings → Usage → "Also on the overview"): a card's detail page still lists them. A dot sets a session's state, cache countdown and context fill apart
+- A tray click opens the panel in the corner of the screen, like Windows' own flyouts, and a new install remembers where you drag it
+- The taskbar strip is on for a new install and for anyone who never chose, and the dot on a logo while its agent works is green
+- Settings marks what the last two releases added with a "New" badge, until you have opened that group once
+
+### Bug Fixes
+- The panel no longer stands in the corner as an empty dark rectangle from the app's start until it is first opened (0.9.1): Windows drew the hidden window once "Hide from screen sharing" had sent it its setting, on or off
+- Factory droid 1.x: its login in the Windows credential store is found (#51, thanks @happtim)
+
 ## v0.9.1
 
 Desktop widgets and a screen-edge rail, what you spend each day, six new providers, and a panel you can widen.
