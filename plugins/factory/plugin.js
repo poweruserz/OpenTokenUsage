@@ -1,6 +1,9 @@
 (function () {
   const AUTH_V2_PATH = "~/.factory/auth.v2.file"
   const AUTH_V2_KEY_PATH = "~/.factory/auth.v2.key"
+  const AUTH_V2_KEYRING_PATH = "~/.factory/auth.v2.keyring"
+  const KEYRING_SERVICE = "Factory CLI"
+  const KEYRING_ACCOUNT = "auth-encryption-key"
   const AUTH_PATHS = ["~/.factory/auth.encrypted", "~/.factory/auth.json"]
   const KEYCHAIN_SERVICES = ["Factory Token", "Factory token", "Factory Auth", "Droid Auth"]
   const WORKOS_CLIENT_ID = "client_01HNM792M5G5G1A2THWPXKFMXB"
@@ -93,38 +96,67 @@
     return null
   }
 
-  function loadAuthFromV2File(ctx) {
-    if (!ctx.host.crypto || typeof ctx.host.crypto.decryptAes256Gcm !== "function") {
-      return null
-    }
-    if (!ctx.host.fs.exists(AUTH_V2_PATH) || !ctx.host.fs.exists(AUTH_V2_KEY_PATH)) {
-      return null
-    }
+  function hasDecryptHelper(ctx) {
+    return Boolean(ctx.host.crypto) && typeof ctx.host.crypto.decryptAes256Gcm === "function"
+  }
 
+  function decryptV2(ctx, authPath, key, source) {
     try {
-      const envelope = ctx.host.fs.readText(AUTH_V2_PATH)
-      const key = ctx.host.fs.readText(AUTH_V2_KEY_PATH)
+      const envelope = ctx.host.fs.readText(authPath)
       const decrypted = ctx.host.crypto.decryptAes256Gcm(envelope, key)
       const auth = parseAuthPayload(ctx, decrypted, { allowPartial: true })
       if (!auth) {
-        ctx.host.log.warn("auth file exists but has no valid auth payload: " + AUTH_V2_PATH)
+        ctx.host.log.warn("auth file exists but has no valid auth payload: " + authPath)
         return null
       }
-      ctx.host.log.info("auth loaded from file: " + AUTH_V2_PATH)
-      return {
-        auth,
-        source: "file-v2",
-        authPath: AUTH_V2_PATH,
-        authKey: key,
-        keychainService: null,
-      }
+      const parsed = ctx.util.tryParseJson(decrypted)
+      const raw = parsed && typeof parsed === "object" ? parsed : null
+      ctx.host.log.info("auth loaded from file: " + authPath)
+      return { auth, raw, source, authPath, authKey: key, keychainService: null }
     } catch (e) {
       ctx.host.log.warn("auth file read failed: " + String(e))
       return null
     }
   }
 
+  function loadAuthFromV2File(ctx) {
+    if (!hasDecryptHelper(ctx)) return null
+    if (!ctx.host.fs.exists(AUTH_V2_PATH) || !ctx.host.fs.exists(AUTH_V2_KEY_PATH)) {
+      return null
+    }
+
+    let key
+    try {
+      key = ctx.host.fs.readText(AUTH_V2_KEY_PATH)
+    } catch (e) {
+      ctx.host.log.warn("auth file read failed: " + String(e))
+      return null
+    }
+    return decryptV2(ctx, AUTH_V2_PATH, key, "file-v2")
+  }
+
+  function loadAuthFromV2Keyring(ctx) {
+    if (!hasDecryptHelper(ctx)) return null
+    if (!ctx.host.fs.exists(AUTH_V2_KEYRING_PATH)) return null
+    if (!ctx.host.keychain || typeof ctx.host.keychain.readGenericPassword !== "function") {
+      return null
+    }
+
+    let key
+    try {
+      key = ctx.host.keychain.readGenericPassword(KEYRING_SERVICE, KEYRING_ACCOUNT)
+    } catch (e) {
+      ctx.host.log.warn("auth keyring key unavailable: " + String(e))
+      return null
+    }
+    if (!key) return null
+    return decryptV2(ctx, AUTH_V2_KEYRING_PATH, key, "keyring-v2")
+  }
+
   function loadAuthFromFiles(ctx) {
+    const keyringAuth = loadAuthFromV2Keyring(ctx)
+    if (keyringAuth) return keyringAuth
+
     const v2Auth = loadAuthFromV2File(ctx)
     if (v2Auth) return v2Auth
 
@@ -181,6 +213,9 @@
     const keychainAuth = loadAuthFromKeychain(ctx)
     if (keychainAuth) return keychainAuth
 
+    if (!ctx.host.fs.exists(AUTH_V2_KEYRING_PATH)) {
+      ctx.host.log.warn("auth file not found: " + AUTH_V2_KEYRING_PATH)
+    }
     if (!ctx.host.fs.exists(AUTH_V2_PATH)) {
       ctx.host.log.warn("auth file not found: " + AUTH_V2_PATH)
     }
@@ -201,12 +236,17 @@
     if (!auth) return false
 
     try {
-      if (authState.source === "file-v2" && authState.authPath && authState.authKey) {
+      if (
+        (authState.source === "file-v2" || authState.source === "keyring-v2") &&
+        authState.authPath &&
+        authState.authKey
+      ) {
         if (!ctx.host.crypto || typeof ctx.host.crypto.encryptAes256Gcm !== "function") {
           ctx.host.log.warn("auth persistence skipped: unsupported source " + authState.source)
           return false
         }
-        const envelope = ctx.host.crypto.encryptAes256Gcm(JSON.stringify(auth, null, 2), authState.authKey)
+        const payload = authState.raw ? Object.assign({}, authState.raw, auth) : auth
+        const envelope = ctx.host.crypto.encryptAes256Gcm(JSON.stringify(payload, null, 2), authState.authKey)
         ctx.host.fs.writeText(authState.authPath, envelope)
         ctx.host.log.info("auth file updated: " + authState.authPath)
         return true

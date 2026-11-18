@@ -3096,17 +3096,13 @@ pub fn patch_ccusage_wrapper(ctx: &rquickjs::Ctx<'_>) -> rquickjs::Result<()> {
     )
 }
 
-/// go-keyring (the `agy` CLI) stores a secret in Windows Credential Manager as a generic
-/// credential named `service:account`, its value as raw UTF-8 bytes.
+/// Reads a generic credential by its full target name; the value is raw UTF-8 bytes.
 #[cfg(windows)]
-fn read_windows_credential(service: &str, account: &str) -> Option<String> {
+fn read_windows_credential_target(target: &str) -> Option<String> {
     use windows_sys::Win32::Security::Credentials::{
         CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
     };
-    let target: Vec<u16> = format!("{service}:{account}")
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
+    let target: Vec<u16> = target.encode_utf16().chain(Some(0)).collect();
     let mut cred: *mut CREDENTIALW = std::ptr::null_mut();
     if unsafe { CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut cred) } == 0 {
         return None;
@@ -3121,6 +3117,14 @@ fn read_windows_credential(service: &str, account: &str) -> Option<String> {
     };
     unsafe { CredFree(cred as *const _) };
     String::from_utf8(bytes).ok()
+}
+
+/// go-keyring (the `agy` CLI) names the generic credential `service:account`; keytar
+/// (Factory droid) names it `service/account`. Both store the value as raw UTF-8 bytes.
+#[cfg(windows)]
+fn read_windows_credential(service: &str, account: &str) -> Option<String> {
+    read_windows_credential_target(&format!("{service}:{account}"))
+        .or_else(|| read_windows_credential_target(&format!("{service}/{account}")))
 }
 
 #[cfg(not(windows))]
@@ -3173,7 +3177,8 @@ fn is_allowed_credential_filter(filter: &str) -> bool {
 }
 
 /// Windows has no macOS Keychain. `readGenericPassword(service, account)` reads the
-/// go-keyring item from Credential Manager; Credential Manager has no service-only lookup,
+/// go-keyring (`service:account`) or keytar (`service/account`) item from Credential Manager;
+/// Credential Manager has no service-only lookup,
 /// so every other call fails fast and plugins fall back to their file-based sources.
 fn inject_keychain<'js>(
     ctx: &Ctx<'js>,
@@ -3770,6 +3775,44 @@ mod tests {
             "got: {}",
             results[2]
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn keychain_reads_keytar_item_from_credential_manager() {
+        use windows_sys::Win32::Security::Credentials::{
+            CredDeleteW, CredWriteW, CREDENTIALW, CRED_PERSIST_SESSION, CRED_TYPE_GENERIC,
+        };
+        let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+        let mut target = wide("__openusage_keytar_test__/acct");
+        let mut user = wide("acct");
+        let mut blob = b"a2V5".to_vec();
+        let mut cred: CREDENTIALW = unsafe { std::mem::zeroed() };
+        cred.Type = CRED_TYPE_GENERIC;
+        cred.TargetName = target.as_mut_ptr();
+        cred.UserName = user.as_mut_ptr();
+        cred.CredentialBlob = blob.as_mut_ptr();
+        cred.CredentialBlobSize = blob.len() as u32;
+        cred.Persist = CRED_PERSIST_SESSION;
+        assert_ne!(unsafe { CredWriteW(&cred, 0) }, 0, "write test credential");
+
+        let rt = Runtime::new().expect("runtime");
+        let ctx = Context::full(&rt).expect("context");
+        let results: Vec<String> = ctx.with(|ctx| {
+            inject_host_api(&ctx, "test", &std::env::temp_dir(), "0.0.0").expect("inject");
+            ctx.eval(
+                r#"
+                var k = __openusage_ctx.host.keychain;
+                [["__openusage_keytar_test__", "acct"], ["__openusage_keytar_test__", "other"]]
+                    .map(function (a) { try { return k.readGenericPassword.apply(k, a) } catch (e) { return String(e) } })
+                "#,
+            )
+            .expect("js eval")
+        });
+        unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) };
+
+        assert_eq!(results[0], "a2V5");
+        assert!(results[1].contains("not found"), "got: {}", results[1]);
     }
 
     #[test]

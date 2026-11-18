@@ -81,6 +81,7 @@ Premium tokens (`premium.totalAllowance > 0`) are only available on Max/Enterpri
 
 ### Token Location
 
+- `~/.factory/auth.v2.keyring` + its key in Windows Credential Manager (generic credential `Factory CLI/auth-encryption-key`; droid 1.x on Windows; AES-256-GCM encrypted JSON)
 - `~/.factory/auth.v2.file` + `~/.factory/auth.v2.key` (current droid auth store; AES-256-GCM encrypted JSON)
 - `~/.factory/auth.encrypted` (legacy droid auth file)
 - `~/.factory/auth.json` (older droid auth file)
@@ -106,7 +107,7 @@ Premium tokens (`premium.totalAllowance > 0`) are only available on Max/Enterpri
 
 ### Token Refresh
 
-Access tokens have a 7-day lifetime. Refreshed when within 24 hours of expiry or on 401/403.
+Access tokens have a 7-day lifetime. Refreshed when within 24 hours of expiry or on 401/403. A refreshed login is written back to the encrypted file it was read from, keeping its other fields (`active_organization_id`, `whoami`, `region`).
 
 ```
 POST https://api.workos.com/user_management/authenticate

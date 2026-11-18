@@ -288,6 +288,105 @@ describe("factory plugin", () => {
     expect(persisted.access_token).toBe(makeJwt(futureExp))
   })
 
+  it("loads auth from auth.v2.keyring with key from Credential Manager", async () => {
+    const ctx = makeCtx()
+    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+    const authV2 = makeEncryptedAuthV2({
+      access_token: makeJwt(futureExp),
+      refresh_token: "refresh",
+    })
+    ctx.host.fs.writeText("~/.factory/auth.v2.keyring", authV2.envelope)
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) =>
+      service === "Factory CLI" && account === "auth-encryption-key" ? authV2.keyB64 : null
+    )
+    ctx.host.http.request.mockReturnValue({
+      status: 200,
+      headers: {},
+      bodyText: JSON.stringify({
+        usage: {
+          startDate: 1770623326000,
+          endDate: 1772956800000,
+          standard: { orgTotalTokensUsed: 789, totalAllowance: 20000000 },
+          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
+        },
+      }),
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("Factory CLI", "auth-encryption-key")
+  })
+
+  it("throws not logged in when auth.v2.keyring exists but its key is unavailable", async () => {
+    const ctx = makeCtx()
+    const authV2 = makeEncryptedAuthV2({
+      access_token: makeJwt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60),
+      refresh_token: "refresh",
+    })
+    ctx.host.fs.writeText("~/.factory/auth.v2.keyring", authV2.envelope)
+    ctx.host.keychain.readGenericPassword.mockImplementation(() => {
+      throw new Error("keychain item not found")
+    })
+
+    const plugin = await loadPlugin()
+    expect(() => plugin.probe(ctx)).toThrow("Not logged in")
+  })
+
+  it("persists refreshed keyring auth back to auth.v2.keyring and keeps other fields", async () => {
+    const ctx = makeCtx()
+    const nearExp = Math.floor(Date.now() / 1000) + 12 * 60 * 60
+    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
+    const authV2 = makeEncryptedAuthV2({
+      access_token: makeJwt(nearExp),
+      refresh_token: "refresh",
+      active_organization_id: "org_1",
+      whoami: { region: "us" },
+    })
+    ctx.host.fs.writeText("~/.factory/auth.v2.keyring", authV2.envelope)
+    ctx.host.keychain.readGenericPassword.mockImplementation((service, account) =>
+      service === "Factory CLI" && account === "auth-encryption-key" ? authV2.keyB64 : null
+    )
+    ctx.host.fs.writeText.mockClear()
+
+    ctx.host.http.request.mockImplementation((opts) => {
+      if (String(opts.url).includes("workos.com")) {
+        return {
+          status: 200,
+          bodyText: JSON.stringify({
+            access_token: makeJwt(futureExp),
+            refresh_token: "new-refresh",
+          }),
+        }
+      }
+      return {
+        status: 200,
+        headers: {},
+        bodyText: JSON.stringify({
+          usage: {
+            startDate: 1770623326000,
+            endDate: 1772956800000,
+            standard: { orgTotalTokensUsed: 111, totalAllowance: 20000000 },
+            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
+          },
+        }),
+      }
+    })
+
+    const plugin = await loadPlugin()
+    const result = plugin.probe(ctx)
+    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(ctx.host.fs.writeText).toHaveBeenCalledTimes(1)
+    expect(ctx.host.fs.writeText).toHaveBeenCalledWith("~/.factory/auth.v2.keyring", expect.any(String))
+
+    const persistedEnvelope = ctx.host.fs.readText("~/.factory/auth.v2.keyring")
+    const persisted = JSON.parse(ctx.host.crypto.decryptAes256Gcm(persistedEnvelope, authV2.keyB64))
+    expect(persisted.refresh_token).toBe("new-refresh")
+    expect(persisted.access_token).toBe(makeJwt(futureExp))
+    expect(persisted.active_organization_id).toBe("org_1")
+    expect(persisted.whoami.region).toBe("us")
+  })
+
   it("prefers auth.encrypted over stale auth.json when both exist", async () => {
     const ctx = makeCtx()
     const pastExp = Math.floor(Date.now() / 1000) - 1000
