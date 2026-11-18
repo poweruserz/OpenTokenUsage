@@ -351,7 +351,8 @@ This file holds the project facts that are easy to get wrong.
   applies the exclusion right before showing (`capture_privacy::before_show`); `set_capture_privacy` touches the
   panel only while it is visible. Both go through `win::sync`, which goes by what the panel was last given
   (`PANEL_EXCLUDED`), never by `GetWindowDisplayAffinity`: that reads 0 for a hidden window though the exclusion
-  survives hide and show. The widgets' tooltip follows the same rule (`sync_tooltip_privacy`: while it shows, or on
+  survives hide and show (with the option on, a window about to show is asked again all the same). The widgets'
+  tooltip follows the same rule (`sync_tooltip_privacy`: while it shows, or on
   `TTN_SHOW` right before): once it was shown, it is drawn the same way. The widgets themselves are layered windows,
   which are not, so they are asked as they are. None of them is asked while the option has stayed off since start.
 - tao 0.35 re-applies visibility from its own tracked flag on every window-flag change and writes the style bits

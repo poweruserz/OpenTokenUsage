@@ -1434,7 +1434,7 @@ mod win {
                     0
                 }
                 // The hover text is about to show: its capture exclusion is due right now.
-                WM_NOTIFY if (*(lparam as *const NMHDR)).code == TTN_SHOW => {
+                WM_NOTIFY if lparam != 0 && (*(lparam as *const NMHDR)).code == TTN_SHOW => {
                     sync_tooltip_privacy(true);
                     0
                 }

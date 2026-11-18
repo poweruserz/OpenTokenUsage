@@ -142,9 +142,10 @@ pub mod win {
 
     /// `exclude` for a window that can be hidden: when `on` differs from what it was last
     /// `given`, and only while it is visible or `showing` (shown right after). Hidden, it waits
-    /// for its next show.
+    /// for its next show. With the option on, a window about to show is asked again whatever it
+    /// was given: harmless then, and nothing shows unexcluded should Windows have dropped it.
     pub fn sync(hwnd: HWND, given: &AtomicBool, on: bool, showing: bool) {
-        if given.load(Ordering::Relaxed) == on {
+        if given.load(Ordering::Relaxed) == on && !(showing && on) {
             return;
         }
         if (showing || unsafe { IsWindowVisible(hwnd) } != 0) && exclude(hwnd, on) {
@@ -198,16 +199,18 @@ mod tests {
         assert_eq!(asked(), 0, "left alone while hidden");
         win::sync(hwnd, &given, true, true);
         assert_eq!(asked(), 1, "asked right before its show");
+        win::sync(hwnd, &given, true, true);
+        assert_eq!(asked(), 2, "and again at every show while on");
         // Turned off while hidden: Windows reports no exclusion then, only `given` knows of it.
         given.store(true, Ordering::Relaxed);
         win::sync(hwnd, &given, false, false);
-        assert_eq!(asked(), 1, "left alone while hidden again");
+        assert_eq!(asked(), 2, "left alone while hidden again");
         assert!(
             given.load(Ordering::Relaxed),
             "its exclusion is still to be taken back"
         );
         win::sync(hwnd, &given, false, true);
-        assert_eq!(asked(), 2, "asked right before its next show");
+        assert_eq!(asked(), 3, "asked right before its next show");
         unsafe { DestroyWindow(hwnd) };
     }
 }
