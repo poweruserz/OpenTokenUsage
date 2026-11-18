@@ -111,6 +111,10 @@ describe("settings", () => {
     storeState.clear()
     storeState.set("trayIconStyle", "bars")
     await expect(loadTaskbarStrip()).resolves.toBe(false)
+    // One that migrates to the plain icon gets the strip on its first start already.
+    storeState.clear()
+    storeState.set("trayIconStyle", "provider")
+    await expect(loadTaskbarStrip()).resolves.toBe(true)
   })
 
   it("remembers the panel's spot on a new install, not on an older one, and keeps a choice", async () => {

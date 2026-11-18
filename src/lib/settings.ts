@@ -846,8 +846,10 @@ export const saveTrayLogoColors = (value: boolean) => saveBoolean(TRAY_LOGO_COLO
 export async function loadTaskbarStrip(): Promise<boolean> {
   const stored = await store.get<unknown>(TASKBAR_STRIP_KEY);
   if (typeof stored === "boolean") return stored;
-  // A legacy tray style not migrated yet (the bootstrap migrates it later) is a choice made too.
-  if ((await store.get<unknown>(MENUBAR_ICON_STYLE_KEY)) == null && (await store.get<unknown>(LEGACY_TRAY_ICON_STYLE_KEY)) != null) {
+  // A legacy tray style not migrated yet (the bootstrap migrates it later): the ones that become a style with
+  // numbers (`migrateLegacyTraySettings`) are a choice made too.
+  const legacy = await store.get<unknown>(LEGACY_TRAY_ICON_STYLE_KEY);
+  if ((await store.get<unknown>(MENUBAR_ICON_STYLE_KEY)) == null && (legacy === "bars" || legacy === "circle")) {
     return false;
   }
   return (await loadMenubarIconStyle()) === "icon";
