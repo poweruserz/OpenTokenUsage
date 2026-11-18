@@ -2923,11 +2923,25 @@ describe("claude plugin", () => {
       expect(() => plugin.probe(ctx)).toThrow("Not logged in. Run `claude` to authenticate.")
     })
 
-    it("names the app's account for the WSL same-account check", async () => {
+    it("never names the app's account for the WSL same-account check (that would hide a WSL card)", async () => {
       const ctx = makeCtx()
-      withApp(ctx, appLogin())
+      const readLogin = withApp(ctx, appLogin())
       const plugin = await loadPlugin()
-      expect(plugin.accountKey(ctx)).toBe("acc-1")
+      expect(plugin.accountKey(ctx)).toBeNull()
+      expect(readLogin).not.toHaveBeenCalled()
+    })
+
+    it("an unreadable app login is a read failure, never a lost sign-in with a `claude` fix", async () => {
+      const ctx = makeCtx()
+      ctx.host.claudeDesktop = {
+        readLogin: vi.fn(() => {
+          throw new Error("could not read the Claude app's sign-in")
+        }),
+      }
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow(
+        "Couldn't read Claude's config.json. Check its file permissions or log into Claude again."
+      )
     })
   })
 })

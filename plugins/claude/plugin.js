@@ -332,32 +332,33 @@
   // The Claude app's own sign-in, for people without Claude Code's CLI login (host:
   // claude_desktop.rs, only on the usual card, null when its setting is off). Never refreshed or
   // written here: the app renews it, and a refresh would rotate its token and sign the app out.
+  // Throws when the app's files exist but can't be read (mid-write, DPAPI): that is no lost sign-in.
   function loadDesktopCredentials(ctx) {
     const desktop = ctx.host.claudeDesktop
     if (!desktop || typeof desktop.readLogin !== "function") return null
-    try {
-      const login = ctx.util.tryParseJson(desktop.readLogin() || "")
-      if (!login || typeof login.accessToken !== "string" || !login.accessToken.trim()) return null
-      return {
-        oauth: {
-          accessToken: login.accessToken,
-          expiresAt: login.expiresAt,
-          subscriptionType: login.subscriptionType,
-          rateLimitTier: login.rateLimitTier,
-          scopes: ["user:profile"],
-        },
-        source: "desktop",
-        account: typeof login.account === "string" && login.account ? login.account : null,
-      }
-    } catch (e) {
-      ctx.host.log.warn("Claude app sign-in read failed: " + String(e))
-      return null
+    const login = ctx.util.tryParseJson(desktop.readLogin() || "")
+    if (!login || typeof login.accessToken !== "string" || !login.accessToken.trim()) return null
+    return {
+      oauth: {
+        accessToken: login.accessToken,
+        expiresAt: login.expiresAt,
+        subscriptionType: login.subscriptionType,
+        rateLimitTier: login.rateLimitTier,
+        scopes: ["user:profile"],
+      },
+      source: "desktop",
+      account: typeof login.account === "string" && login.account ? login.account : null,
     }
   }
 
   // A newer token the app stored meanwhile (it renews its login while it runs), else null.
   function adoptDesktopLogin(ctx, creds) {
-    const fresh = loadDesktopCredentials(ctx)
+    let fresh = null
+    try {
+      fresh = loadDesktopCredentials(ctx)
+    } catch (e) {
+      ctx.host.log.warn("Claude app sign-in read failed: " + String(e))
+    }
     if (!fresh || fresh.oauth.accessToken === creds.oauth.accessToken) return null
     if (needsRefresh(ctx, fresh.oauth, Date.now())) return null
     ctx.host.log.info("using the login the Claude app renewed meanwhile")
@@ -366,7 +367,14 @@
   }
 
   function loadDesktopFallback(ctx) {
-    const desktop = loadDesktopCredentials(ctx)
+    let desktop
+    try {
+      desktop = loadDesktopCredentials(ctx)
+    } catch (e) {
+      ctx.host.log.warn("Claude app sign-in read failed: " + String(e))
+      // Grey and without a "run `claude`" fix, which couldn't help here.
+      throw "Couldn't read Claude's config.json. Check its file permissions or log into Claude again."
+    }
     if (desktop) ctx.host.log.info("credentials loaded from the Claude app")
     return desktop
   }
@@ -686,13 +694,14 @@
 
   // The answer is kept per account; without `.claude.json`'s account id, per token pair (a new pair
   // asks again). Unable to tell logins apart, it could show another login's grants: skipped then.
-  function resolveResetGrants(ctx, accessToken, fingerprint, atLimit) {
+  // `appAccount`: the Claude app's login is in use; `.claude.json` may then name another account.
+  function resolveResetGrants(ctx, accessToken, fingerprint, atLimit, appAccount) {
     const path = resetGrantsPath(ctx)
     let account
     let claudeJson
     try {
-      claudeJson = readClaudeJson(ctx)
-      account = accountIdOf(claudeJson) || (fingerprint ? "login:" + fingerprint : null)
+      claudeJson = appAccount ? null : readClaudeJson(ctx)
+      account = appAccount || accountIdOf(claudeJson) || (fingerprint ? "login:" + fingerprint : null)
     } catch (e) {
       ctx.host.log.warn("reset grants skipped: account lookup failed: " + String(e))
       return null
@@ -1480,7 +1489,7 @@
       const atLimit =
         Object.values(data).some((w) => w && typeof w.utilization === "number" && w.utilization >= 100) ||
         (Array.isArray(data.limits) && data.limits.some((l) => l && (parseNumber(l.percent) ?? 0) >= 100))
-      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint, atLimit))
+      pushResetGrantsLine(lines, ctx, resolveResetGrants(ctx, creds.oauth.accessToken, fingerprint, atLimit, creds.source === "desktop" ? creds.account : null))
     }
 
     const usageResult = queryTokenUsage(ctx, homePath)
@@ -1508,15 +1517,11 @@
     return typeof id === "string" && id.trim() ? id.trim() : null
   }
 
-  // Who is signed in, for the WSL same-account check (wsl.rs). The Claude app keys its logins by
-  // the same account id as Claude Code.
+  // Who is signed in, for the WSL same-account check (wsl.rs).
   function accountKey(ctx) {
-    const id = accountIdOf(readClaudeJson(ctx))
-    if (id) return id
-    // The card reads the app's login only while Claude Code has none.
-    if (loadStoredCredentials(ctx, true)) return null
-    const desktop = loadDesktopCredentials(ctx)
-    return desktop ? desktop.account : null
+    // Never the Claude app's account: wsl.rs hides (and forgets) a WSL card matching this key even
+    // while the usual card is off or its app login expired, and the WSL login may be the only working one.
+    return accountIdOf(readClaudeJson(ctx))
   }
 
   globalThis.__openusage_plugin = { id: "claude", probe, accountKey }

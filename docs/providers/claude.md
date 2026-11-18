@@ -116,7 +116,7 @@ Someone who uses the Claude desktop app without Claude Code has no login above. 
 }
 ```
 
-The host hands the plugin the `user:profile` entry that lasts longest: its token, expiry, plan and account id, never the refresh token. The plugin never refreshes it (that would rotate the app's refresh token and sign the app out): when it has expired or the endpoint rejects it, the plugin reads the app's login again (the app renews it while it runs) and otherwise says "Claude session expired. Open Claude and sign in again." The account id is Claude Code's too, so the WSL same-account check and the kept usage answer go by it.
+The host hands the plugin the `user:profile` entry that lasts longest: its token, expiry, plan and account id, never the refresh token. The plugin never refreshes it (that would rotate the app's refresh token and sign the app out): when it has expired or the endpoint rejects it, the plugin reads the app's login again (the app renews it while it runs) and otherwise says "Claude session expired. Open Claude and sign in again." The account id (Claude Code's own) keys the kept usage answer and the reset grants. It never feeds the WSL same-account check: a WSL card matching it would be hidden even while the usual card is off or its app login has expired. A login the app has but that can't be read (mid-write, DPAPI) shows as a read failure, not as a lost sign-in with a `claude` fix.
 
 ### Token Refresh
 
