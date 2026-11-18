@@ -13,6 +13,7 @@
   // (upstream #1417; seen here as `invalid_grant`). So refresh only once the token has expired.
   const REFRESH_BUFFER_MS = 0
   const DESKTOP_SESSION_EXPIRED = "Claude session expired. Open Claude and sign in again."
+  const DESKTOP_UNREADABLE = "Couldn't read Claude's config.json. Check its file permissions or log into Claude again."
   // NOTE: the host runs every probe in a fresh runtime, so nothing at module scope survives
   // between probes. The host remembers 429s (answering them without a network call); anything
   // else that must persist lives in pluginDataDir.
@@ -373,9 +374,12 @@
     } catch (e) {
       ctx.host.log.warn("Claude app sign-in read failed: " + String(e))
       // Grey and without a "run `claude`" fix, which couldn't help here.
-      throw "Couldn't read Claude's config.json. Check its file permissions or log into Claude again."
+      return { oauth: {}, source: "desktop", problem: DESKTOP_UNREADABLE }
     }
-    if (desktop) ctx.host.log.info("credentials loaded from the Claude app")
+    if (!desktop) return null
+    // Never refreshed here: an expired login waits for the app to renew it.
+    if (needsRefresh(ctx, desktop.oauth, Date.now())) desktop.problem = DESKTOP_SESSION_EXPIRED
+    else ctx.host.log.info("credentials loaded from the Claude app")
     return desktop
   }
 
@@ -401,9 +405,10 @@
       ctx.host.log.info("preferring stored profile-scoped login over CLAUDE_CODE_OAUTH_TOKEN")
       return fileCredentials
     }
-    // The app's login reads usage; the inference-only token can't.
+    // The app's login reads usage; the inference-only token can't. One that can't be used now
+    // leaves the token's card (local spend, the plan) as it was.
     const desktop = loadDesktopFallback(ctx)
-    if (desktop) return desktop
+    if (desktop && !desktop.problem) return desktop
     const stored = keychainCredentials || fileCredentials
 
     const oauth = stored && stored.oauth ? Object.assign({}, stored.oauth) : {}
@@ -1299,22 +1304,35 @@
     pushModelUsageLines(lines, ctx, usage.daily)
   }
 
+  // Local spend comes from ccusage and needs no OAuth login (e.g. Claude Code on an API-key gateway),
+  // so it shows under a "Not logged in" badge instead of an error card (upstream #1138). Null
+  // without any recorded spend.
+  function localSpendOnly(ctx) {
+    const usageResult = queryTokenUsage(ctx, getClaudeHomeOverride(ctx))
+    const hasSpend = (day) => Number(day && day.totalTokens) > 0 || (usageCostUsd(day) || 0) > 0
+    if (usageResult.status !== "ok" || !usageResult.data.daily.some(hasSpend)) return null
+    ctx.host.log.info("not logged in; showing local spend only")
+    const lines = [ctx.line.badge({ label: "Status", text: "Not logged in", color: "#f59e0b" })]
+    pushLocalUsageLines(lines, ctx, usageResult.data)
+    return { plan: null, lines: lines }
+  }
+
+  // The Claude app's login expired or was rejected mid-probe: the card it had without that login.
+  function appLoginLost(ctx) {
+    const spend = localSpendOnly(ctx)
+    if (spend) return spend
+    throw DESKTOP_SESSION_EXPIRED
+  }
+
   function probe(ctx) {
     const creds = loadCredentials(ctx)
-    if (!creds || !creds.oauth || !creds.oauth.accessToken || !creds.oauth.accessToken.trim()) {
-      // Local spend comes from ccusage and needs no OAuth login (e.g. Claude Code on an API-key
-      // gateway), so show it under a "Not logged in" badge instead of an error card
-      // (upstream #1138). No recorded spend at all stays the plain auth error.
-      const usageResult = queryTokenUsage(ctx, getClaudeHomeOverride(ctx))
-      const hasSpend = (day) => Number(day && day.totalTokens) > 0 || (usageCostUsd(day) || 0) > 0
-      if (usageResult.status === "ok" && usageResult.data.daily.some(hasSpend)) {
-        ctx.host.log.info("not logged in; showing local spend only")
-        const lines = [ctx.line.badge({ label: "Status", text: "Not logged in", color: "#f59e0b" })]
-        pushLocalUsageLines(lines, ctx, usageResult.data)
-        return { plan: null, lines: lines }
-      }
-      ctx.host.log.error("probe failed: not logged in")
-      throw "Not logged in. Run `claude` to authenticate."
+    // The Claude app's login, when it can't be used now, is no login: the card stays what it was without it.
+    const problem = creds && creds.problem
+    if (problem || !creds || !creds.oauth || !creds.oauth.accessToken || !creds.oauth.accessToken.trim()) {
+      const spend = localSpendOnly(ctx)
+      if (spend) return spend
+      ctx.host.log.error("probe failed: " + (problem || "not logged in"))
+      throw problem || "Not logged in. Run `claude` to authenticate."
     }
 
     const nowMs = Date.now()
@@ -1328,12 +1346,16 @@
     let staleSince = null
     if (canFetchLiveUsage) {
       const account = usageAccount(ctx, creds)
-      const live = account ? loadLiveLimits(ctx, nowMs, accountSince(ctx, account, nowMs)) : null
+      // Claude Code's status line carries no account, and with the app's login in use it may be
+      // another account's (an inference-only token's): ignored then.
+      const fromApp = creds.source === "desktop"
+      const live = account && !fromApp ? loadLiveLimits(ctx, nowMs, accountSince(ctx, account, nowMs)) : null
       const last = account ? loadLastUsage(ctx, account) : null
       const lastAge = last ? nowMs - last.at : Infinity
       // The kept answer stands in for a read inside the gap, unless a status line posted since is
       // newer than it (going back to the answer would undo what the card showed).
-      const keep = !live && lastAge >= 0 && lastAge < MIN_READ_GAP_MS && statusLineCapturedAt(ctx) <= last.at
+      const lineAt = fromApp ? 0 : statusLineCapturedAt(ctx)
+      const keep = !live && lastAge >= 0 && lastAge < MIN_READ_GAP_MS && lineAt <= last.at
       if (live && last && lastAge < LIVE_API_INTERVAL_MS) {
         ctx.host.log.info("usage from Claude Code's status line")
         data = withLiveLimits(last.data, live, nowMs)
@@ -1348,9 +1370,9 @@
           const refreshed = refreshToken(ctx, creds)
           if (refreshed) {
             accessToken = refreshed
-          } else if (creds.source === "desktop") {
+          } else if (fromApp) {
             // Expired (no refresh buffer) and the app hasn't renewed it: it does once opened.
-            throw DESKTOP_SESSION_EXPIRED
+            return appLoginLost(ctx)
           } else {
             ctx.host.log.warn("proactive refresh failed, trying with existing token")
           }
@@ -1385,7 +1407,7 @@
 
         if (ctx.util.isAuthStatus(resp.status)) {
           ctx.host.log.error("usage returned auth error after all retries: status=" + resp.status)
-          if (creds.source === "desktop") throw DESKTOP_SESSION_EXPIRED
+          if (fromApp) return appLoginLost(ctx)
           throw "Token expired. Run `claude` to log in again."
         }
 
