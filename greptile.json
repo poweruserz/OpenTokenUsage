@@ -1,16 +1,4 @@
 {
   "instructions": "Follow the Code Review Rules section of AGENTS.md: what to flag and what not to. CLAUDE.md explains the project facts behind them.",
-  "customContext": {
-    "files": [
-      {
-        "path": "AGENTS.md",
-        "description": "Project rules; its Code Review Rules section lists what to flag and what not to"
-      },
-      {
-        "path": "CLAUDE.md",
-        "description": "Project facts that are easy to get wrong: plugins, host, installer, releases"
-      }
-    ]
-  },
   "ignorePatterns": "bun.lock\n**/*.png\n**/*.webp\n**/*.webm\n**/*.ico"
 }
