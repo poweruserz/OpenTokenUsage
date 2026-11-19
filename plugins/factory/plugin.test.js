@@ -1054,7 +1054,7 @@ describe("factory plugin", () => {
       expect(weekly.periodDurationMs).toBeUndefined()
     })
 
-    it("adds Droid Core lines after the standard ones", async () => {
+    it("shows no Droid Core lines", async () => {
       const ctx = setup({
         hasActiveSubscription: true,
         limits: {
@@ -1063,24 +1063,19 @@ describe("factory plugin", () => {
         },
       })
       const plugin = await loadPlugin()
-      const result = plugin.probe(ctx)
-      expect(result.lines.map((l) => l.label)).toEqual([
-        "Session",
-        "Weekly",
-        "Monthly",
-        "Droid Core",
-        "Droid Core Weekly",
-        "Droid Core Monthly",
-      ])
-      expect(line(result, "Droid Core Weekly").used).toBe(5)
-      expect(line(result, "Droid Core Monthly").used).toBe(6)
+      expect(plugin.probe(ctx).lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Monthly"])
     })
 
-    it("shows no Droid Core lines when limits.core is missing", async () => {
-      const ctx = setup(limitsBody())
+    it("clamps the monthly period to the previous month's last day", async () => {
+      vi.setSystemTime(new Date("2027-03-20T00:00:00.000Z"))
+      const end = "2027-03-31T12:00:00.000Z"
+      const ctx = setup({
+        hasActiveSubscription: true,
+        limits: { standard: { fiveHour: bucket(0, null), weekly: bucket(0, null), monthly: bucket(10, end) } },
+      })
       const plugin = await loadPlugin()
-      const labels = plugin.probe(ctx).lines.map((l) => l.label)
-      expect(labels.some((label) => label.startsWith("Droid Core"))).toBe(false)
+      // Feb 28 12:00 → Mar 31 12:00 is 31 days, not the 28 days from Mar 3.
+      expect(line(plugin.probe(ctx), "Monthly").periodDurationMs).toBe(31 * 24 * 60 * 60 * 1000)
     })
 
     it("skips unlimited buckets", async () => {

@@ -381,18 +381,22 @@
     return ctx.line.progress(line)
   }
 
+  // One calendar month before the reset, the day clamped to that month's end (Mar 31 → Feb 28, not Mar 3).
   function monthPeriodMs(windowEndMs) {
     const start = new Date(windowEndMs)
+    const day = start.getUTCDate()
+    start.setUTCDate(1)
     start.setUTCMonth(start.getUTCMonth() - 1)
+    const lastDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate()
+    start.setUTCDate(Math.min(day, lastDay))
     return windowEndMs - start.getTime()
   }
 
-  function pushBucketLines(ctx, lines, group, labels, nowMs) {
-    if (!group) return
+  function pushBucketLines(ctx, lines, group, nowMs) {
     const buckets = [
-      [group.fiveHour, labels[0], FIVE_HOUR_MS],
-      [group.weekly, labels[1], WEEK_MS],
-      [group.monthly, labels[2], "month"],
+      [group.fiveHour, "Session", FIVE_HOUR_MS],
+      [group.weekly, "Weekly", WEEK_MS],
+      [group.monthly, "Monthly", "month"],
     ]
     for (const [bucket, label, periodMs] of buckets) {
       if (!bucket || bucket.unlimited === true) continue
@@ -488,8 +492,7 @@
     }
 
     const lines = []
-    pushBucketLines(ctx, lines, standard, ["Session", "Weekly", "Monthly"], nowMs)
-    pushBucketLines(ctx, lines, limits.core, ["Droid Core", "Droid Core Weekly", "Droid Core Monthly"], nowMs)
+    pushBucketLines(ctx, lines, standard, nowMs)
 
     if (lines.length === 0) {
       lines.push(ctx.line.badge({ label: "Status", text: "No usage data", color: "#a3a3a3" }))

@@ -828,8 +828,6 @@ export const en = {
   "label.Weekly": "Weekly",
   "label.Claude Weekly": "Claude Weekly",
   "label.Argon Weekly": "Argon Weekly",
-  "label.Droid Core Weekly": "Droid Core Weekly",
-  "label.Droid Core Monthly": "Droid Core Monthly",
   "label.Monthly": "Monthly",
   "label.Today": "Today",
   "label.Yesterday": "Yesterday",

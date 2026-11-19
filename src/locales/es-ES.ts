@@ -828,8 +828,6 @@ export const esES: Messages = {
   "label.Weekly": "Semanal",
   "label.Claude Weekly": "Claude semanal",
   "label.Argon Weekly": "Argon semanal",
-  "label.Droid Core Weekly": "Droid Core semanal",
-  "label.Droid Core Monthly": "Droid Core mensual",
   "label.Monthly": "Mensual",
   "label.Today": "Hoy",
   "label.Yesterday": "Ayer",

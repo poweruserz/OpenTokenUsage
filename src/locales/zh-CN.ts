@@ -828,8 +828,6 @@ export const zhCN: Messages = {
   "label.Weekly": "每周",
   "label.Claude Weekly": "Claude 每周",
   "label.Argon Weekly": "Argon 每周",
-  "label.Droid Core Weekly": "Droid Core 每周",
-  "label.Droid Core Monthly": "Droid Core 每月",
   "label.Monthly": "每月",
   "label.Today": "今天",
   "label.Yesterday": "昨天",

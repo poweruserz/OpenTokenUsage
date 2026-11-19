@@ -828,8 +828,6 @@ export const ja: Messages = {
   "label.Weekly": "週間",
   "label.Claude Weekly": "Claude 週間",
   "label.Argon Weekly": "Argon 週間",
-  "label.Droid Core Weekly": "Droid Core 週間",
-  "label.Droid Core Monthly": "Droid Core 月間",
   "label.Monthly": "月間",
   "label.Today": "今日",
   "label.Yesterday": "昨日",

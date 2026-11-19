@@ -50,7 +50,7 @@ Returns the usage limits Factory's web dashboard and droid show. (The old `/api/
 }
 ```
 
-The response carries no identity fields. Extra usage, overage and managed computers are not shown.
+The response carries no identity fields. Droid Core (`limits.core`), extra usage, overage and managed computers are not shown.
 
 ### Lines
 
@@ -58,12 +58,9 @@ The response carries no identity fields. Extra usage, overage and managed comput
 |---|---|---|---|
 | `standard.fiveHour` | Session | overview | 5 hours |
 | `standard.weekly` | Weekly | overview | 7 days |
-| `standard.monthly` | Monthly | overview | `windowEnd` minus one calendar month (UTC) |
-| `core.fiveHour` | Droid Core | detail | 5 hours |
-| `core.weekly` | Droid Core Weekly | detail | 7 days |
-| `core.monthly` | Droid Core Monthly | detail | one month |
+| `standard.monthly` | Monthly | overview | `windowEnd` minus one calendar month (UTC), the day clamped to that month's end |
 
-Each line is a percent bar (`used` = `usedPercent`, `limit` = 100), reset at `windowEnd`. Like droid, a bucket whose `windowEnd` is null or already past counts as 0% with no reset time (nothing used since the window ended). A bucket with `unlimited: true` is skipped, and a missing `limits.core` just means no Core lines.
+Each line is a percent bar (`used` = `usedPercent`, `limit` = 100), reset at `windowEnd`. Like droid, a bucket whose `windowEnd` is null or already past counts as 0% with no reset time (nothing used since the window ended). A bucket with `unlimited: true` is skipped.
 
 Without `limits.standard`: `hasActiveSubscription: false` shows a "No usage data" badge, otherwise the probe fails with "Usage response missing data". The card has no plan badge.
 

@@ -828,8 +828,6 @@ export const tr: Messages = {
   "label.Weekly": "Haftalık",
   "label.Claude Weekly": "Claude haftalık",
   "label.Argon Weekly": "Argon haftalık",
-  "label.Droid Core Weekly": "Droid Core haftalık",
-  "label.Droid Core Monthly": "Droid Core aylık",
   "label.Monthly": "Aylık",
   "label.Today": "Bugün",
   "label.Yesterday": "Dün",

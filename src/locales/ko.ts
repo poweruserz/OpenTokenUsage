@@ -828,8 +828,6 @@ export const ko: Messages = {
   "label.Weekly": "주간",
   "label.Claude Weekly": "Claude 주간",
   "label.Argon Weekly": "Argon 주간",
-  "label.Droid Core Weekly": "Droid Core 주간",
-  "label.Droid Core Monthly": "Droid Core 월간",
   "label.Monthly": "월간",
   "label.Today": "오늘",
   "label.Yesterday": "어제",

@@ -15,9 +15,6 @@
     { "type": "progress", "label": "Session", "scope": "overview", "primaryOrder": 1 },
     { "type": "progress", "label": "Weekly", "scope": "overview", "period": "weekly", "primaryOrder": 2 },
     { "type": "progress", "label": "Monthly", "scope": "overview", "primaryOrder": 3 },
-    { "type": "progress", "label": "Droid Core", "scope": "detail" },
-    { "type": "progress", "label": "Droid Core Weekly", "scope": "detail" },
-    { "type": "progress", "label": "Droid Core Monthly", "scope": "detail" },
     { "type": "badge", "label": "Status", "scope": "overview" }
   ]
 }
