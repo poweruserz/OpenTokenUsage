@@ -8,74 +8,61 @@
 - **Base URL:** `https://api.factory.ai`
 - **Auth provider:** WorkOS (`api.workos.com`)
 - **Client ID:** `client_01HNM792M5G5G1A2THWPXKFMXB`
-- **Token counts:** integers (raw token counts)
-- **Timestamps:** unix milliseconds
-- **Billing period:** ~27 days (monthly)
+- **Utilization:** integer percent (0-100)
+- **Timestamps:** ISO 8601
+- **Windows:** rolling 5-hour, weekly and monthly (the monthly one runs from the subscription start)
 
 ## Endpoints
 
-### POST /api/organization/subscription/usage
+### GET /api/billing/limits
 
-Returns token usage for the current billing period.
+Returns the usage limits Factory's web dashboard and droid show. (The old `/api/organization/subscription/usage` token pool no longer matches them and is not used.)
 
 #### Headers
 
 | Header | Required | Value |
 |---|---|---|
 | Authorization | yes | `Bearer <access_token>` |
-| Content-Type | yes | `application/json` |
 | Accept | no | `application/json` |
-
-#### Request Body
-
-```json
-{
-  "useCache": true
-}
-```
 
 #### Response
 
 ```jsonc
 {
-  "usage": {
-    "startDate": 1770623326000,         // billing period start (unix ms)
-    "endDate": 1772956800000,           // billing period end (unix ms)
+  "usesTokenRateLimitsBilling": true,
+  "hasActiveSubscription": true,
+  "limits": {
     "standard": {
-      "userTokens": 0,                  // user's token usage
-      "orgTotalTokensUsed": 5000000,    // org total tokens used
-      "orgOverageUsed": 0,              // overage tokens used
-      "basicAllowance": 20000000,       // base allowance
-      "totalAllowance": 20000000,       // total (base + bonus)
-      "orgOverageLimit": 0,             // overage limit
-      "usedRatio": 0.25                 // usage ratio (0-1)
+      "fiveHour": { "usedPercent": 0,  "windowEnd": null, "secondsRemaining": null },
+      "weekly":   { "usedPercent": 22, "windowEnd": "2026-11-24T02:54:20.580Z", "secondsRemaining": 436099 },
+      "monthly":  { "usedPercent": 11, "windowEnd": "2026-12-17T02:54:20.580Z", "secondsRemaining": 2423299 }
     },
-    "premium": {
-      "userTokens": 0,
-      "orgTotalTokensUsed": 0,
-      "orgOverageUsed": 0,
-      "basicAllowance": 0,              // 0 for Pro, >0 for Max/Enterprise
-      "totalAllowance": 0,
-      "orgOverageLimit": 0,
-      "usedRatio": 0
+    "core": {                           // Droid Core (optional)
+      "fiveHour": { "usedPercent": 0, "windowEnd": null, "secondsRemaining": null },
+      "weekly":   { "usedPercent": 0, "windowEnd": null, "secondsRemaining": null },
+      "monthly":  { "usedPercent": 0, "windowEnd": null, "secondsRemaining": null }
     }
   },
-  "source": "cache",                    // "cache" or "live"
-  "cacheUpdated": false
+  "overagePreference": "droidCore",
+  "canManageOverage": true,
+  "extraUsageBalanceCents": 0,
+  "extraUsageAllowed": true
 }
 ```
 
-### Plan Detection
+The response carries no identity fields. Droid Core (`limits.core`), extra usage, overage and managed computers are not shown.
 
-Plan is inferred from `standard.totalAllowance`:
+### Lines
 
-| Allowance | Plan |
-|---|---|
-| 200M+ | Max |
-| 20M+ | Pro |
-| >0 | Basic |
+| Bucket | Label | Scope | Period |
+|---|---|---|---|
+| `standard.fiveHour` | Session | overview | 5 hours |
+| `standard.weekly` | Weekly | overview | 7 days |
+| `standard.monthly` | Monthly | overview | `windowEnd` minus one calendar month (UTC), the day clamped to that month's end |
 
-Premium tokens (`premium.totalAllowance > 0`) are only available on Max/Enterprise plans.
+Each line is a percent bar (`used` = `usedPercent`, `limit` = 100), reset at `windowEnd`. Like droid, a bucket whose `windowEnd` is null or already past counts as 0% with no reset time (nothing used since the window ended). A bucket with `unlimited: true` is skipped.
+
+Without `limits.standard`: `hasActiveSubscription: false` shows a "No usage data" badge, otherwise the probe fails with "Usage response missing data". The card has no plan badge.
 
 ## Authentication
 
