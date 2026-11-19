@@ -219,6 +219,7 @@ The app follows Windows' language when it has it, English otherwise, and Setting
 - **Add a provider.** Each one is just a plugin. See the [Plugin API](docs/plugins/api.md).
 - **Fix a bug.** PRs welcome. Provide before/after screenshots.
 - **Request a feature.** [Open an issue](https://github.com/PowerUserZ/OpenTokenUsage/issues/new) and make your case.
+- **Accessibility.** What works with a keyboard, a screen reader, contrast themes and larger text, and what doesn't yet: [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 ## Support
 
