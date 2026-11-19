@@ -34,6 +34,31 @@
 - Plugin SVG logos must use `currentColor` so icon theming works correctly.
 - If the PR includes visual changes, refuse to create it without providing before/after screenshots.
 
+## Code Review Rules
+Read by every reviewer (Claude in ai-review, Codex, Greptile). Report bugs, security holes and data loss; skip style, naming and formatting. `CLAUDE.md` explains each rule below.
+
+Flag:
+- Plugin state kept in module variables: each probe runs in a fresh QuickJS runtime (keep it under `ctx.app.pluginDataDir`).
+- A label a plugin can show on the overview card that `plugin.json` doesn't declare with `scope: "overview"` (that card goes blank).
+- A new endpoint's identity fields (email, name, ids, card, checkout links) missing from `redact_body` in `src-tauri/src/plugin_engine/host_api.rs`, or without a test there. Any token, key, cookie or full response body written to a log.
+- A plugin that sends a request, or throws an error `isNotSetUpError` doesn't know, when nothing of it is set up: first start would turn its card on for everyone. A rejected login reported as "not set up".
+- JS re-implementing what the host already does: 429 backoff, probe timeouts, one probe at a time.
+- User-facing text added or changed without all 11 languages (`src/locales/*.ts`, `src/locales/plugin-errors/*.ts`), or `en.lock.json` updated without the translations.
+- Date math in local time where the provider uses UTC, or a month stepped back with `setMonth` without clamping the day (Mar 31 → Feb 28, not Mar 3).
+- Tauri command arguments sent from JS in snake_case (they silently don't match).
+- Files of other tools (Claude Code's `settings.json`, Cursor's `state.vscdb`, a CLI's login) changed beyond what the feature needs; a login refreshed by a plugin documented as read-only.
+- A command started from text a provider returned that is not in `ALLOWED_COMMANDS` (`src-tauri/src/setup_actions.rs`).
+- A failure swallowed: it shows where the user acted (an inline message, the card's error), never a silent fallback.
+- macOS code paths, telemetry or analytics.
+- A `tauri*` crate in `src-tauri/Cargo.lock` moved to a major.minor that the matching `@tauri-apps/*` package doesn't have (the release build then fails; CI doesn't build it).
+
+Don't flag:
+- A failed settings save logged with `console.error` only: on purpose, the same for every setting.
+- Large existing files left unsplit (`src/lib/settings.ts`, `src/pages/settings.tsx`, `src/components/provider-card.tsx`).
+- Rare cases outside what the change set out to do; this app stays small on purpose.
+- Behavior the PR description or a commit message says is intended, except the security items above (secrets in logs, other tools' files, commands, telemetry): those are flagged whatever the description says.
+- `bun.lock` churn, images and videos.
+
 ## Project Memories
 Use below list to store and recall user notes when asked to do so.
 
