@@ -135,7 +135,7 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Cursor**](docs/providers/cursor.md) / credits, total usage, requests, auto usage, API usage, Grok Bot, on-demand, bonus spend, CLI auth
 - [**DeepSeek**](docs/providers/deepseek.md) / API balance
 - [**Devin**](docs/providers/devin.md) / weekly and daily quota, extra usage
-- [**Factory / Droid**](docs/providers/factory.md) / standard, premium tokens
+- [**Factory / Droid**](docs/providers/factory.md) / session, weekly, monthly, Droid Core limits
 - [**Grok**](docs/providers/grok.md) / weekly limit, credits used, pay-as-you-go cap
 - [**JetBrains AI Assistant**](docs/providers/jetbrains-ai-assistant.md) / quota, remaining
 - [**Kilo**](docs/providers/kilo.md) / credits, Kilo Pass month

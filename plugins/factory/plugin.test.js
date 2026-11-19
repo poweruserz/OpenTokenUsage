@@ -1,6 +1,30 @@
 import crypto from "node:crypto"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { makeCtx } from "../test-helpers.js"
+
+const BASE_NOW = Date.parse("2026-11-17T00:00:00.000Z")
+const WINDOW_END = "2026-12-17T02:54:20.580Z"
+
+function bucket(usedPercent, windowEnd) {
+  return { usedPercent, windowEnd, secondsRemaining: null }
+}
+
+function limitsBody(overrides) {
+  const windowEnd = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+  return Object.assign(
+    {
+      hasActiveSubscription: true,
+      limits: {
+        standard: {
+          fiveHour: bucket(0, null),
+          weekly: bucket(22, windowEnd),
+          monthly: bucket(11, windowEnd),
+        },
+      },
+    },
+    overrides
+  )
+}
 
 const loadPlugin = async () => {
   await import("./plugin.js")
@@ -64,18 +88,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 123, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("loads auth from auth.v2.file when present", async () => {
@@ -91,18 +110,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 456, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   describe("with both auth.v2.keyring and auth.v2.file", () => {
@@ -126,12 +140,7 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 1, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       })
       return ctx
@@ -176,18 +185,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 789, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(ctx.host.http.request).not.toHaveBeenCalledWith(
       expect.objectContaining({ url: expect.stringContaining("workos.com") }),
     )
@@ -206,18 +210,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 321, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("falls back to auth.encrypted when v2 crypto helper is unavailable", async () => {
@@ -238,18 +237,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 654, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("falls back to auth.encrypted when auth.v2.file decrypts to invalid auth data", async () => {
@@ -266,18 +260,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 987, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("throws not logged in when auth.v2.file exists without its key", async () => {
@@ -318,19 +307,14 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 111, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(ctx.host.fs.writeText).toHaveBeenCalledTimes(1)
     expect(ctx.host.fs.writeText).toHaveBeenCalledWith("~/.factory/auth.v2.file", expect.any(String))
 
@@ -356,18 +340,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 789, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("Factory CLI", "auth-encryption-key")
   })
 
@@ -416,19 +395,14 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 111, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(ctx.host.fs.writeText).toHaveBeenCalledTimes(1)
     expect(ctx.host.fs.writeText).toHaveBeenCalledWith("~/.factory/auth.v2.keyring", expect.any(String))
 
@@ -458,18 +432,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 1000000, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     // Should not have attempted to refresh (fresh token doesn't need it)
     expect(ctx.host.http.request).not.toHaveBeenCalledWith(
       expect.objectContaining({ url: expect.stringContaining("workos.com") }),
@@ -492,18 +461,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 1, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("Factory Token")
   })
 
@@ -523,18 +487,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 9, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("skips invalid keychain payload and tries next service", async () => {
@@ -554,18 +513,13 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 2, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("Factory Token")
     expect(ctx.host.keychain.readGenericPassword).toHaveBeenCalledWith("Factory token")
   })
@@ -598,12 +552,7 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
@@ -615,112 +564,6 @@ describe("factory plugin", () => {
     expect(service).toBe("Factory Token")
     const parsed = JSON.parse(writtenPayload)
     expect(parsed.refresh_token).toBe("new-refresh")
-  })
-
-  it("fetches usage and formats standard tokens", async () => {
-    const ctx = makeCtx()
-    // Token expires in 7 days (no refresh needed)
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: {
-            orgTotalTokensUsed: 5000000,
-            totalAllowance: 20000000,
-          },
-          premium: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 0,
-          },
-        },
-      }),
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-
-    expect(result.plan).toBe("Pro")
-    const standardLine = result.lines.find((line) => line.label === "Standard")
-    expect(standardLine).toBeTruthy()
-    expect(standardLine.used).toBe(5000000)
-    expect(standardLine.limit).toBe(20000000)
-  })
-
-  it("shows premium line when premium allowance > 0", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: {
-            orgTotalTokensUsed: 10000000,
-            totalAllowance: 200000000,
-          },
-          premium: {
-            orgTotalTokensUsed: 1000000,
-            totalAllowance: 50000000,
-          },
-        },
-      }),
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-
-    expect(result.plan).toBe("Max")
-    const premiumLine = result.lines.find((line) => line.label === "Premium")
-    expect(premiumLine).toBeTruthy()
-    expect(premiumLine.used).toBe(1000000)
-    expect(premiumLine.limit).toBe(50000000)
-  })
-
-  it("omits premium line when premium allowance is 0", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 20000000,
-          },
-          premium: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 0,
-          },
-        },
-      }),
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-
-    const premiumLine = result.lines.find((line) => line.label === "Premium")
-    expect(premiumLine).toBeUndefined()
   })
 
   it("refreshes token when near expiry", async () => {
@@ -751,12 +594,7 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
@@ -785,19 +623,14 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("continues with existing token when proactive refresh returns invalid_grant but token is still valid", async () => {
@@ -827,19 +660,14 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     expect(usageSawCurrentToken).toBe(true)
   })
 
@@ -883,7 +711,7 @@ describe("factory plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Usage response invalid")
   })
 
-  it("throws when usage response missing usage object", async () => {
+  it("throws when usage response has no limits", async () => {
     const ctx = makeCtx()
     const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
     ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
@@ -894,31 +722,6 @@ describe("factory plugin", () => {
 
     const plugin = await loadPlugin()
     expect(() => plugin.probe(ctx)).toThrow("Usage response missing data")
-  })
-
-  it("returns no usage data badge when standard is missing", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-        },
-      }),
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-
-    expect(result.lines[0].label).toBe("Status")
-    expect(result.lines[0].text).toBe("No usage data")
   })
 
   it("throws on usage request failures", async () => {
@@ -1006,12 +809,7 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       }
     })
@@ -1020,7 +818,7 @@ describe("factory plugin", () => {
     const result = plugin.probe(ctx)
 
     expect(usageCalls).toBe(2)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
   it("throws token expired after retry still fails", async () => {
@@ -1050,115 +848,6 @@ describe("factory plugin", () => {
     expect(() => plugin.probe(ctx)).toThrow("Token expired")
   })
 
-  it("retries with GET when POST returns 405", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-
-    let calls = []
-    ctx.host.http.request.mockImplementation((opts) => {
-      calls.push(opts)
-      if (opts.method === "POST" && String(opts.url).includes("usage")) {
-        return { status: 405, headers: {}, bodyText: "" }
-      }
-      if (opts.method === "GET" && String(opts.url).includes("usage")) {
-        return {
-          status: 200,
-          headers: {},
-          bodyText: JSON.stringify({
-            usage: {
-              startDate: 1770623326000,
-              endDate: 1772956800000,
-              standard: { orgTotalTokensUsed: 100, totalAllowance: 20000000 },
-              premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-            },
-          }),
-        }
-      }
-      return { status: 500, headers: {}, bodyText: "" }
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
-    const usageCalls = calls.filter((c) => String(c.url).includes("usage"))
-    expect(usageCalls).toHaveLength(2)
-    expect(usageCalls[0].method).toBe("POST")
-    expect(usageCalls[1].method).toBe("GET")
-    expect(usageCalls[1].headers.Authorization).toContain("Bearer ")
-  })
-
-  it("infers Basic plan from low allowance", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 1000000,
-          },
-          premium: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 0,
-          },
-        },
-      }),
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-
-    expect(result.plan).toBe("Basic")
-  })
-
-  it("includes resetsAt and periodDurationMs from usage dates", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    const startDate = 1770623326000
-    const endDate = 1772956800000
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate,
-          endDate,
-          standard: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 20000000,
-          },
-          premium: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 0,
-          },
-        },
-      }),
-    })
-
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-
-    const standardLine = result.lines.find((line) => line.label === "Standard")
-    expect(standardLine.resetsAt).toBeTruthy()
-    expect(standardLine.periodDurationMs).toBe(endDate - startDate)
-  })
-
   it("loads direct JWT auth payloads from plain text and quoted JSON strings", async () => {
     const jwt = "header.payload.signature"
 
@@ -1169,12 +858,7 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       })
 
@@ -1182,7 +866,7 @@ describe("factory plugin", () => {
       vi.resetModules()
       const plugin = await loadPlugin()
       const result = plugin.probe(ctx)
-      expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+      expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     }
 
     await runCase(jwt)
@@ -1205,17 +889,12 @@ describe("factory plugin", () => {
         status: 200,
         headers: {},
         bodyText: JSON.stringify({
-          usage: {
-            startDate: 1770623326000,
-            endDate: 1772956800000,
-            standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-            premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-          },
+          ...limitsBody(),
         }),
       })
       const plugin = await loadPlugin()
       const result = plugin.probe(ctx)
-      expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+      expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     } finally {
       globalThis.TextDecoder = originalTextDecoder
     }
@@ -1244,12 +923,7 @@ describe("factory plugin", () => {
           status: 200,
           headers: {},
           bodyText: JSON.stringify({
-            usage: {
-              startDate: 1770623326000,
-              endDate: 1772956800000,
-              standard: { orgTotalTokensUsed: 0, totalAllowance: 20000000 },
-              premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-            },
+            ...limitsBody(),
           }),
         }
       })
@@ -1258,7 +932,7 @@ describe("factory plugin", () => {
       vi.resetModules()
       const plugin = await loadPlugin()
       const result = plugin.probe(ctx)
-      expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+      expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
     }
 
     await runCase({ status: 500, headers: {}, bodyText: "" })
@@ -1276,53 +950,174 @@ describe("factory plugin", () => {
       status: 200,
       headers: {},
       bodyText: JSON.stringify({
-        usage: {
-          startDate: 1770623326000,
-          endDate: 1772956800000,
-          standard: { orgTotalTokensUsed: 1, totalAllowance: 20000000 },
-          premium: { orgTotalTokensUsed: 0, totalAllowance: 0 },
-        },
+        ...limitsBody(),
       }),
     })
 
     const plugin = await loadPlugin()
     const result = plugin.probe(ctx)
-    expect(result.lines.find((line) => line.label === "Standard")).toBeTruthy()
+    expect(result.lines.find((line) => line.label === "Weekly")).toBeTruthy()
   })
 
-  it("handles usage dates and counters when optional values are missing", async () => {
-    const ctx = makeCtx()
-    const futureExp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
-      access_token: makeJwt(futureExp),
-      refresh_token: "refresh",
-    }))
-    ctx.host.http.request.mockReturnValue({
-      status: 200,
-      headers: {},
-      bodyText: JSON.stringify({
-        usage: {
-          startDate: "n/a",
-          endDate: "n/a",
+  describe("billing limits", () => {
+    function setup(body) {
+      const ctx = makeCtx()
+      ctx.host.fs.writeText("~/.factory/auth.json", JSON.stringify({
+        access_token: makeJwt(Math.floor(BASE_NOW / 1000) + 7 * 24 * 60 * 60),
+        refresh_token: "refresh",
+      }))
+      ctx.host.http.request.mockReturnValue({ status: 200, headers: {}, bodyText: JSON.stringify(body) })
+      return ctx
+    }
+
+    function line(result, label) {
+      return result.lines.find((l) => l.label === label)
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(BASE_NOW)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("requests billing limits with GET and the bearer token", async () => {
+      const ctx = setup(limitsBody())
+      const plugin = await loadPlugin()
+      plugin.probe(ctx)
+      const call = ctx.host.http.request.mock.calls.map((c) => c[0]).find((o) => String(o.url).includes("billing"))
+      expect(call.method).toBe("GET")
+      expect(call.url).toBe("https://api.factory.ai/api/billing/limits")
+      expect(call.headers.Authorization).toContain("Bearer ")
+      expect(call.bodyText).toBeUndefined()
+    })
+
+    it("maps standard buckets to Session, Weekly and Monthly percent lines", async () => {
+      const ctx = setup({
+        hasActiveSubscription: true,
+        limits: {
           standard: {
-            // Missing orgTotalTokensUsed should fall back to 0
-            totalAllowance: 0,
-          },
-          premium: {
-            orgTotalTokensUsed: 0,
-            totalAllowance: 0,
+            fiveHour: bucket(5, "2026-11-17T03:00:00.000Z"),
+            weekly: bucket(22, "2026-11-24T02:54:20.580Z"),
+            monthly: bucket(11, WINDOW_END),
           },
         },
-      }),
+      })
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+      expect(result.lines.map((l) => l.label)).toEqual(["Session", "Weekly", "Monthly"])
+      const session = line(result, "Session")
+      expect(session.used).toBe(5)
+      expect(session.limit).toBe(100)
+      expect(session.format).toEqual({ kind: "percent" })
+      expect(session.resetsAt).toBe("2026-11-17T03:00:00.000Z")
+      expect(session.periodDurationMs).toBe(5 * 60 * 60 * 1000)
+      const weekly = line(result, "Weekly")
+      expect(weekly.used).toBe(22)
+      expect(weekly.resetsAt).toBe("2026-11-24T02:54:20.580Z")
+      expect(weekly.periodDurationMs).toBe(7 * 24 * 60 * 60 * 1000)
+      const monthly = line(result, "Monthly")
+      expect(monthly.used).toBe(11)
+      expect(monthly.resetsAt).toBe(WINDOW_END)
+      expect(monthly.periodDurationMs).toBe(30 * 24 * 60 * 60 * 1000)
     })
 
-    const plugin = await loadPlugin()
-    const result = plugin.probe(ctx)
-    const standardLine = result.lines.find((line) => line.label === "Standard")
-    expect(standardLine).toBeTruthy()
-    expect(standardLine.used).toBe(0)
-    expect(standardLine.resetsAt).toBeUndefined()
-    expect(standardLine.periodDurationMs).toBeUndefined()
-    expect(result.plan).toBeNull()
+    it("shows 0% without reset data when windowEnd is null", async () => {
+      const ctx = setup({
+        hasActiveSubscription: true,
+        limits: { standard: { fiveHour: bucket(40, null), weekly: bucket(0, null), monthly: bucket(0, null) } },
+      })
+      const plugin = await loadPlugin()
+      const session = line(plugin.probe(ctx), "Session")
+      expect(session.used).toBe(0)
+      expect(session.resetsAt).toBeUndefined()
+      expect(session.periodDurationMs).toBeUndefined()
+    })
+
+    it("shows 0% without reset data when windowEnd is in the past", async () => {
+      const ctx = setup({
+        hasActiveSubscription: true,
+        limits: {
+          standard: {
+            fiveHour: bucket(0, null),
+            weekly: bucket(80, "2026-11-10T00:00:00.000Z"),
+            monthly: bucket(11, WINDOW_END),
+          },
+        },
+      })
+      const plugin = await loadPlugin()
+      const weekly = line(plugin.probe(ctx), "Weekly")
+      expect(weekly.used).toBe(0)
+      expect(weekly.resetsAt).toBeUndefined()
+      expect(weekly.periodDurationMs).toBeUndefined()
+    })
+
+    it("adds Droid Core lines after the standard ones", async () => {
+      const ctx = setup({
+        hasActiveSubscription: true,
+        limits: {
+          standard: { fiveHour: bucket(1, null), weekly: bucket(2, WINDOW_END), monthly: bucket(3, WINDOW_END) },
+          core: { fiveHour: bucket(4, null), weekly: bucket(5, WINDOW_END), monthly: bucket(6, WINDOW_END) },
+        },
+      })
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+      expect(result.lines.map((l) => l.label)).toEqual([
+        "Session",
+        "Weekly",
+        "Monthly",
+        "Droid Core",
+        "Droid Core Weekly",
+        "Droid Core Monthly",
+      ])
+      expect(line(result, "Droid Core Weekly").used).toBe(5)
+      expect(line(result, "Droid Core Monthly").used).toBe(6)
+    })
+
+    it("shows no Droid Core lines when limits.core is missing", async () => {
+      const ctx = setup(limitsBody())
+      const plugin = await loadPlugin()
+      const labels = plugin.probe(ctx).lines.map((l) => l.label)
+      expect(labels.some((label) => label.startsWith("Droid Core"))).toBe(false)
+    })
+
+    it("skips unlimited buckets", async () => {
+      const ctx = setup({
+        hasActiveSubscription: true,
+        limits: {
+          standard: {
+            fiveHour: { unlimited: true },
+            weekly: bucket(2, WINDOW_END),
+            monthly: { unlimited: true, usedPercent: 0, windowEnd: null },
+          },
+        },
+      })
+      const plugin = await loadPlugin()
+      expect(plugin.probe(ctx).lines.map((l) => l.label)).toEqual(["Weekly"])
+    })
+
+    it("returns a No usage data badge when there is no limits.standard and no active subscription", async () => {
+      const ctx = setup({ hasActiveSubscription: false, limits: {} })
+      const plugin = await loadPlugin()
+      const result = plugin.probe(ctx)
+      expect(result.lines).toHaveLength(1)
+      expect(result.lines[0].label).toBe("Status")
+      expect(result.lines[0].text).toBe("No usage data")
+    })
+
+    it("throws when limits.standard is missing with an active subscription", async () => {
+      const ctx = setup({ hasActiveSubscription: true, limits: {} })
+      const plugin = await loadPlugin()
+      expect(() => plugin.probe(ctx)).toThrow("Usage response missing data. Try again later.")
+    })
+
+    it("returns no plan", async () => {
+      const ctx = setup(limitsBody())
+      const plugin = await loadPlugin()
+      expect(plugin.probe(ctx).plan).toBeUndefined()
+    })
   })
+
 })

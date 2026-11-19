@@ -8,7 +8,9 @@
   const KEYCHAIN_SERVICES = ["Factory Token", "Factory token", "Factory Auth", "Droid Auth"]
   const WORKOS_CLIENT_ID = "client_01HNM792M5G5G1A2THWPXKFMXB"
   const WORKOS_AUTH_URL = "https://api.workos.com/user_management/authenticate"
-  const USAGE_URL = "https://api.factory.ai/api/organization/subscription/usage"
+  const USAGE_URL = "https://api.factory.ai/api/billing/limits"
+  const FIVE_HOUR_MS = 5 * 60 * 60 * 1000
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000
   const TOKEN_REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000 // 24 hours before expiry
 
   function decodeHexUtf8(hex) {
@@ -354,32 +356,48 @@
   }
 
   function fetchUsage(ctx, accessToken) {
-    var resp = ctx.util.request({
-      method: "POST",
+    return ctx.util.request({
+      method: "GET",
       url: USAGE_URL,
       headers: {
         Authorization: "Bearer " + accessToken,
-        "Content-Type": "application/json",
         Accept: "application/json",
         "User-Agent": "OpenUsage",
       },
-      bodyText: JSON.stringify({ useCache: true }),
       timeoutMs: 10000,
     })
-    if (resp.status === 405) {
-      ctx.host.log.info("POST returned 405, retrying with GET")
-      resp = ctx.util.request({
-        method: "GET",
-        url: USAGE_URL,
-        headers: {
-          Authorization: "Bearer " + accessToken,
-          Accept: "application/json",
-          "User-Agent": "OpenUsage",
-        },
-        timeoutMs: 10000,
-      })
+  }
+
+  // A bucket with no window, or one that has ended, has no usage yet (droid shows "Use Droid to start").
+  function bucketLine(ctx, label, bucket, periodMs, nowMs) {
+    const windowEndMs = typeof bucket.windowEnd === "string" ? Date.parse(bucket.windowEnd) : NaN
+    const active = Number.isFinite(windowEndMs) && windowEndMs > nowMs
+    const used = active && typeof bucket.usedPercent === "number" ? bucket.usedPercent : 0
+    const line = { label, used, limit: 100, format: { kind: "percent" } }
+    if (active) {
+      line.resetsAt = ctx.util.toIso(windowEndMs)
+      line.periodDurationMs = periodMs === "month" ? monthPeriodMs(windowEndMs) : periodMs
     }
-    return resp
+    return ctx.line.progress(line)
+  }
+
+  function monthPeriodMs(windowEndMs) {
+    const start = new Date(windowEndMs)
+    start.setUTCMonth(start.getUTCMonth() - 1)
+    return windowEndMs - start.getTime()
+  }
+
+  function pushBucketLines(ctx, lines, group, labels, nowMs) {
+    if (!group) return
+    const buckets = [
+      [group.fiveHour, labels[0], FIVE_HOUR_MS],
+      [group.weekly, labels[1], WEEK_MS],
+      [group.monthly, labels[2], "month"],
+    ]
+    for (const [bucket, label, periodMs] of buckets) {
+      if (!bucket || bucket.unlimited === true) continue
+      lines.push(bucketLine(ctx, label, bucket, periodMs, nowMs))
+    }
   }
 
   function probe(ctx) {
@@ -458,69 +476,26 @@
       throw "Usage response invalid. Try again later."
     }
 
-    const usage = data.usage
-    if (!usage) {
+    const limits = data.limits
+    const standard = limits && limits.standard
+    if (!standard) {
+      if (data.hasActiveSubscription === false) {
+        return {
+          lines: [ctx.line.badge({ label: "Status", text: "No usage data", color: "#a3a3a3" })],
+        }
+      }
       throw "Usage response missing data. Try again later."
     }
 
     const lines = []
-
-    // Calculate reset time and period from usage dates
-    const endDate = usage.endDate
-    const startDate = usage.startDate
-    const resetsAt = typeof endDate === "number" ? ctx.util.toIso(endDate) : null
-    const periodDurationMs = (typeof endDate === "number" && typeof startDate === "number")
-      ? (endDate - startDate)
-      : null
-
-    // Standard tokens (primary line)
-    const standard = usage.standard
-    if (standard && typeof standard.totalAllowance === "number") {
-      const used = standard.orgTotalTokensUsed || 0
-      const limit = standard.totalAllowance
-      lines.push(ctx.line.progress({
-        label: "Standard",
-        used: used,
-        limit: limit,
-        format: { kind: "count", suffix: "tokens" },
-        resetsAt: resetsAt,
-        periodDurationMs: periodDurationMs,
-      }))
-    }
-
-    // Premium tokens (detail line, only if plan includes premium)
-    const premium = usage.premium
-    if (premium && typeof premium.totalAllowance === "number" && premium.totalAllowance > 0) {
-      const used = premium.orgTotalTokensUsed || 0
-      const limit = premium.totalAllowance
-      lines.push(ctx.line.progress({
-        label: "Premium",
-        used: used,
-        limit: limit,
-        format: { kind: "count", suffix: "tokens" },
-        resetsAt: resetsAt,
-        periodDurationMs: periodDurationMs,
-      }))
-    }
-
-    // Infer plan from allowance
-    let plan = null
-    if (standard && typeof standard.totalAllowance === "number") {
-      const allowance = standard.totalAllowance
-      if (allowance >= 200000000) {
-        plan = "Max"
-      } else if (allowance >= 20000000) {
-        plan = "Pro"
-      } else if (allowance > 0) {
-        plan = "Basic"
-      }
-    }
+    pushBucketLines(ctx, lines, standard, ["Session", "Weekly", "Monthly"], nowMs)
+    pushBucketLines(ctx, lines, limits.core, ["Droid Core", "Droid Core Weekly", "Droid Core Monthly"], nowMs)
 
     if (lines.length === 0) {
       lines.push(ctx.line.badge({ label: "Status", text: "No usage data", color: "#a3a3a3" }))
     }
 
-    return { plan: plan, lines: lines }
+    return { lines: lines }
   }
 
   // Who is signed in, for the WSL same-account check (wsl.rs): the access token's subject. Local only.
