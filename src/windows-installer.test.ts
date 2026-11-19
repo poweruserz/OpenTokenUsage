@@ -20,6 +20,10 @@ it("updates in-app without a setup window", () => {
 it("keeps MSI removal and notifications working after the identifier change", () => {
   // The setup removes an MSI only when its Publisher matches; 0.7.7's MSI says "sunstory".
   expect(tauriConf.bundle.publisher).toBe("sunstory")
+  // Installed apps shows the fork's name, written after Tauri's own "sunstory".
+  expect(readFileSync("src-tauri/windows/hooks.nsh", "utf8")).toContain(
+    'WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "PowerUserZ"',
+  )
   // Updates keep the old Start menu shortcut, whose AppUserModelID toasts need to match.
   expect(tauriConf.bundle.windows.nsis.installerHooks).toBe("./windows/hooks.nsh")
   expect(readFileSync("src-tauri/windows/hooks.nsh", "utf8")).toContain("SetLnkAppUserModelId")

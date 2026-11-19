@@ -9,6 +9,9 @@
   ${If} ${FileExists} "$DESKTOP\${PRODUCTNAME}.lnk"
     !insertmacro SetLnkAppUserModelId "$DESKTOP\${PRODUCTNAME}.lnk"
   ${EndIf}
+  ; Installed apps shows this Publisher. bundle.publisher stays "sunstory" so the setup still finds
+  ; and removes a 0.7.7 MSI (it matches on Publisher), so only the name people see is replaced.
+  WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "PowerUserZ"
 !macroend
 
 ; data_dirs.rs leaves junctions to the new folder at the old paths of the accounts folder and of
