@@ -65,7 +65,7 @@ With Windows' **Animation effects** off, the panel stops the blinking "since you
 
 ## Languages and notifications
 
-- 11 languages, all left-to-right. Dates and numbers follow the language.
+- 11 languages, all left-to-right. Dates follow the language. Numbers on cards and US dollar amounts always use US formatting (`1,234.5`, `$1,234.56`); amounts in another currency follow the language.
 - Alerts are Windows notifications with text. The app plays their sound itself (or **No sound**) and skips it during Do Not Disturb.
 - **Hide from screen sharing** (Settings → App, off by default) also hides the panel and widgets from tools that read the screen as an image.
 
