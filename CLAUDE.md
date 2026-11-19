@@ -478,7 +478,8 @@ This file holds the project facts that are easy to get wrong.
   shortcut: updates don't recreate shortcuts, so `src-tauri/windows/hooks.nsh` stamps it on every
   install. `bundle.publisher` stays `"sunstory"` (it was the default from the old identifier)
   because the NSIS setup only removes an MSI whose Publisher matches it; change it once 0.7.7 MSI
-  installs are gone.
+  installs are gone. Until then `hooks.nsh` rewrites the Publisher that Installed apps shows to
+  `PowerUserZ` after install; the exe's CompanyName (also from `bundle.publisher`) still says sunstory.
 - Release: bump the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
   (+ `Cargo.lock`), add a `## vX.Y.Z` section to `CHANGELOG.md` (required: it becomes the release
   body the in-app changelog shows), then push a `v*` tag → `publish.yml` (windows-latest) builds
