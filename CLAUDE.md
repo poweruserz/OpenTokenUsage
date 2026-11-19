@@ -431,6 +431,14 @@ This file holds the project facts that are easy to get wrong.
 - No telemetry: the upstream Aptabase ping (reported to upstream's account) was removed in 0.7.0.
   Don't add analytics back.
 
+## Issues and outside PRs
+- An issue whose fix has merged is closed, without asking the owner (standing approval), with a comment that
+  thanks the reporter, says what changed (PR link) and which release ships it, or that the next one will, and
+  answers anything they raised that stays open. Close it as `completed`, or `not planned` when the fix is
+  declined. Skill: `close-resolved-issues`.
+- A fork PR never gets `ai-review`, so a ready one is carried over to a same-repo branch with the contributor
+  credited. Skill: `carry-over-fork-pr`.
+
 ## Verify before committing
 - `bunx tsc --noEmit` · `bun run test` (src + plugins) · `cd src-tauri && cargo test --lib`.
 - Vitest `testTimeout` is 20 s on purpose (cold transform of a file's first test is slow on
