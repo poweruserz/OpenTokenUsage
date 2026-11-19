@@ -58,6 +58,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
   ```
 
 - **Signed updates.** The app installs an update only if it's signed with the release key whose public half is built into the app.
+- **Code signing is on its way.** The [SignPath Foundation](https://signpath.org/) accepted the project; once its certificate is issued, the app and installer will be signed. Releases up to 0.9.2 are unsigned. See the [code signing policy](#code-signing-policy).
 - **Your data stays on your PC.** No telemetry, no account, no server of its own. See [Privacy](#privacy).
 - **Found a security problem?** Report it privately, as [SECURITY.md](SECURITY.md) describes.
 
@@ -163,6 +164,19 @@ Smart polls reuse successful local token-history scans for up to 15 minutes; man
 - [**Qwen Code**](docs/providers/qwen-code.md) / requests today and this month (local ledger)
 - [**Synthetic**](docs/providers/synthetic.md) / 5-hour rate limit, subscription, tool calls, search
 - [**Z.ai**](docs/providers/zai.md) / session, weekly, web searches
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+
+Signing starts with the first release after the certificate is issued; earlier releases are unsigned.
+
+- **What is signed:** only the OpenTokenUsage app (`opentokenusage.exe`) and its installer (`OpenTokenUsage_<version>_x64-setup.exe`), built by GitHub Actions from a tagged commit of this repository. Nothing built elsewhere and no third-party program is signed.
+- **Committers and reviewers:** [PowerUserZ](https://github.com/PowerUserZ). Outside contributions arrive as pull requests and are merged only after review.
+- **Approvers:** [PowerUserZ](https://github.com/PowerUserZ) (owner) approves every signing request.
+- **Privacy:** see [Privacy](#privacy).
+- **System changes:** it installs for the current Windows user in `%LOCALAPPDATA%\OpenTokenUsage`, without admin rights. Start on login is on by default (a value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`); turn it off in Settings. It asks Windows to show its tray icon next to the clock, only if you haven't chosen yourself. Updates come only from this repository's releases, are checked against the updater signing key, and install when you choose.
+- **Uninstall:** Windows Settings > Apps > Installed apps > OpenTokenUsage. The uninstaller can also delete the app's data folders; `%USERPROFILE%\.openusage\config.json` (proxy and custom balance settings) stays, delete it by hand. Turn off Start on login first to remove its Run value too.
 
 ## Privacy
 

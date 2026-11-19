@@ -1,0 +1,140 @@
+name: SignPath test signing
+
+# Proves the code signing pipeline with SignPath's self-signed test certificate. The SignPath Foundation
+# reviews this setup before it orders the production certificate; until then publish.yml stays unsigned.
+# Run it from the Actions tab.
+#
+# An NSIS installer can't be signed from the inside, and Tauri's bundler writes the bundle type into the app
+# exe (`__TAURI_BUNDLE_TYPE_VAR_UNK` → `_NSS`) right before it packs it, then puts the unpatched exe back. An exe
+# signed before that patch would carry a broken signature inside the installer. So the exe is patched here the
+# same way, then signed; when the installer is bundled from it, the bundler finds no `_UNK` marker, only logs
+# "Failed to add bundler type to the binary", and packs the signed exe untouched. Then the installer is signed.
+#
+# Needs: the SIGNPATH_API_TOKEN secret (the "CI builds" submitter's API token), the SignPath GitHub App
+# installed on this repository, and .signpath/artifact-configuration.xml as the project's default artifact
+# configuration in SignPath. Actions are pinned to full commit SHAs, as in publish.yml.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # the SignPath action reads this run and downloads its artifacts
+
+env:
+  SIGNPATH_ORGANIZATION_ID: de864410-1dbb-4246-a3fd-12533f6e00d6
+  SIGNPATH_PROJECT_SLUG: OpenTokenUsage
+  SIGNPATH_POLICY_SLUG: test-signing
+
+jobs:
+  sign:
+    runs-on: windows-latest # SignPath signs OSS builds only from GitHub-hosted runners
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable branch, 2026-09-03
+        with:
+          toolchain: stable
+      - uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+
+      - name: App version
+        id: version
+        run: echo "version=$(node -p 'require("./src-tauri/tauri.conf.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app (no installer yet)
+        run: bun tauri build --no-bundle
+
+      - name: Mark the exe as the NSIS build, as the bundler would
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = process.argv[1];
+            const data = fs.readFileSync(file);
+            // tauri-bundler patch_binary: the first occurrence, same length.
+            const at = data.indexOf("__TAURI_BUNDLE_TYPE_VAR_UNK");
+            if (at < 0) throw new Error("bundle type marker not found in " + file);
+            data.write("__TAURI_BUNDLE_TYPE_VAR_NSS", at);
+            fs.writeFileSync(file, data);
+          ' src-tauri/target/release/opentokenusage.exe
+
+      - name: Upload the unsigned app
+        id: upload-app
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-unsigned
+          path: src-tauri/target/release/opentokenusage.exe
+          if-no-files-found: error
+
+      - name: Sign the app
+        uses: signpath/github-action-submit-signing-request@4a84eb4ad763290f059275786f2deed97c2c672b # v3.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-app
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+
+      - name: Bundle the installer from the signed app
+        run: |
+          cp signed-app/opentokenusage.exe src-tauri/target/release/opentokenusage.exe
+          # No updater files here: the updater .sig must be made from the signed installer (publish.yml's job).
+          bun tauri bundle --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload the unsigned installer
+        id: upload-setup
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: setup-unsigned
+          path: src-tauri/target/release/bundle/nsis/OpenTokenUsage_${{ steps.version.outputs.version }}_x64-setup.exe
+          if-no-files-found: error
+
+      - name: Sign the installer
+        uses: signpath/github-action-submit-signing-request@4a84eb4ad763290f059275786f2deed97c2c672b # v3.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.upload-setup.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed-setup
+          parameters: |
+            version: ${{ toJSON(steps.version.outputs.version) }}
+
+      - name: Check the installer and the app inside it
+        shell: pwsh
+        run: |
+          # Take the exe out of the signed installer: that is what users get. The test root isn't trusted by
+          # Windows, so UnknownError is expected; HashMismatch means a file changed after it was signed.
+          $setup = (Get-ChildItem signed-setup/*.exe).FullName
+          7z e $setup -opacked opentokenusage.exe -r -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "7-Zip could not take opentokenusage.exe out of $setup" }
+          foreach ($file in @($setup, "packed/opentokenusage.exe")) {
+            $sig = Get-AuthenticodeSignature $file
+            "{0}: {1} ({2}: {3})" -f $file, $sig.SignerCertificate.Subject, $sig.Status, $sig.StatusMessage
+            if ($sig.Status -notin @("Valid", "UnknownError")) { throw "$file has no intact signature: $($sig.Status)" }
+          }
+          $marker = Select-String -Path packed/opentokenusage.exe -Pattern "__TAURI_BUNDLE_TYPE_VAR_NSS" -SimpleMatch -Quiet
+          if (-not $marker) { throw "The packed exe isn't marked as the NSIS build; the updater would not know its install type" }
+
+      - name: Upload the signed files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-test
+          path: |
+            packed/opentokenusage.exe
+            signed-setup/
