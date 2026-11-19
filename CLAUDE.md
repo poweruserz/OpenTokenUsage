@@ -498,6 +498,16 @@ This file holds the project facts that are easy to get wrong.
   publishing: "Re-run failed jobs" (tauri-action reuses the draft); after publishing, never "Re-run all jobs". The updater points
   at this fork's `latest.json`, never upstream's. `git fetch upstream` must not bring upstream's
   Swift `v0.7.x` tags (`remote.upstream.tagOpt --no-tags`).
+- Code signing (SignPath Foundation, accepted 2026-11-19): `signpath-test.yml` (run by hand) signs with the test
+  certificate; the Foundation reviews it, then issues the production certificate. Until then releases are unsigned and
+  `publish.yml` doesn't sign. NSIS can't be signed from the inside, and the bundler patches the exe's bundle type
+  (`__TAURI_BUNDLE_TYPE_VAR_UNK` → `_NSS`) right before packing it, then restores the unpatched exe, so a signature
+  made before that patch breaks inside the installer: build `--no-bundle`, patch the marker to `_NSS` yourself, sign
+  that exe, copy it back and `tauri bundle` (it finds no `_UNK`, warns, and packs the signed exe untouched), sign the
+  installer, and only then make the updater `.sig` (`tauri signer sign`), or updates break.
+  Signing goes only through `signpath/github-action-submit-signing-request` on GitHub-hosted runners (origin
+  verification), never Tauri's `signCommand`. `.signpath/artifact-configuration.xml` mirrors the project's default
+  artifact configuration in SignPath; change both together. The README's "Code signing policy" section is required.
 - Workflow actions are pinned to full commit SHAs (version in a comment) and Bun to an exact
   version; bump them deliberately. The winget job needs a valid `WINGET_TOKEN` (classic PAT,
   `public_repo` + `workflow`): the branch it creates in the `PowerUserZ/winget-pkgs` fork carries

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The project's default artifact configuration in SignPath (paste it there; this copy is for review).
+     Each signing request is a GitHub artifact (a ZIP) holding one exe: the app first, then the installer
+     bundled from the signed app. SignPath Foundation requires the product name and version to be enforced. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="*.exe" product-name="OpenTokenUsage" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>
