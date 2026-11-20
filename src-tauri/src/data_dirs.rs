@@ -1,10 +1,14 @@
 //! Up to 0.7.8 the app identifier was upstream's `com.sunstory.openusage`. Tauri names the app's
 //! folders after it: `%APPDATA%\<id>` (settings, accounts, plugin data, usage cache) and
 //! `%LOCALAPPDATA%\<id>` (logs, WebView2), so the first start under the new identifier moves them.
+//! Up to 0.9.2 the proxy and custom balances were in upstream's `~/.openusage/config.json`; it moves
+//! into `%APPDATA%\<id>` too, where the uninstaller's "delete app data" removes it with the rest.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const LEGACY_IDENTIFIER: &str = "com.sunstory.openusage";
+const LEGACY_CONFIG_DIR: &str = ".openusage";
+pub const CONFIG_FILE: &str = "config.json";
 /// Settings tells users to point CLAUDE_CONFIG_DIR / CODEX_HOME at an account's folder, so what moves
 /// out of the old `accounts`, the whole folder or one account folder, leaves a junction at its old
 /// path (`windows/hooks.nsh` removes them on uninstall).
@@ -31,7 +35,31 @@ pub fn migrate_legacy(identifier: &str) -> Vec<String> {
             ));
         }
     }
+    if let (Some(home), Some(data)) = (dirs::home_dir(), dirs::data_dir()) {
+        move_config(&home.join(LEGACY_CONFIG_DIR), &data.join(identifier), &mut log);
+    }
     log
+}
+
+/// 0.9.2's `config.json`, while it's still there.
+pub fn legacy_config() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| home.join(LEGACY_CONFIG_DIR).join(CONFIG_FILE))
+}
+
+/// Moves `config.json` unless the new folder has one (written by this version: newer), then removes
+/// the old folder once it's empty. A move that fails (the file locked, or a redirected %APPDATA% on
+/// another drive) leaves it in place: `config::in_use` reads it there and the next start tries again.
+/// Nothing is ever deleted. The log names no path: those hold the Windows user name.
+fn move_config(old_dir: &Path, new_dir: &Path, log: &mut Vec<String>) {
+    let (old, new) = (old_dir.join(CONFIG_FILE), new_dir.join(CONFIG_FILE));
+    if old.is_file() && !new.exists() {
+        let moved = std::fs::create_dir_all(new_dir).and_then(|()| std::fs::rename(&old, &new));
+        log.push(match moved {
+            Ok(()) => format!("moved ~/{LEGACY_CONFIG_DIR}/{CONFIG_FILE} to %APPDATA%"),
+            Err(err) => format!("can't move ~/{LEGACY_CONFIG_DIR}/{CONFIG_FILE}: {err}"),
+        });
+    }
+    let _ = std::fs::remove_dir(old_dir);
 }
 
 /// Moves every entry the new folder doesn't have yet, then removes the old folder once it's empty.
@@ -94,7 +122,7 @@ fn move_entries(
 
 #[cfg(test)]
 mod tests {
-    use super::{LEGACY_IDENTIFIER, move_entries};
+    use super::{CONFIG_FILE, LEGACY_IDENTIFIER, move_config, move_entries};
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -195,5 +223,37 @@ mod tests {
 
         fs::remove_dir_all(&root).unwrap();
         assert!(log.is_empty(), "{log:?}");
+    }
+
+    #[test]
+    fn the_config_moves_into_the_app_folder_and_never_over_a_newer_one() {
+        let (_, new, root) = folders("config");
+        let old = root.join(".openusage");
+        let mut log = Vec::new();
+
+        // Nothing there: nothing made.
+        move_config(&old, &new, &mut log);
+        assert!(!new.exists() && log.is_empty());
+
+        // An empty old folder (an older version made it and saved nothing) goes too.
+        fs::create_dir_all(&old).unwrap();
+        move_config(&old, &new, &mut log);
+        assert!(!old.exists() && log.is_empty());
+
+        write(&old.join(CONFIG_FILE), "old");
+        move_config(&old, &new, &mut log);
+        assert_eq!(read(&new.join(CONFIG_FILE)), "old");
+        assert!(!old.exists(), "the emptied folder is removed");
+        assert_eq!(log.len(), 1);
+        assert!(!log[0].contains(&*root.to_string_lossy()), "{log:?}");
+
+        // Saved by this version since: the old copy stays where it is, and so does its folder.
+        write(&old.join(CONFIG_FILE), "older");
+        move_config(&old, &new, &mut log);
+        assert_eq!(read(&new.join(CONFIG_FILE)), "old");
+        assert_eq!(read(&old.join(CONFIG_FILE)), "older");
+        assert_eq!(log.len(), 1);
+
+        fs::remove_dir_all(&root).unwrap();
     }
 }

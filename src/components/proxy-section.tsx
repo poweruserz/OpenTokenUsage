@@ -14,14 +14,22 @@ const STATUS_TEXT = {
   broken: "settings.configBroken",
 } as const satisfies Record<string, MessageKey>
 
+const BROKEN = "configBroken:"
+
+/** The file a save refused because it isn't valid JSON (`config.rs` answers `configBroken:<file>`), or null. */
+export function configBrokenPath(error: unknown): string | null {
+  return typeof error === "string" && error.startsWith(BROKEN) ? error.slice(BROKEN.length) : null
+}
+
 /**
  * The outbound proxy for provider, status-page and update requests (`config.rs`, kept in
- * ~/.openusage/config.json). Saved ones apply from the next request; the host refuses an address
+ * config.json in the app's data folder). Saved ones apply from the next request; the host refuses an address
  * that isn't a proxy.
  */
 export function ProxySection() {
   const [setting, setSetting] = useState<ProxySetting>({ enabled: false, url: "" })
   const [status, setStatus] = useState<keyof typeof STATUS_TEXT | null>(null)
+  const [brokenPath, setBrokenPath] = useState("")
 
   useEffect(() => {
     invoke<ProxySetting>("get_proxy_setting")
@@ -36,7 +44,9 @@ export function ProxySection() {
       setStatus("saved")
     } catch (error) {
       if (error !== "invalidUrl") console.error("Failed to save the proxy setting:", error)
-      setStatus(error === "invalidUrl" ? "invalid" : error === "configBroken" ? "broken" : "error")
+      const broken = configBrokenPath(error)
+      setBrokenPath(broken ?? "")
+      setStatus(error === "invalidUrl" ? "invalid" : broken ? "broken" : "error")
     }
   }
 
@@ -83,7 +93,7 @@ export function ProxySection() {
         </div>
         {status && (
           <p className={cn("text-xs", status === "saved" ? "text-muted-foreground" : "text-destructive")} role="status">
-            {t(STATUS_TEXT[status])}
+            {t(STATUS_TEXT[status], { path: brokenPath })}
           </p>
         )}
       </form>

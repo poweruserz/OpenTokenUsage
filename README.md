@@ -176,7 +176,7 @@ Signing starts with the first release after the certificate is issued; earlier r
 - **Approvers:** [PowerUserZ](https://github.com/PowerUserZ) (owner) approves every signing request.
 - **Privacy:** see [Privacy](#privacy).
 - **System changes:** it installs for the current Windows user in `%LOCALAPPDATA%\OpenTokenUsage`, without admin rights. Start on login is on by default (a value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`); turn it off in Settings. It asks Windows to show its tray icon next to the clock, only if you haven't chosen yourself. Updates come only from this repository's releases, are checked against the updater signing key, and install when you choose.
-- **Uninstall:** Windows Settings > Apps > Installed apps > OpenTokenUsage. The uninstaller can also delete the app's data folders; `%USERPROFILE%\.openusage\config.json` (proxy and custom balance settings) stays, delete it by hand. Turn off Start on login first to remove its Run value too.
+- **Uninstall:** Windows Settings > Apps > Installed apps > OpenTokenUsage. The uninstaller can also delete the app's data folders, proxy and custom balance settings included. Turn off Start on login first to remove its Run value too.
 
 ## Privacy
 

@@ -1,9 +1,8 @@
 (function () {
-  // Balances of the accounts set in Settings → Providers → Custom balances (`balances` in
-  // ~/.openusage/config.json; each key comes from the environment variable it names). Presets as
+  // Balances of the accounts set in Settings → Providers → Custom balances (`balances` in the app
+  // data folder's config.json; each key comes from the environment variable it names). Presets as
   // token-monitor (github.com/Javis603/token-monitor, MIT) reads them: New API (account or key),
   // Sub2API, or one GET endpoint whose numbers sit at dot paths.
-  var CONFIG = "~/.openusage/config.json"
   var MAX = 5
   // New API counts quota in units; /api/status says how many make a dollar.
   var NEWAPI_UNIT = 500000
@@ -113,7 +112,10 @@
   }
 
   function probe(ctx) {
-    var config = ctx.host.fs.exists(CONFIG) ? ctx.util.tryParseJson(ctx.host.fs.readText(CONFIG)) : null
+    var path = ctx.app.appDataDir + "/config.json"
+    // 0.9.2's file while the host couldn't move it (config.rs `in_use` picks the same way).
+    if (!ctx.host.fs.exists(path)) path = "~/.openusage/config.json"
+    var config = ctx.host.fs.exists(path) ? ctx.util.tryParseJson(ctx.host.fs.readText(path)) : null
     var accounts = config && Array.isArray(config.balances) ? config.balances.slice(0, MAX) : []
     if (accounts.length === 0) throw "No custom balance set up. Add one in Settings."
 

@@ -101,7 +101,7 @@ This file holds the project facts that are easy to get wrong.
     kept in place through `claude_statusline.rs`'s `Entries`).
   - Usage export (`export_usage`): daily tokens per card + latest limits as CSV (BOM, formula-safe) and JSON in Downloads;
     `autoExport` writes it once a day.
-  - Custom balances (`config.rs` `balances` in `~/.openusage/config.json`, at most 5, each checked in Rust; the
+  - Custom balances (`config.rs` `balances` in `config.json`, at most 5, each checked in Rust; the
     `custom-balance` plugin reads them): New API account (`/api/user/self`, `New-Api-User`), New API key
     (`/api/usage/token/`), quota ÷ `/api/status` `quota_per_unit` (500000 default), Sub2API (`/api/v1/auth/me`), or a
     custom GET path with dot paths, divisor and currency. Only the key's environment-variable name is stored, and it
@@ -297,7 +297,12 @@ This file holds the project facts that are easy to get wrong.
   (`frame_at`, checked with the 2 s full-screen timer; its start is kept across updates so a redraw doesn't restart it).
   No rise highlight there.
 - Provider nav side (`navRight`, in `BACKUP_KEYS`): Settings → Panel; `app-shell.tsx` reverses the row.
-- Proxy (`config.rs`, Settings → App): `~/.openusage/config.json`'s `proxy` (http/https/socks5/socks5h, host required,
+- `config.json` in `%APPDATA%\<id>` (`config::init` at start; the plugin reads `ctx.app.appDataDir`) holds the proxy and
+  custom balances; 0.9.2 and older kept it in upstream's `~/.openusage`, which `data_dirs.rs` moves (never over a
+  newer one, never deleting anything). One it couldn't move (locked, `%APPDATA%` on another drive) is read and saved
+  where it is (`config::in_use`, the plugin picks the same way) until a later start moves it. In the app data folder,
+  the uninstaller's "delete app data" removes it too.
+- Proxy (`config.rs`, Settings → App): `config.json`'s `proxy` (http/https/socks5/socks5h, host required,
   localhost never proxied), resolved once and kept in `RESOLVED_PROXY`; `set_proxy_setting` validates, writes the file
   atomically keeping its other keys, and swaps the cached proxy. Plugin HTTP, status badges and the updater
   (`check({ proxy })`) use it.

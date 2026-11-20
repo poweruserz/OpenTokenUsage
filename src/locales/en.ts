@@ -116,7 +116,7 @@ export const en = {
   "settings.claudeCode.desktopLoginHint": "When Claude Code isn't signed in, the Claude card reads usage with the Claude app's sign-in. It is only read, never renewed.",
 
 
-  "settings.configBroken": "Not saved: ~/.openusage/config.json isn't valid JSON. Fix or delete that file, then save again.",
+  "settings.configBroken": "Not saved: {path} isn't valid JSON. Fix or delete that file, then save again.",
 
 
   "settings.strip.desktopEdgeSide": "Edge",

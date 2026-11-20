@@ -116,7 +116,7 @@ export const ptBR: Messages = {
   "settings.claudeCode.desktopLoginHint": "Se o Claude Code não estiver conectado, o cartão do Claude lê o uso com o login do app Claude. Ele só é lido, nunca renovado.",
 
 
-  "settings.configBroken": "Não salvo: ~/.openusage/config.json não é um JSON válido. Corrija ou apague esse arquivo e salve de novo.",
+  "settings.configBroken": "Não salvo: {path} não é um JSON válido. Corrija ou apague esse arquivo e salve de novo.",
 
 
   "settings.strip.desktopEdgeSide": "Borda",

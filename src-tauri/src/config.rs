@@ -1,9 +1,29 @@
 use reqwest::Proxy;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
-/// Proxy configuration loaded from ~/.openusage/config.json
+/// The file as messages name it: the real path holds the Windows user name, and they reach the log.
+const SHOWN_PATH: &str = r"%APPDATA%\com.poweruserz.opentokenusage\config.json";
+const LEGACY_SHOWN_PATH: &str = "~/.openusage/config.json";
+
+/// How messages (the log, Settings' "not saved") name the file in use (`in_use`).
+fn shown(path: &std::path::Path) -> &'static str {
+    if crate::data_dirs::legacy_config().as_deref() == Some(path) {
+        LEGACY_SHOWN_PATH
+    } else {
+        SHOWN_PATH
+    }
+}
+
+/// The app's data folder (`%APPDATA%\<identifier>`), set once at start, before anything reads the file.
+static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn init(app_data_dir: PathBuf) {
+    let _ = APP_DATA_DIR.set(app_data_dir);
+}
+
+/// Proxy configuration loaded from config.json in the app's data folder
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProxyConfig {
     pub enabled: bool,
@@ -26,9 +46,18 @@ pub fn resolved_proxy() -> Option<Proxy> {
     slot.get_or_insert_with(load_and_resolve_proxy).clone()
 }
 
-/// Config file path: ~/.openusage/config.json
 fn config_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".openusage").join("config.json"))
+    let new = APP_DATA_DIR.get()?.join(crate::data_dirs::CONFIG_FILE);
+    Some(in_use(new, crate::data_dirs::legacy_config()))
+}
+
+/// The app folder's file, or 0.9.2's while the start couldn't move it (`data_dirs::move_config`):
+/// read and saved where it is, so nothing in it is lost. The custom-balance plugin picks the same way.
+fn in_use(new: PathBuf, old: Option<PathBuf>) -> PathBuf {
+    match old {
+        Some(old) if !new.exists() && old.is_file() => old,
+        _ => new,
+    }
 }
 
 fn read_config() -> Option<AppConfig> {
@@ -37,10 +66,9 @@ fn read_config() -> Option<AppConfig> {
     match serde_json::from_str::<AppConfig>(&contents) {
         Ok(cfg) => Some(cfg),
         Err(e) => {
-            // The literal path: the real one holds the Windows user name.
             log::warn!(
-                "[config] failed to parse ~/.openusage/config.json: {}, using defaults",
-                e
+                "[config] failed to parse {}: {e}, using defaults",
+                shown(&path)
             );
             None
         }
@@ -124,7 +152,7 @@ fn with_proxy(config: serde_json::Value, setting: &ProxySetting) -> serde_json::
     serde_json::Value::Object(object)
 }
 
-/// Saves the proxy to ~/.openusage/config.json and uses it from the next request on. An address that
+/// Saves the proxy to config.json and uses it from the next request on. An address that
 /// isn't a usable proxy is refused ("invalidUrl"), even while turned off, so it never lands on disk.
 #[tauri::command]
 pub fn set_proxy_setting(enabled: bool, url: String) -> Result<(), String> {
@@ -151,26 +179,29 @@ pub fn set_proxy_setting(enabled: bool, url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Rewrites ~/.openusage/config.json through `change`, which gets what's there (Null when there is no
+/// Rewrites config.json through `change`, which gets what's there (Null when there is no
 /// file). A file it can't read or parse stops the save: rewriting it would drop the other settings.
 fn update_config(
     change: impl FnOnce(serde_json::Value) -> serde_json::Value,
 ) -> Result<(), String> {
-    update_config_at(&config_path().ok_or("no home directory")?, change)
+    update_config_at(&config_path().ok_or("no app data folder")?, change)
 }
 
 fn update_config_at(
     path: &std::path::Path,
     change: impl FnOnce(serde_json::Value) -> serde_json::Value,
 ) -> Result<(), String> {
-    // The literal `~` path in messages: they reach the log, which mustn't name the Windows user.
     let current = match std::fs::read_to_string(path) {
         Ok(text) => serde_json::from_str(&text).map_err(|e| {
-            log::warn!("[config] ~/.openusage/config.json is not valid JSON ({e}): not saved");
-            "configBroken".to_string()
+            log::warn!(
+                "[config] {} is not valid JSON ({e}): not saved",
+                shown(path)
+            );
+            // Settings names the file to fix: the old one while it couldn't be moved.
+            format!("configBroken:{}", shown(path))
         })?,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::Value::Null,
-        Err(e) => return Err(format!("can't read ~/.openusage/config.json: {e}")),
+        Err(e) => return Err(format!("can't read {}: {e}", shown(path))),
     };
     let text = serde_json::to_string_pretty(&change(current)).map_err(|e| e.to_string())?;
     if let Some(dir) = path.parent() {
@@ -323,7 +354,7 @@ pub fn get_custom_balances() -> Vec<BalanceEndpoint> {
         .unwrap_or_default()
 }
 
-/// Saves the custom balances (at most 5, each checked) to ~/.openusage/config.json's `balances`,
+/// Saves the custom balances (at most 5, each checked) to config.json's `balances`,
 /// anything else in the file kept. An invalid one is refused with what's wrong with it.
 #[tauri::command]
 pub fn set_custom_balances(balances: Vec<BalanceEndpoint>) -> Result<(), String> {
@@ -418,6 +449,39 @@ mod tests {
     }
 
     #[test]
+    fn the_shown_path_names_the_apps_own_folder() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let identifier = conf["identifier"].as_str().unwrap();
+        assert_eq!(
+            SHOWN_PATH,
+            format!(r"%APPDATA%\{identifier}\{}", crate::data_dirs::CONFIG_FILE)
+        );
+        // The old file is named as what it is while it's the one in use.
+        let legacy = crate::data_dirs::legacy_config().unwrap();
+        assert_eq!(shown(&legacy), LEGACY_SHOWN_PATH);
+        assert!(legacy.ends_with(LEGACY_SHOWN_PATH.trim_start_matches("~/")));
+        assert_eq!(shown(std::path::Path::new("elsewhere.json")), SHOWN_PATH);
+    }
+
+    #[test]
+    fn a_config_the_start_couldnt_move_is_used_where_it_is() {
+        let dir = std::env::temp_dir().join(format!("otu-config-in-use-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (new, old) = (dir.join("new.json"), dir.join("old.json"));
+        // Neither there: the app folder's, where Settings then saves.
+        assert_eq!(in_use(new.clone(), Some(old.clone())), new);
+        std::fs::write(&old, "{}").unwrap();
+        assert_eq!(in_use(new.clone(), Some(old.clone())), old);
+        // Once the app folder has one, the old file is never read again.
+        std::fs::write(&new, "{}").unwrap();
+        assert_eq!(in_use(new.clone(), Some(old.clone())), new);
+        assert_eq!(in_use(new.clone(), None), new);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn redact_proxy_url_with_credentials() {
         let url = "http://user:pass@127.0.0.1:10808";
         let redacted = redact_proxy_url(url);
@@ -494,7 +558,7 @@ mod tests {
         // Settings tells the user the file is the problem, not their entries.
         assert_eq!(
             update_config_at(&path, add),
-            Err("configBroken".to_string())
+            Err(format!("configBroken:{SHOWN_PATH}"))
         );
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),

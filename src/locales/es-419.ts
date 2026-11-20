@@ -116,7 +116,7 @@ export const es419: Messages = {
   "settings.claudeCode.desktopLoginHint": "Si Claude Code no tiene sesión iniciada, la tarjeta de Claude lee el uso con el inicio de sesión de la app de Claude. Solo se lee, nunca se renueva.",
 
 
-  "settings.configBroken": "No se guardó: ~/.openusage/config.json no es un JSON válido. Corrige o borra ese archivo y vuelve a guardar.",
+  "settings.configBroken": "No se guardó: {path} no es un JSON válido. Corrige o borra ese archivo y vuelve a guardar.",
 
 
   "settings.strip.desktopEdgeSide": "Borde",

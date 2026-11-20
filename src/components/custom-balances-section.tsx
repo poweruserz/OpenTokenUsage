@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { invoke, isTauri } from "@tauri-apps/api/core"
+import { configBrokenPath } from "@/components/proxy-section"
 import { SettingsSection } from "@/components/settings-section"
 import { t } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -81,6 +82,7 @@ function Field({
 export function CustomBalancesSection() {
   const [balances, setBalances] = useState<Draft[] | null>(null)
   const [status, setStatus] = useState<"saved" | "invalid" | "broken" | null>(null)
+  const [brokenPath, setBrokenPath] = useState("")
 
   useEffect(() => {
     if (!isTauri()) return
@@ -109,7 +111,9 @@ export function CustomBalancesSection() {
     } catch (error) {
       console.error("Custom balances not saved:", error)
       // `configBroken`: the file has a typo, not the entries (`config.rs`).
-      setStatus(error === "configBroken" ? "broken" : "invalid")
+      const broken = configBrokenPath(error)
+      setBrokenPath(broken ?? "")
+      setStatus(broken ? "broken" : "invalid")
     }
   }
 
@@ -209,7 +213,7 @@ export function CustomBalancesSection() {
           </button>
           {status && (
             <span className={cn("text-xs", status === "saved" ? "text-muted-foreground" : "text-destructive")}>
-              {t(status === "saved" ? "settings.balances.saved" : status === "broken" ? "settings.configBroken" : "settings.balances.invalid")}
+              {t(status === "saved" ? "settings.balances.saved" : status === "broken" ? "settings.configBroken" : "settings.balances.invalid", { path: brokenPath })}
             </span>
           )}
         </div>
