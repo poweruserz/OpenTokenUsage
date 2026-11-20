@@ -108,7 +108,7 @@ describe("SideNav", () => {
     render(<SideNav activeView="home" onViewChange={vi.fn()} plugins={[]} />)
 
     await userEvent.click(screen.getByRole("button", { name: "Support OpenTokenUsage" }))
-    expect(screen.getByRole("dialog", { name: "Keep OpenTokenUsage free" })).toBeInTheDocument()
+    expect(screen.getByRole("dialog", { name: "Your companion on every build" })).toBeInTheDocument()
     expect(screen.getByText("buymeacoffee.com/poweruserz")).toBeInTheDocument()
     expect(openUrl).not.toHaveBeenCalled()
 
