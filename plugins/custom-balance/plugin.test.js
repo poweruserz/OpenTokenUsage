@@ -10,7 +10,7 @@ const reply = (status, body) => ({ status, headers: {}, bodyText: typeof body ==
 
 const setup = (balances, answers, env = { RELAY_TOKEN: "tok" }) => {
   const ctx = makeCtx()
-  if (balances) ctx.host.fs.writeText("~/.openusage/config.json", JSON.stringify({ proxy: null, balances }))
+  if (balances) ctx.host.fs.writeText(ctx.app.appDataDir + "/config.json", JSON.stringify({ proxy: null, balances }))
   ctx.host.env.get.mockImplementation((name) => env[name] ?? null)
   ctx.host.http.request.mockImplementation((request) => {
     const answer = answers[request.url]
@@ -28,6 +28,15 @@ describe("custom-balance plugin", () => {
     const ctx = setup(null, {})
     expect(() => plugin.probe(ctx)).toThrow("No custom balance set up. Add one in Settings.")
     expect(ctx.host.http.request).not.toHaveBeenCalled()
+  })
+
+  it("reads 0.9.2's ~/.openusage config only while the app folder has none (the host couldn't move it)", async () => {
+    const plugin = await loadPlugin()
+    const ctx = setup(null, {}, {})
+    ctx.host.fs.writeText("~/.openusage/config.json", JSON.stringify({ balances: [newapi] }))
+    expect(() => plugin.probe(ctx)).toThrow("No RELAY_TOKEN found. Set up environment variable first.")
+    ctx.host.fs.writeText(ctx.app.appDataDir + "/config.json", JSON.stringify({ proxy: null }))
+    expect(() => plugin.probe(ctx)).toThrow("No custom balance set up. Add one in Settings.")
   })
 
   it("asks for the one account's key variable when it isn't set", async () => {

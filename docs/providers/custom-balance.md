@@ -9,7 +9,7 @@ Settings → Providers → Custom balances; the presets follow
 
 1. Put the account's key in a Windows **user** environment variable whose name starts with `OTU_` (for example
    `OTU_RELAY_KEY`). The key itself is never stored by the app; only the variable's name is, in
-   `~/.openusage/config.json` (`balances`). The prefix keeps the card from ever reading another variable, such as an
+   `%APPDATA%\com.poweruserz.opentokenusage\config.json` (`balances`). The prefix keeps the card from ever reading another variable, such as an
    AI provider's API key, and sending it to the address you typed.
 2. In Settings → Providers → Custom balances, add the account: a name, the type, the panel's address and the variable's
    name (New API account: also your numeric user ID). Save.

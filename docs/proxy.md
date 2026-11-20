@@ -3,12 +3,13 @@
 OpenTokenUsage can route provider, status page and update requests through an optional proxy.
 
 - Supported proxy types: `socks5://`, `http://`, `https://`
-- Settings → **App** → **Proxy**, saved to `~/.openusage/config.json`
+- Settings → **App** → **Proxy**, saved to `%APPDATA%\com.poweruserz.opentokenusage\config.json`
 - Default: off
 
 ## Config File
 
-Settings writes this file for you. To set it by hand, create `~/.openusage/config.json`:
+Settings writes this file for you. To set it by hand, create `%APPDATA%\com.poweruserz.opentokenusage\config.json`
+(0.9.2 and older kept it in `~/.openusage/config.json`; the first start of a newer version moves it):
 
 ```json
 {

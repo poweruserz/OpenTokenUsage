@@ -116,7 +116,7 @@ export const it: Messages = {
   "settings.claudeCode.desktopLoginHint": "Se Claude Code non ha effettuato l'accesso, la scheda Claude legge l'utilizzo con l'accesso dell'app Claude. Viene solo letto, mai rinnovato.",
 
 
-  "settings.configBroken": "Non salvato: ~/.openusage/config.json non è un JSON valido. Correggi o elimina il file, poi salva di nuovo.",
+  "settings.configBroken": "Non salvato: %APPDATA%\\com.poweruserz.opentokenusage\\config.json non è un JSON valido. Correggi o elimina il file, poi salva di nuovo.",
 
 
   "settings.strip.desktopEdgeSide": "Bordo",

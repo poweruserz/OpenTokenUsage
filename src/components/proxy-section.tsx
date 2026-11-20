@@ -16,7 +16,7 @@ const STATUS_TEXT = {
 
 /**
  * The outbound proxy for provider, status-page and update requests (`config.rs`, kept in
- * ~/.openusage/config.json). Saved ones apply from the next request; the host refuses an address
+ * config.json in the app's data folder). Saved ones apply from the next request; the host refuses an address
  * that isn't a proxy.
  */
 export function ProxySection() {

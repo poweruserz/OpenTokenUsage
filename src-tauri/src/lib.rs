@@ -588,6 +588,10 @@ pub fn run() {
 
     let context = tauri::generate_context!();
     let migrated = data_dirs::migrate_legacy(&context.config().identifier);
+    // Tauri's app data dir on Windows; config.rs is read before the app (and its path resolver) exists.
+    if let Some(data) = dirs::data_dir() {
+        config::init(data.join(&context.config().identifier));
+    }
 
     tauri::Builder::default()
         // First, so a second launch (Start menu, installer) only opens the running app's panel.
