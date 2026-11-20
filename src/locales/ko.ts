@@ -116,7 +116,7 @@ export const ko: Messages = {
   "settings.claudeCode.desktopLoginHint": "Claude Code에 로그인되어 있지 않으면 Claude 카드가 Claude 앱의 로그인으로 사용량을 읽습니다. 읽기만 하고 갱신하지 않습니다.",
 
 
-  "settings.configBroken": "저장되지 않음: %APPDATA%\\com.poweruserz.opentokenusage\\config.json이 올바른 JSON이 아닙니다. 파일을 고치거나 삭제한 뒤 다시 저장하세요.",
+  "settings.configBroken": "저장되지 않음: {path}이 올바른 JSON이 아닙니다. 파일을 고치거나 삭제한 뒤 다시 저장하세요.",
 
 
   "settings.strip.desktopEdgeSide": "가장자리",

@@ -116,7 +116,7 @@ export const tr: Messages = {
   "settings.claudeCode.desktopLoginHint": "Claude Code'da oturum açık değilse Claude kartı kullanımı Claude uygulamasının oturumuyla okur. Oturum yalnızca okunur, hiç yenilenmez.",
 
 
-  "settings.configBroken": "Kaydedilmedi: %APPDATA%\\com.poweruserz.opentokenusage\\config.json geçerli bir JSON değil. Dosyayı düzeltin ya da silin, sonra yeniden kaydedin.",
+  "settings.configBroken": "Kaydedilmedi: {path} geçerli bir JSON değil. Dosyayı düzeltin ya da silin, sonra yeniden kaydedin.",
 
 
   "settings.strip.desktopEdgeSide": "Kenar",

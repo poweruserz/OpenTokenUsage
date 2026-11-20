@@ -5,6 +5,16 @@ use std::sync::{Mutex, OnceLock};
 
 /// The file as messages name it: the real path holds the Windows user name, and they reach the log.
 const SHOWN_PATH: &str = r"%APPDATA%\com.poweruserz.opentokenusage\config.json";
+const LEGACY_SHOWN_PATH: &str = "~/.openusage/config.json";
+
+/// How messages (the log, Settings' "not saved") name the file in use (`in_use`).
+fn shown(path: &std::path::Path) -> &'static str {
+    if crate::data_dirs::legacy_config().as_deref() == Some(path) {
+        LEGACY_SHOWN_PATH
+    } else {
+        SHOWN_PATH
+    }
+}
 
 /// The app's data folder (`%APPDATA%\<identifier>`), set once at start, before anything reads the file.
 static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -56,7 +66,10 @@ fn read_config() -> Option<AppConfig> {
     match serde_json::from_str::<AppConfig>(&contents) {
         Ok(cfg) => Some(cfg),
         Err(e) => {
-            log::warn!("[config] failed to parse {SHOWN_PATH}: {e}, using defaults");
+            log::warn!(
+                "[config] failed to parse {}: {e}, using defaults",
+                shown(&path)
+            );
             None
         }
     }
@@ -180,11 +193,15 @@ fn update_config_at(
 ) -> Result<(), String> {
     let current = match std::fs::read_to_string(path) {
         Ok(text) => serde_json::from_str(&text).map_err(|e| {
-            log::warn!("[config] {SHOWN_PATH} is not valid JSON ({e}): not saved");
-            "configBroken".to_string()
+            log::warn!(
+                "[config] {} is not valid JSON ({e}): not saved",
+                shown(path)
+            );
+            // Settings names the file to fix: the old one while it couldn't be moved.
+            format!("configBroken:{}", shown(path))
         })?,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::Value::Null,
-        Err(e) => return Err(format!("can't read {SHOWN_PATH}: {e}")),
+        Err(e) => return Err(format!("can't read {}: {e}", shown(path))),
     };
     let text = serde_json::to_string_pretty(&change(current)).map_err(|e| e.to_string())?;
     if let Some(dir) = path.parent() {
@@ -440,6 +457,11 @@ mod tests {
             SHOWN_PATH,
             format!(r"%APPDATA%\{identifier}\{}", crate::data_dirs::CONFIG_FILE)
         );
+        // The old file is named as what it is while it's the one in use.
+        let legacy = crate::data_dirs::legacy_config().unwrap();
+        assert_eq!(shown(&legacy), LEGACY_SHOWN_PATH);
+        assert!(legacy.ends_with(LEGACY_SHOWN_PATH.trim_start_matches("~/")));
+        assert_eq!(shown(std::path::Path::new("elsewhere.json")), SHOWN_PATH);
     }
 
     #[test]
@@ -536,7 +558,7 @@ mod tests {
         // Settings tells the user the file is the problem, not their entries.
         assert_eq!(
             update_config_at(&path, add),
-            Err("configBroken".to_string())
+            Err(format!("configBroken:{SHOWN_PATH}"))
         );
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),

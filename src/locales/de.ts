@@ -116,7 +116,7 @@ export const de: Messages = {
   "settings.claudeCode.desktopLoginHint": "Ist Claude Code nicht angemeldet, liest die Claude-Karte die Nutzung mit der Anmeldung der Claude-App. Sie wird nur gelesen, nie erneuert.",
 
 
-  "settings.configBroken": "Nicht gespeichert: %APPDATA%\\com.poweruserz.opentokenusage\\config.json ist kein gültiges JSON. Datei korrigieren oder löschen, dann erneut speichern.",
+  "settings.configBroken": "Nicht gespeichert: {path} ist kein gültiges JSON. Datei korrigieren oder löschen, dann erneut speichern.",
 
 
   "settings.strip.desktopEdgeSide": "Rand",
