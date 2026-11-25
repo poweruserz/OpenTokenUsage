@@ -416,6 +416,9 @@
         answered = true
         if (status >= 200 && status < 300) return { port: ports[i], scheme: schemes[j] }
         if (!other && !ctx.util.isAuthStatus(status)) other = { port: ports[i], scheme: schemes[j] }
+        // The port speaks this scheme. Plain HTTP to an HTTPS port only makes agy print a TLS
+        // handshake error in the user's terminal on every refresh (#118).
+        break
       }
       if (!answered) ctx.host.log.info("port " + ports[i] + " probe failed on both schemes")
     }
