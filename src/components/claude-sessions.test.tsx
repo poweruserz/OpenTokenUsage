@@ -5,6 +5,7 @@ import {
   ClaudeSessionList,
   ClaudeSessions,
   hasLiveSessions,
+  modelName,
   useClaudeSessions,
   type LiveSession,
 } from "@/components/claude-sessions"
@@ -98,5 +99,31 @@ describe("claude sessions", () => {
     expect(screen.getAllByRole("img", { name: "Working" })).toHaveLength(1)
     // A dot between a row's state and its context; none on the row with the state alone.
     expect(screen.getAllByText("·")).toHaveLength(2)
+  })
+
+  it("names the model and thinking level each session runs on", () => {
+    render(
+      <ClaudeSessionList
+        sessions={[
+          session({ id: "a", name: "api", model: "claude-opus-5-5", effort: "xhigh" }),
+          session({ id: "b", name: "web", model: "gpt-6.2-astra", effort: "ultra" }),
+          session({ id: "c", name: "docs", model: "claude-sonnet-4-5-20250929" }),
+          session({ id: "d", name: "cli" }),
+        ]}
+      />
+    )
+    expect(screen.getByText("Opus 5.5 · xhigh")).toHaveClass("text-muted-foreground")
+    expect(screen.getByText("gpt-6.2-astra · ultra")).toBeInTheDocument()
+    expect(screen.getByText("Sonnet 4.5")).toBeInTheDocument()
+    // Nothing logged yet: the name alone.
+    expect(screen.getByText("cli").children).toHaveLength(0)
+  })
+
+  it("shortens Claude model ids and leaves others as they are", () => {
+    expect(modelName("claude-opus-5-5")).toBe("Opus 5.5")
+    expect(modelName("claude-haiku-4-5-20251001")).toBe("Haiku 4.5")
+    expect(modelName("claude-opus-4-20250514")).toBe("Opus 4")
+    expect(modelName("claude-3-5-sonnet-20241022")).toBe("claude-3-5-sonnet-20241022")
+    expect(modelName("gpt-6.2-astra")).toBe("gpt-6.2-astra")
   })
 })

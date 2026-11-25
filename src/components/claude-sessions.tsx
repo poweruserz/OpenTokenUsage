@@ -18,6 +18,17 @@ export type LiveSession = {
   contextPercent: number | null
   /** When the last answer's prompt cache runs out (unix ms; Claude only). */
   cacheExpiresAt?: number | null
+  /** The last answer's (Claude) or turn's (Codex) model id and thinking level, as the CLI logged them. */
+  model?: string | null
+  effort?: string | null
+}
+
+/** "claude-opus-5-5" → "Opus 5.5" (a dated id loses its date); any other model as the CLI named it. */
+export function modelName(id: string) {
+  const claude = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(id)
+  if (!claude) return id
+  const [, family, major, minor] = claude
+  return `${family[0].toUpperCase()}${family.slice(1)} ${minor ? `${major}.${minor}` : major}`
 }
 
 export const SESSIONS_POLL_MS = 5_000
@@ -145,28 +156,34 @@ function SessionRow({ session }: { session: LiveSession }) {
       </span>
     ),
   ].filter(Boolean)
+  // Ids and levels are the CLI's own words ("xhigh"), shown as it writes them.
+  const runsOn = [session.model && modelName(session.model), session.effort].filter(Boolean).join(" · ")
   return (
-    <div className="flex items-center gap-2 text-xs" title={session.cwd}>
-      <span
-        role="img"
-        aria-label={statusText ?? undefined}
-        className={cn("size-1.5 shrink-0 rounded-full", status?.dot ?? "bg-muted-foreground/50")}
-      />
-      <span className="min-w-0 flex-1 truncate">{session.name}</span>
-      {details.length > 0 && (
-        <span className="flex shrink-0 items-center gap-1.5">
-          {details.map((detail, index) => (
-            <Fragment key={index}>
-              {index > 0 && (
-                <span aria-hidden="true" className="text-muted-foreground">
-                  ·
-                </span>
-              )}
-              {detail}
-            </Fragment>
-          ))}
-        </span>
-      )}
+    <div className="text-xs" title={session.cwd}>
+      <div className="flex items-center gap-2">
+        <span
+          role="img"
+          aria-label={statusText ?? undefined}
+          className={cn("size-1.5 shrink-0 rounded-full", status?.dot ?? "bg-muted-foreground/50")}
+        />
+        <span className="min-w-0 flex-1 truncate">{session.name}</span>
+        {details.length > 0 && (
+          <span className="flex shrink-0 items-center gap-1.5">
+            {details.map((detail, index) => (
+              <Fragment key={index}>
+                {index > 0 && (
+                  <span aria-hidden="true" className="text-muted-foreground">
+                    ·
+                  </span>
+                )}
+                {detail}
+              </Fragment>
+            ))}
+          </span>
+        )}
+      </div>
+      {/* Its own line under the name (indented past the dot), so the details beside the name can't cut it. */}
+      {runsOn && <div className="truncate pl-3.5 text-muted-foreground">{runsOn}</div>}
     </div>
   )
 }
