@@ -159,31 +159,31 @@ function SessionRow({ session }: { session: LiveSession }) {
   // Ids and levels are the CLI's own words ("xhigh"), shown as it writes them.
   const runsOn = [session.model && modelName(session.model), session.effort].filter(Boolean).join(" · ")
   return (
-    <div className="flex items-start gap-2 text-xs" title={session.cwd}>
-      {/* Centered on the first line (16 px high): the model, when known, goes under the name. */}
-      <span
-        role="img"
-        aria-label={statusText ?? undefined}
-        className={cn("mt-[5px] size-1.5 shrink-0 rounded-full", status?.dot ?? "bg-muted-foreground/50")}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate">{session.name}</span>
-        {runsOn && <span className="block truncate text-muted-foreground">{runsOn}</span>}
-      </span>
-      {details.length > 0 && (
-        <span className="flex shrink-0 items-center gap-1.5">
-          {details.map((detail, index) => (
-            <Fragment key={index}>
-              {index > 0 && (
-                <span aria-hidden="true" className="text-muted-foreground">
-                  ·
-                </span>
-              )}
-              {detail}
-            </Fragment>
-          ))}
-        </span>
-      )}
+    <div className="text-xs" title={session.cwd}>
+      <div className="flex items-center gap-2">
+        <span
+          role="img"
+          aria-label={statusText ?? undefined}
+          className={cn("size-1.5 shrink-0 rounded-full", status?.dot ?? "bg-muted-foreground/50")}
+        />
+        <span className="min-w-0 flex-1 truncate">{session.name}</span>
+        {details.length > 0 && (
+          <span className="flex shrink-0 items-center gap-1.5">
+            {details.map((detail, index) => (
+              <Fragment key={index}>
+                {index > 0 && (
+                  <span aria-hidden="true" className="text-muted-foreground">
+                    ·
+                  </span>
+                )}
+                {detail}
+              </Fragment>
+            ))}
+          </span>
+        )}
+      </div>
+      {/* Its own line under the name (indented past the dot), so the details beside the name can't cut it. */}
+      {runsOn && <div className="truncate pl-3.5 text-muted-foreground">{runsOn}</div>}
     </div>
   )
 }
