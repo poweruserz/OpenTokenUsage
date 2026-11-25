@@ -632,6 +632,32 @@ describe("antigravity plugin", () => {
     ])
   })
 
+  it("never sends plain HTTP to a port that answered over HTTPS (#118)", async () => {
+    const ctx = makeCtx()
+    ctx.host.ls.discover.mockReturnValue(makeDiscovery({ ports: [10001, 10002] }))
+
+    const probed = []
+    ctx.host.http.request.mockImplementation((opts) => {
+      const url = String(opts.url)
+      if (url.includes("GetUnleashData")) {
+        const port = parseInt(url.match(/:(\d+)\//)[1])
+        const scheme = url.startsWith("https") ? "https" : "http"
+        probed.push({ port, scheme })
+        // Both ports speak HTTPS only; 10001 refuses the call, 10002 serves it.
+        if (scheme === "http") return { status: 400, bodyText: "Client sent an HTTP request to an HTTPS server.\n" }
+        return port === 10001 ? { status: 401, bodyText: "" } : { status: 200, bodyText: "{}" }
+      }
+      return { status: 200, bodyText: JSON.stringify(makeUserStatusResponse()) }
+    })
+
+    const plugin = await loadPlugin()
+    plugin.probe(ctx)
+    expect(probed).toEqual([
+      { port: 10001, scheme: "https" },
+      { port: 10002, scheme: "https" },
+    ])
+  })
+
   it("never sends apiKey in LS metadata (unified schema has no apiKey)", async () => {
     const ctx = makeCtx()
     const discovery = makeDiscovery()
