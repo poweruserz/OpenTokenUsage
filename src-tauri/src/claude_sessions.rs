@@ -58,6 +58,10 @@ pub struct LiveSession {
     context_percent: Option<f64>,
     /// When the prompt cache of the last answer runs out (unix ms; Claude only).
     cache_expires_at: Option<u64>,
+    /// The model of the last answer (Claude) or turn (Codex), as the CLI logged its id.
+    model: Option<String>,
+    /// The thinking level it ran at (`effort`: low … xhigh, max, ultra), as the CLI logged it.
+    effort: Option<String>,
 }
 
 /// The sessions in one `sessions` folder whose process still runs, oldest first.
@@ -97,10 +101,15 @@ fn read_sessions(dir: &Path, is_running: impl Fn(u32, Option<u64>) -> bool) -> V
                 })
                 .unwrap_or_else(|| file.cwd.clone());
             let config = dir.parent().unwrap_or(dir);
+            let tail = claude_transcript(config, &file.cwd, &file.session_id)
+                .map(|path| claude_tail(&path))
+                .unwrap_or_default();
+            let (model, effort) = claude_model(&tail);
             let session = LiveSession {
                 context_percent: crate::claude_statusline::context_percent(&file.session_id),
-                cache_expires_at: claude_transcript(config, &file.cwd, &file.session_id)
-                    .and_then(|path| claude_cache_expiry(&read_tail(&path, CLAUDE_TAIL_BYTES))),
+                cache_expires_at: claude_cache_expiry(&tail),
+                model,
+                effort,
                 id: file.session_id,
                 name,
                 cwd: file.cwd,
@@ -114,6 +123,18 @@ fn read_sessions(dir: &Path, is_running: impl Fn(u32, Option<u64>) -> bool) -> V
 }
 
 const CLAUDE_TAIL_BYTES: u64 = 256 * 1024;
+const CLAUDE_LONG_TAIL_BYTES: u64 = 4 * 1024 * 1024;
+
+/// The end of a transcript, holding its last answer: tool outputs after it (one session had 1 MB of
+/// them) push it out of the usual read, so a longer one is read then.
+/// shortcut: an answer further back than 4 MB shows no model or cache; remember it per session if that shows.
+fn claude_tail(path: &Path) -> String {
+    let tail = read_tail(path, CLAUDE_TAIL_BYTES);
+    if claude_model(&tail).0.is_some() {
+        return tail;
+    }
+    read_tail(path, CLAUDE_LONG_TAIL_BYTES)
+}
 
 /// A session's transcript: `projects/<cwd, every other character a dash>/<session id>.jsonl`, else
 /// the first project folder holding it. The id must look like one (it names a file).
@@ -213,6 +234,40 @@ fn claude_cache_expiry(tail: &str) -> Option<u64> {
     expiry
 }
 
+/// A model id or thinking level from a log, shown as text: a short plain word or nothing.
+fn log_word(value: &serde_json::Value) -> Option<String> {
+    value
+        .as_str()
+        .filter(|text| {
+            !text.is_empty()
+                && text.len() <= 64
+                && text
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
+        })
+        .map(str::to_owned)
+}
+
+/// The model and thinking level of a Claude session's last answer (not a sub-agent's, not an API
+/// error's `<synthetic>` stand-in). Each answer line carries both: `message.model` and `effort`.
+fn claude_model(tail: &str) -> (Option<String>, Option<String>) {
+    tail.lines()
+        .rev()
+        .filter(|line| line.contains("\"assistant\""))
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find_map(|entry| {
+            if entry["type"] != "assistant"
+                || entry["isSidechain"] == true
+                || entry["isApiErrorMessage"] == true
+            {
+                return None;
+            }
+            let model = log_word(&entry["message"]["model"])?;
+            Some((Some(model), log_word(&entry["effort"])))
+        })
+        .unwrap_or((None, None))
+}
+
 /// Whether `pid` runs and, when the file gives one, was started at `proc_start` (else the pid was
 /// reused by another process after the session ended).
 fn process_running(pid: u32, proc_start: Option<u64>) -> bool {
@@ -303,6 +358,7 @@ fn codex_session(modified: SystemTime, path: &Path, now: SystemTime) -> LiveSess
     let (finished, cwd) = codex_tail_state(&tail);
     let cwd = cwd.or_else(|| codex_first_cwd(path)).unwrap_or_default();
     let quiet = now.duration_since(modified).unwrap_or_default() > CODEX_BUSY;
+    let (model, effort) = codex_model(&tail);
     LiveSession {
         id: path
             .file_stem()
@@ -316,7 +372,24 @@ fn codex_session(modified: SystemTime, path: &Path, now: SystemTime) -> LiveSess
         status: Some(if finished || quiet { "idle" } else { "busy" }.into()),
         context_percent: codex_context_percent(&tail),
         cache_expires_at: None,
+        model,
+        effort,
     }
+}
+
+/// The model and thinking level of the newest `turn_context` (one starts every turn).
+/// shortcut: a turn longer than the tail read shows neither until the next one; read the head too if that shows.
+fn codex_model(tail: &str) -> (Option<String>, Option<String>) {
+    tail.lines()
+        .rev()
+        .filter(|line| line.contains("\"turn_context\""))
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .find(|value| value["type"] == "turn_context")
+        .map(|value| {
+            let payload = &value["payload"];
+            (log_word(&payload["model"]), log_word(&payload["effort"]))
+        })
+        .unwrap_or((None, None))
 }
 
 /// Tokens Codex keeps in every context (instructions, tools) and leaves out of the share it shows.
@@ -606,6 +679,8 @@ mod tests {
                     status: Some("waiting".into()),
                     context_percent: None,
                     cache_expires_at: None,
+                    model: None,
+                    effort: None,
                 },
                 LiveSession {
                     id: "newer".into(),
@@ -614,6 +689,8 @@ mod tests {
                     status: Some("busy".into()),
                     context_percent: Some(91.0),
                     cache_expires_at: None,
+                    model: None,
+                    effort: None,
                 },
             ]
         );
@@ -829,6 +906,91 @@ mod tests {
     }
 
     #[test]
+    fn a_session_shows_the_model_and_thinking_level_of_its_last_answer() {
+        let answer = |model: &str, effort: Option<&str>, extra: serde_json::Value| {
+            let mut entry = serde_json::json!({"type": "assistant", "message": {"model": model}});
+            if let Some(effort) = effort {
+                entry["effort"] = effort.into();
+            }
+            for (key, value) in extra.as_object().unwrap() {
+                entry[key] = value.clone();
+            }
+            entry.to_string()
+        };
+        let none = serde_json::json!({});
+        let tail = [
+            answer("claude-sonnet-5-5", Some("medium"), none.clone()),
+            answer("claude-opus-5-5", Some("xhigh"), none.clone()),
+            // A sub-agent's answer and an API error's stand-in are not the session's.
+            answer(
+                "claude-haiku-5-5",
+                Some("low"),
+                serde_json::json!({"isSidechain": true}),
+            ),
+            answer(
+                "<synthetic>",
+                None,
+                serde_json::json!({"isApiErrorMessage": true}),
+            ),
+            r#"{"type":"user","message":{"role":"user","content":"hi"}}"#.into(),
+        ]
+        .join("\n");
+        let some = |text: &str| Some(text.to_owned());
+        assert_eq!(
+            claude_model(&tail),
+            (some("claude-opus-5-5"), some("xhigh"))
+        );
+        // An older Claude Code logs no level; a model that isn't a plain id is left out.
+        assert_eq!(
+            claude_model(&answer("claude-opus-5-5", None, none.clone())),
+            (some("claude-opus-5-5"), None)
+        );
+        assert_eq!(
+            claude_model(&answer("<b>x</b>", Some("high"), none)),
+            (None, None)
+        );
+        assert_eq!(claude_model(""), (None, None));
+
+        let turn = |model: &str, effort: &str| {
+            serde_json::json!({"type": "turn_context", "payload": {"model": model, "effort": effort}})
+                .to_string()
+        };
+        let codex = [
+            turn("gpt-6.2", "high"),
+            turn("gpt-6.2-astra", "ultra"),
+            r#"{"type":"event_msg","payload":{"type":"agent_message","message":"turn_context"}}"#
+                .into(),
+        ]
+        .join("\n");
+        assert_eq!(codex_model(&codex), (some("gpt-6.2-astra"), some("ultra")));
+        assert_eq!(codex_model(""), (None, None));
+    }
+
+    #[test]
+    fn an_answer_behind_long_tool_output_is_still_found() {
+        let dir = temp_dir("long-tail");
+        let path = dir.join("session.jsonl");
+        let answer =
+            r#"{"type":"assistant","effort":"high","message":{"model":"claude-opus-5-5"}}"#;
+        let output = format!(
+            r#"{{"type":"attachment","text":"{}"}}"#,
+            "x".repeat(80 * 1024)
+        );
+        let lines: Vec<&str> = std::iter::once(answer)
+            .chain(std::iter::repeat_n(output.as_str(), 5))
+            .collect();
+        std::fs::write(&path, lines.join("\n")).unwrap();
+        assert_eq!(
+            claude_model(&read_tail(&path, CLAUDE_TAIL_BYTES)),
+            (None, None)
+        );
+        assert_eq!(
+            claude_model(&claude_tail(&path)),
+            (Some("claude-opus-5-5".into()), Some("high".into()))
+        );
+    }
+
+    #[test]
     fn a_waiting_session_outranks_a_busy_one() {
         let session = |status: &str| LiveSession {
             id: status.into(),
@@ -837,6 +999,8 @@ mod tests {
             status: Some(status.into()),
             context_percent: None,
             cache_expires_at: None,
+            model: None,
+            effort: None,
         };
         assert_eq!(
             activity_of(&[session("busy"), session("waiting")]),
