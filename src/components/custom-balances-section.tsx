@@ -118,7 +118,7 @@ export function CustomBalancesSection() {
   }
 
   return (
-    <SettingsSection newFeature="balances" title={t("settings.balances.title")} description={t("settings.balances.desc")}>
+    <SettingsSection title={t("settings.balances.title")} description={t("settings.balances.desc")}>
       <div className="space-y-3">
         {balances.map((balance, index) => (
           <div key={index} className="space-y-1.5 rounded-md border border-surface-stroke p-2">

@@ -58,7 +58,7 @@ Either way it installs for your Windows user only (`%LOCALAPPDATA%\OpenTokenUsag
   ```
 
 - **Signed updates.** The app installs an update only if it's signed with the release key whose public half is built into the app.
-- **Code signing is on its way.** The [SignPath Foundation](https://signpath.org/) accepted the project; once its certificate is issued, the app and installer will be signed. Releases up to 0.9.2 are unsigned. See the [code signing policy](#code-signing-policy).
+- **Code signing is on its way.** The [SignPath Foundation](https://signpath.org/) accepted the project; once its certificate is issued, the app and installer will be signed. Releases so far are unsigned. See the [code signing policy](#code-signing-policy).
 - **Your data stays on your PC.** No telemetry, no account, no server of its own. See [Privacy](#privacy).
 - **Found a security problem?** Report it privately, as [SECURITY.md](SECURITY.md) describes.
 

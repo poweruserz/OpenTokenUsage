@@ -48,7 +48,7 @@ export function SettingsBackupSection() {
     }
   }
   return (
-    <SettingsSection newFeature="backup" title={t("settings.backup.title")} description={t("settings.backup.desc")}>
+    <SettingsSection title={t("settings.backup.title")} description={t("settings.backup.desc")}>
       <div className="flex gap-2">
         <button type="button" className="fluent-control px-3" onClick={() => void exportSettings()}>
           {t("settings.backup.export")}

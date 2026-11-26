@@ -25,15 +25,15 @@ const atLeast = (version: string, floor: string) => {
 
 describe("new-feature badges", () => {
   it("badge everything until its group was opened, and only that group's features go", () => {
-    expect(shownNewFeatures([]).has("widgets")).toBe(true)
-    const seen = seenAfterOpening([], "taskbar")
-    expect(seen).toEqual(expect.arrayContaining(["widgets", "stripLook"]))
-    expect(seen).not.toContain("proxy")
+    expect(shownNewFeatures([]).has("cards")).toBe(true)
+    const seen = seenAfterOpening([], "usage")
+    expect(seen).toEqual(["cards"])
+    expect(seen).not.toContain("claudeCode")
     const shown = shownNewFeatures(seen ?? [])
-    expect(hasNewFeature(shown, "taskbar")).toBe(false)
-    expect(hasNewFeature(shown, "app")).toBe(true)
+    expect(hasNewFeature(shown, "usage")).toBe(false)
+    expect(hasNewFeature(shown, "providers")).toBe(true)
     // Opening a group whose features were already seen changes nothing (no write).
-    expect(seenAfterOpening(seen ?? [], "taskbar")).toBeNull()
+    expect(seenAfterOpening(seen ?? [], "usage")).toBeNull()
   })
 
   it("a remount within one visit (a language switch) keeps the badges; leaving Settings ends the visit", async () => {
@@ -47,7 +47,7 @@ describe("new-feature badges", () => {
     again.unmount()
     useAppUiStore.setState({ activeView: "settings" })
     const next = renderHook(() => useNewFeatures("usage"))
-    await waitFor(() => expect(next.result.current.shown.has("widgets")).toBe(true))
+    await waitFor(() => expect(next.result.current.shown.has("claudeCode")).toBe(true))
     expect(next.result.current.shown.has("cards")).toBe(false)
     next.unmount()
   })

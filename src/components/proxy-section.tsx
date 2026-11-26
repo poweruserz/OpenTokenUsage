@@ -51,7 +51,7 @@ export function ProxySection() {
   }
 
   return (
-    <SettingsSection newFeature="proxy" title={t("settings.proxy.title")} description={t("settings.proxy.desc")}>
+    <SettingsSection title={t("settings.proxy.title")} description={t("settings.proxy.desc")}>
       <form
         className="space-y-2"
         onSubmit={(e) => {

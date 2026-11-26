@@ -690,7 +690,7 @@ function PanelSection() {
     }
   };
   return (
-    <SettingsSection newFeature="panel" title={t("settings.panel.title")} description={t("settings.panel.desc")}>
+    <SettingsSection title={t("settings.panel.title")} description={t("settings.panel.desc")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={`remember-position-${remember}`}
@@ -841,7 +841,7 @@ function WhatsNewSection() {
   }, []);
   if (on === null) return null;
   return (
-    <SettingsSection newFeature="whatsNew" title={t("settings.whatsNew.title")}>
+    <SettingsSection title={t("settings.whatsNew.title")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={String(on)}
@@ -884,7 +884,7 @@ function UsageExportSection() {
     }
   };
   return (
-    <SettingsSection newFeature="export" title={t("settings.export.title")} description={t("settings.export.desc")}>
+    <SettingsSection title={t("settings.export.title")} description={t("settings.export.desc")}>
       <button type="button" disabled={busy} onClick={() => void exportNow()} className="fluent-control px-3 disabled:opacity-50">
         {t("settings.export.now")}
       </button>
@@ -926,7 +926,7 @@ function SubscriptionsSection({ plugins }: { plugins: PluginConfig[] }) {
   const shown = (usd: number | undefined) =>
     usd == null ? "" : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(usd * currency.rate);
   return (
-    <SettingsSection newFeature="plans" title={t("settings.plans.title")} description={t("settings.plans.desc")}>
+    <SettingsSection title={t("settings.plans.title")} description={t("settings.plans.desc")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={`plan-multiple-${features.planMultiple}`}
@@ -971,7 +971,7 @@ function NotificationsSection({ plugins }: { plugins: PluginConfig[] }) {
   const usageAlerts = useAppPreferencesStore((state) => state.usageAlerts);
   const setUsageAlerts = useAppPreferencesStore((state) => state.setUsageAlerts);
   return (
-    <SettingsSection newFeature="alerts" title={t("settings.alerts.title")} description={t("settings.alerts.desc")}>
+    <SettingsSection title={t("settings.alerts.title")} description={t("settings.alerts.desc")}>
       <label className="flex items-center gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={`usage-alerts-${usageAlerts}`}
@@ -1295,7 +1295,7 @@ export function SettingsPage({
       </TabsContent>
 
       <TabsContent value="appearance" className="min-w-0 space-y-1">
-        <SettingsSection newFeature="theme" title={t("settings.theme.title")} description={t("settings.theme.desc")}>
+        <SettingsSection title={t("settings.theme.title")} description={t("settings.theme.desc")}>
           <SegmentedControl
             ariaLabel={t("settings.theme.title")}
             options={THEME_OPTIONS}

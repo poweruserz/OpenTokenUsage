@@ -9,19 +9,7 @@ import { useAppUiStore } from "@/stores/app-ui-store"
  */
 export const NEW_FEATURES = {
   cards: { since: "0.9.2", category: "usage" },
-  plans: { since: "0.9.1", category: "usage" },
-  widgets: { since: "0.9.1", category: "taskbar" },
-  stripLook: { since: "0.9.1", category: "taskbar" },
-  theme: { since: "0.9.1", category: "appearance" },
-  panel: { since: "0.9.1", category: "appearance" },
-  balances: { since: "0.9.1", category: "providers" },
   claudeCode: { since: "0.9.2", category: "providers" },
-  alerts: { since: "0.9.1", category: "notifications" },
-  proxy: { since: "0.9.1", category: "app" },
-  privacy: { since: "0.9.1", category: "app" },
-  whatsNew: { since: "0.9.1", category: "app" },
-  export: { since: "0.9.1", category: "app" },
-  backup: { since: "0.9.1", category: "app" },
 } as const satisfies Record<string, { since: string; category: string }>
 
 export type NewFeatureId = keyof typeof NEW_FEATURES

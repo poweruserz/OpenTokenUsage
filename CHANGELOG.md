@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.9.3
+
+Live sessions show which model and thinking level each session runs on, Factory shows its real limits, and Antigravity's CLI stays quiet.
+
+### New Features
+- Live sessions on the Claude and Codex cards show the model and thinking level each session runs on, under its name ("Opus 5.5 · xhigh")
+- Factory: the card shows the 5-hour, weekly and monthly limits that droid and Factory's dashboard show (#108, thanks @happtim)
+
+### Bug Fixes
+- Antigravity: refreshing usage no longer makes `agy` print a TLS handshake error in its terminal every few minutes (#118, thanks @flosure23)
+- A Claude session whose last answer is followed by a lot of tool output shows its model and prompt-cache countdown
+- The proxy and custom balance settings moved from `~/.openusage` into the app's data folder (moved on first start), so uninstalling with "delete app data" removes them too
+
 ## v0.9.2
 
 The panel no longer leaves a dark rectangle on the screen, Claude is found through its desktop app, and a signed-out card simply asks you to sign in.
