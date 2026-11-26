@@ -9,7 +9,7 @@ export function PrivacySection() {
   const enabled = useAppPreferencesStore((state) => state.capturePrivacy)
   const setEnabled = useAppPreferencesStore((state) => state.setCapturePrivacy)
   return (
-    <SettingsSection newFeature="privacy" title={t("settings.privacy.title")}>
+    <SettingsSection title={t("settings.privacy.title")}>
       <label className="flex items-start gap-2 text-[13px] select-none text-foreground">
         <Checkbox
           key={String(enabled)}
